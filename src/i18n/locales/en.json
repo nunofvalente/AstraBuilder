@@ -1,0 +1,15 @@
+﻿{
+  "cards": {
+    "title": "All Cards",
+    "empty": "No cards available yet. Add cards in Supabase to see them listed here.",
+    "error": "Failed to load cards.",
+    "fields": {
+      "type": "Type",
+      "subtype": "Subtype",
+      "cost": "Cost",
+      "attack": "Attack",
+      "health": "Health",
+      "influence": "Influence"
+    }
+  }
+}
