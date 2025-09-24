@@ -1,22 +1,27 @@
 import type { Locale } from "./config";
 
-type CardsDictionary = {
-  cards: {
+type HomeDictionary = {
+  home: {
     title: string;
-    empty: string;
-    error: string;
-    fields: {
-      type: string;
-      subtype: string;
-      cost: string;
-      attack: string;
-      health: string;
-      influence: string;
+    subtitle: string;
+    sections: {
+      popular: {
+        title: string;
+        placeholder: string;
+      };
+      trending: {
+        title: string;
+        placeholder: string;
+      };
+    };
+    actions: {
+      browse: string;
+      create: string;
     };
   };
 };
 
-type DictionaryModule = { default: CardsDictionary };
+type DictionaryModule = { default: HomeDictionary };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
 
@@ -27,7 +32,7 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = CardsDictionary;
+export type Dictionary = HomeDictionary;
 
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);
