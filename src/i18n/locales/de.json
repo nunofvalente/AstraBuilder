@@ -1,15 +1,20 @@
 {
-  "cards": {
-    "title": "Alle Karten",
-    "empty": "Noch keine Karten vorhanden. Fuege Karten in Supabase hinzu, um sie hier zu sehen.",
-    "error": "Karten konnten nicht geladen werden.",
-    "fields": {
-      "type": "Typ",
-      "subtype": "Untertyp",
-      "cost": "Kosten",
-      "attack": "Angriff",
-      "health": "Gesundheit",
-      "influence": "Einfluss"
+  "home": {
+    "title": "AstraBuilder",
+    "subtitle": "Deckbuilding-Website fuer Echoes of Astra",
+    "sections": {
+      "popular": {
+        "title": "Beliebte Decks",
+        "placeholder": "Beliebte Decks erscheinen bald hier."
+      },
+      "trending": {
+        "title": "Trendende Decks",
+        "placeholder": "Trendende Decks erscheinen bald hier."
+      }
+    },
+    "actions": {
+      "browse": "Alle Decks durchsuchen",
+      "create": "Ein Deck erstellen"
     }
   }
 }

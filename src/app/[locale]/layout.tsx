@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 
+import { TopBar } from "@/components/top-bar";
 import { LangAttribute } from "@/i18n/LangAttribute";
 import { SUPPORTED_LOCALES, isLocale } from "@/i18n/config";
 
@@ -30,7 +31,10 @@ export default async function LocaleLayout({
   return (
     <>
       <LangAttribute locale={locale} />
-      {children}
+      <div className="min-h-screen bg-[color:var(--background)] transition-colors">
+        <TopBar />
+        <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
+      </div>
     </>
   );
 }

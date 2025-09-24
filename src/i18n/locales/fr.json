@@ -1,15 +1,20 @@
 {
-  "cards": {
-    "title": "Toutes les cartes",
-    "empty": "Aucune carte pour le moment. Ajoutez des cartes dans Supabase pour les voir ici.",
-    "error": "Impossible de charger les cartes.",
-    "fields": {
-      "type": "Type",
-      "subtype": "Sous-type",
-      "cost": "Cout",
-      "attack": "Attaque",
-      "health": "Sante",
-      "influence": "Influence"
+  "home": {
+    "title": "AstraBuilder",
+    "subtitle": "Site de deckbuilding pour Echoes of Astra",
+    "sections": {
+      "popular": {
+        "title": "Decks populaires",
+        "placeholder": "Les decks populaires seront affiches ici bientot."
+      },
+      "trending": {
+        "title": "Decks tendances",
+        "placeholder": "Les decks tendances seront affiches ici bientot."
+      }
+    },
+    "actions": {
+      "browse": "Voir tous les decks",
+      "create": "Creer un deck"
     }
   }
 }

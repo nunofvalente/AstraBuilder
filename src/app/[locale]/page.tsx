@@ -2,8 +2,6 @@ import { notFound } from "next/navigation";
 
 import { getDictionary } from "@/i18n/get-dictionary";
 import { isLocale } from "@/i18n/config";
-import { supabase } from "@/lib/supabase/supabaseClient";
-import type { Card } from "@/types/card";
 
 type LocaleParams = {
   locale: string;
@@ -21,68 +19,50 @@ export default async function HomePage({ params }: LocalePageProps) {
   }
 
   const dictionary = await getDictionary(locale);
-  const { cards: cardsTexts } = dictionary;
-
-  const { data, error } = await supabase
-    .from("cards")
-    .select("*")
-    .returns<Card[]>();
-
-  if (error) {
-    console.error(error);
-    return <p>{cardsTexts.error}</p>;
-  }
-
-  const cards = data ?? [];
+  const { home } = dictionary;
 
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold mb-4">{cardsTexts.title}</h1>
-      {cards.length === 0 ? (
-        <p className="text-gray-600">{cardsTexts.empty}</p>
-      ) : (
-        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cards.map((card) => (
-            <li key={card.id} className="p-4 border rounded shadow">
-              <p className="font-semibold">{card.name}</p>
-              <p>
-                {cardsTexts.fields.type}: {card.type}
-              </p>
-              {card.subtype && (
-                <p>
-                  {cardsTexts.fields.subtype}: {card.subtype}
-                </p>
-              )}
-              {card.cost !== null && (
-                <p>
-                  {cardsTexts.fields.cost}: {card.cost}
-                </p>
-              )}
-              {card.attack !== null && (
-                <p>
-                  {cardsTexts.fields.attack}: {card.attack}
-                </p>
-              )}
-              {card.health !== null && (
-                <p>
-                  {cardsTexts.fields.health}: {card.health}
-                </p>
-              )}
-              {card.influence !== null && (
-                <p>
-                  {cardsTexts.fields.influence}: {card.influence}
-                </p>
-              )}
-              <p className="text-sm italic whitespace-pre-line">
-                {card.rules_text}
-              </p>
-              {card.description && (
-                <p className="text-xs text-gray-500 mt-2">{card.description}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+    <main className="mx-auto flex w-full max-w-4xl flex-col items-center gap-12 px-4 py-12 text-[color:var(--text-primary)]">
+      <section className="flex flex-col items-center gap-3 text-center">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{home.title}</h1>
+        <p className="max-w-2xl text-lg text-[color:var(--text-secondary)]">{home.subtitle}</p>
+      </section>
+
+      <section className="grid w-full gap-8 md:grid-cols-2">
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold">{home.sections.popular.title}</h2>
+            <div className="mt-2 h-px w-full bg-[color:var(--border)]" />
+          </div>
+          <div className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
+            {home.sections.popular.placeholder}
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold">{home.sections.trending.title}</h2>
+            <div className="mt-2 h-px w-full bg-[color:var(--border)]" />
+          </div>
+          <div className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
+            {home.sections.trending.placeholder}
+          </div>
+        </div>
+      </section>
+
+      <section className="flex w-full flex-col items-center gap-3 pb-4 sm:flex-row sm:justify-center">
+        <button
+          type="button"
+          className="w-full rounded-md border border-[color:var(--border)] px-6 py-3 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] sm:w-auto"
+        >
+          {home.actions.browse}
+        </button>
+        <button
+          type="button"
+          className="w-full rounded-md bg-[color:var(--accent)] px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]/60 sm:w-auto"
+        >
+          {home.actions.create}
+        </button>
+      </section>
     </main>
   );
 }
