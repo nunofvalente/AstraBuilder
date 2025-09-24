@@ -1,0 +1,15 @@
+{
+  "cards": {
+    "title": "Alle Karten",
+    "empty": "Noch keine Karten vorhanden. Fuege Karten in Supabase hinzu, um sie hier zu sehen.",
+    "error": "Karten konnten nicht geladen werden.",
+    "fields": {
+      "type": "Typ",
+      "subtype": "Untertyp",
+      "cost": "Kosten",
+      "attack": "Angriff",
+      "health": "Gesundheit",
+      "influence": "Einfluss"
+    }
+  }
+}

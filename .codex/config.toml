@@ -1,0 +1,4 @@
+# Codex Configuration File
+
+# Options: "untrusted", "on-failure", "on-request", "never"
+approval_policy = "on-failure"

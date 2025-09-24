@@ -1,0 +1,15 @@
+{
+  "cards": {
+    "title": "Semua Kad",
+    "empty": "Belum ada kad. Tambah kad dalam Supabase untuk melihatnya di sini.",
+    "error": "Tidak dapat memuat kad.",
+    "fields": {
+      "type": "Jenis",
+      "subtype": "Subjenis",
+      "cost": "Kos",
+      "attack": "Serangan",
+      "health": "Kesihatan",
+      "influence": "Pengaruh"
+    }
+  }
+}
