@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
 import { Footer } from '@/components/footer';
@@ -32,11 +32,14 @@ export default async function LocaleLayout({
   return (
     <>
       <LangAttribute locale={locale} />
-      <div className="flex min-h-screen flex-col bg-[color:var(--background)] transition-colors">
+      <div className="flex h-screen flex-col overflow-hidden bg-[color:var(--background)] transition-colors">
         <TopBar locale={locale} />
-        <main className="flex-1 pb-6">{children}</main>
+        <main className="flex flex-1 min-h-0 flex-col overflow-hidden">{children}</main>
         <Footer />
       </div>
     </>
   );
 }
+
+
+
