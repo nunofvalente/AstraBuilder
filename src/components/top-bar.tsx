@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -114,11 +114,11 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   }
 
   const isDark = theme === "dark";
-  const toolbarTextClass = isDark ? "text-[color:var(--text-primary)]" : "text-white";
-  const toolbarSecondaryTextClass = isDark ? "text-[color:var(--text-secondary)]" : "text-white/80";
+  const toolbarTextClass = "text-white";
+  const toolbarSecondaryTextClass = "text-white/80";
   const menuTextClass = "text-[color:var(--text-primary)]";
   const menuSecondaryTextClass = "text-[color:var(--text-secondary)]";
-  const barColorClass = isDark ? "bg-[color:var(--text-primary)]" : "bg-white";
+  const barColorClass = "bg-white";
   const themeLabel = isDark ? "Dark Mode" : "Light Mode";
   const trackClasses = `relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
     isDark ? "bg-[color:var(--accent)]/80" : "bg-[color:var(--surface-muted)]"
@@ -130,7 +130,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
 
   return (
 
-    <header className="sticky top-0 z-50 border-b border-transparent bg-[var(--surface-overlay)] backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <span className={`text-lg font-semibold ${toolbarTextClass}`}>Logo Placeholder</span>
         <div className="flex items-center gap-4">
@@ -234,3 +234,6 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     </header>
   );
 }
+
+
+

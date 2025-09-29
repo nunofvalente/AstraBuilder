@@ -17,6 +17,23 @@
       "create": "Cipta dek"
     }
   },
+  "builder": {
+    "comingSoon": "Pembina dek akan tiba tidak lama lagi. Datang kembali untuk mula membina dek.",
+    "costCurveEmpty": "Tambah kad untuk melihat keluk kos.",
+    "emptyDeck": "Tiada kad dalam dek anda lagi.",
+    "removeButton": "Buang",
+    "searchLabel": "Cari kad",
+    "title": "Pembina dek",
+    "deckHeading": "Senarai dek",
+    "totalCardsLabel": "Jumlah kad",
+    "filtersDescription": "Pilihan penapisan akan tiba tidak lama lagi.",
+    "noResults": "Tiada kad sepadan dengan carian anda.",
+    "cardsHeading": "Perpustakaan kad",
+    "costCurveHeading": "Keluk kos",
+    "addButton": "Tambah",
+    "searchPlaceholder": "Cari mengikut nama atau kata kunci",
+    "filtersHeading": "Penapis"
+  },
   "cards": {
     "title": "Semua Kad",
     "empty": "Tiada kad buat masa ini. Tambah kad dalam Supabase untuk melihatnya di sini.",

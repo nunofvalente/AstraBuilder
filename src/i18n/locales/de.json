@@ -17,6 +17,23 @@
       "create": "Ein Deck erstellen"
     }
   },
+  "builder": {
+    "comingSoon": "Deck-Builder bald verfugbar. Schau bald wieder vorbei, um Decks zu erstellen.",
+    "costCurveEmpty": "Fuge Karten hinzu, um die Kostenkurve zu sehen.",
+    "emptyDeck": "Noch keine Karten in deinem Deck.",
+    "removeButton": "Entfernen",
+    "searchLabel": "Karten suchen",
+    "title": "Deck-Builder",
+    "deckHeading": "Deckliste",
+    "totalCardsLabel": "Gesamtanzahl",
+    "filtersDescription": "Filteroptionen folgen bald.",
+    "noResults": "Keine Karten passen zu deiner Suche.",
+    "cardsHeading": "Kartensammlung",
+    "costCurveHeading": "Kostenkurve",
+    "addButton": "Hinzufugen",
+    "searchPlaceholder": "Nach Name oder Stichwort suchen",
+    "filtersHeading": "Filter"
+  },
   "cards": {
     "title": "Alle Karten",
     "empty": "Noch keine Karten verfugbar. Fuge Karten in Supabase hinzu, um sie hier zu sehen.",

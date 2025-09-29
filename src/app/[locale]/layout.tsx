@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+﻿import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
+import { Footer } from '@/components/footer';
 import { TopBar } from '@/components/top-bar';
 import { LangAttribute } from '@/i18n/LangAttribute';
 import { SUPPORTED_LOCALES, isLocale } from '@/i18n/config';
@@ -31,9 +32,10 @@ export default async function LocaleLayout({
   return (
     <>
       <LangAttribute locale={locale} />
-      <div className="min-h-screen bg-[color:var(--background)] transition-colors">
+      <div className="flex min-h-screen flex-col bg-[color:var(--background)] transition-colors">
         <TopBar locale={locale} />
-        <div className="pb-6">{children}</div>
+        <main className="flex-1 pb-6">{children}</main>
+        <Footer />
       </div>
     </>
   );
