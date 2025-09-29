@@ -46,5 +46,31 @@
       "health": "Gesundheit",
       "influence": "Einfluss"
     }
+  },
+  "auth": {
+    "signUp": {
+      "title": "Konto erstellen",
+      "description": "Tritt AstraBuilder bei, um deine Decks zu speichern und zu teilen.",
+      "dividerLabel": "Oder fortfahren mit",
+      "form": {
+        "emailLabel": "E-Mail",
+        "passwordLabel": "Passwort",
+        "confirmPasswordLabel": "Passwort bestatigen",
+        "passwordHint": "Verwende mindestens 8 Zeichen.",
+        "submit": "Konto erstellen"
+      },
+      "google": {
+        "button": "Mit Google fortfahren"
+      },
+      "messages": {
+        "passwordMismatch": "Passworter stimmen nicht uberein.",
+        "genericError": "Registrierung fehlgeschlagen. Bitte versuche es erneut.",
+        "checkInbox": "Prufe deinen Posteingang auf den Bestatigungslink."
+      },
+      "footer": {
+        "haveAccount": "Bereits ein Konto?",
+        "signInLink": "Anmelden"
+      }
+    }
   }
 }

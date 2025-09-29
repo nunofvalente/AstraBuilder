@@ -1,9 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import type { User } from "@supabase/supabase-js";
 import { usePathname, useRouter } from "next/navigation";
 import { PrimaryButton } from "@/components/primary-button";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/i18n/config";
+import { supabase } from "@/lib/supabase/supabaseClient";
 import { useTheme } from "@/theme/theme-provider";
 
 type TopBarProps = {
@@ -21,11 +23,51 @@ const LANGUAGE_LABELS: Record<Locale, string> = {
 export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
-  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setUser(session?.user ?? null);
+        setIsAuthReady(true);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        console.error('Failed to fetch session', error);
+        setIsAuthReady(true);
+      });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setUser(session?.user ?? null);
+      setIsAuthReady(true);
+    });
+
+    return () => {
+      isMounted = false;
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (!isMenuOpen && !isLanguageMenuOpen) {
@@ -79,6 +121,27 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     toggleTheme();
   }
 
+  async function handleSignOut() {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Failed to sign out", error);
+      }
+    } catch (error) {
+      console.error("Failed to sign out", error);
+    } finally {
+      setIsSigningOut(false);
+      setIsMenuOpen(false);
+    }
+  }
+
+
   function toggleLanguageMenu() {
     setIsMenuOpen(false);
     setIsLanguageMenuOpen((previous) => !previous);
@@ -128,6 +191,8 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   };
   const languageLabel = LANGUAGE_LABELS[locale];
 
+  const shouldShowSignInButton = isAuthReady && !user;
+  const signOutLabel = isSigningOut ? "Signing out..." : "Sign out";
   return (
 
     <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
@@ -180,9 +245,11 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
               </div>
             ) : null}
           </div>
-          <PrimaryButton className="px-4" type="button">
-            Sign in
-          </PrimaryButton>
+          {shouldShowSignInButton ? (
+            <PrimaryButton className="px-4" type="button" href={`/${locale}/sign-in`}>
+              Sign in
+            </PrimaryButton>
+          ) : null}
           <div className="relative" ref={settingsMenuRef}>
             <button
               type="button"
@@ -226,6 +293,20 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                     />
                   </span>
                 </button>
+                {user ? (
+                  <>
+                    <div className="border-t border-[color:var(--border)]" />
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      disabled={isSigningOut}
+                      className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass} disabled:opacity-70`}
+                      role="menuitem"
+                    >
+                      {signOutLabel}
+                    </button>
+                  </>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -234,6 +315,3 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     </header>
   );
 }
-
-
-

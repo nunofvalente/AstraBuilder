@@ -1,4 +1,4 @@
-﻿import type { Locale } from "./config";
+import type { Locale } from "./config";
 
 type HomeDictionary = {
   home: {
@@ -57,7 +57,36 @@ type CardsDictionary = {
   };
 };
 
-type DictionaryModule = { default: HomeDictionary & BuilderDictionary & CardsDictionary };
+type AuthDictionary = {
+  auth: {
+    signUp: {
+      title: string;
+      description: string;
+      dividerLabel: string;
+      form: {
+        emailLabel: string;
+        passwordLabel: string;
+        confirmPasswordLabel: string;
+        passwordHint: string;
+        submit: string;
+      };
+      google: {
+        button: string;
+      };
+      messages: {
+        passwordMismatch: string;
+        genericError: string;
+        checkInbox: string;
+      };
+      footer: {
+        haveAccount: string;
+        signInLink: string;
+      };
+    };
+  };
+};
+
+type DictionaryModule = { default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
 
@@ -68,7 +97,8 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary;
+export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary;
+export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);

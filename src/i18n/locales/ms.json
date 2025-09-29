@@ -46,5 +46,31 @@
       "health": "Kesihatan",
       "influence": "Pengaruh"
     }
+  },
+  "auth": {
+    "signUp": {
+      "title": "Cipta akaun anda",
+      "description": "Sertai AstraBuilder untuk menyimpan dan berkongsi dek anda.",
+      "dividerLabel": "Atau teruskan dengan",
+      "form": {
+        "emailLabel": "E-mel",
+        "passwordLabel": "Kata laluan",
+        "confirmPasswordLabel": "Sahkan kata laluan",
+        "passwordHint": "Gunakan sekurang-kurangnya 8 aksara.",
+        "submit": "Cipta akaun"
+      },
+      "google": {
+        "button": "Teruskan dengan Google"
+      },
+      "messages": {
+        "passwordMismatch": "Kata laluan tidak sepadan.",
+        "genericError": "Pendaftaran gagal. Cuba lagi.",
+        "checkInbox": "Semak peti masuk anda untuk pautan pengesahan."
+      },
+      "footer": {
+        "haveAccount": "Sudah ada akaun?",
+        "signInLink": "Log masuk"
+      }
+    }
   }
 }
