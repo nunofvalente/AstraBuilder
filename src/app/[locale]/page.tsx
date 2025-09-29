@@ -47,7 +47,7 @@ export default async function HomePage({ params }: LocalePageProps) {
             <TertiaryButton className="w-full sm:w-auto">
               {home.actions.browse}
             </TertiaryButton>
-            <PrimaryButton className="w-full sm:w-auto">
+            <PrimaryButton className="w-full sm:w-auto" href={`/${locale}/create`}>
               {home.actions.create}
             </PrimaryButton>
           </div>
@@ -83,3 +83,4 @@ export default async function HomePage({ params }: LocalePageProps) {
     </main>
   );
 }
+

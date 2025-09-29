@@ -17,6 +17,23 @@
       "create": "Create a deck"
     }
   },
+  "builder": {
+    "comingSoon": "Deck builder coming soon. Check back soon to start building decks.",
+    "costCurveEmpty": "Add cards to see the cost curve.",
+    "emptyDeck": "No cards in your deck yet.",
+    "removeButton": "Remove",
+    "searchLabel": "Search cards",
+    "title": "Deck builder",
+    "deckHeading": "Deck list",
+    "totalCardsLabel": "Total cards",
+    "filtersDescription": "Filtering options coming soon.",
+    "noResults": "No cards match your search.",
+    "cardsHeading": "Card library",
+    "costCurveHeading": "Cost curve",
+    "addButton": "Add",
+    "searchPlaceholder": "Search by name or keyword",
+    "filtersHeading": "Filters"
+  },
   "cards": {
     "title": "All Cards",
     "empty": "No cards available yet. Add cards in Supabase to see them listed here.",

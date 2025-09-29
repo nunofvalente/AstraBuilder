@@ -17,6 +17,23 @@
       "create": "Creer un deck"
     }
   },
+  "builder": {
+    "comingSoon": "Constructeur de deck bientot disponible. Revenez bientot pour creer vos decks.",
+    "costCurveEmpty": "Ajoutez des cartes pour voir la courbe de cout.",
+    "emptyDeck": "Aucune carte dans votre deck pour le moment.",
+    "removeButton": "Retirer",
+    "searchLabel": "Rechercher des cartes",
+    "title": "Constructeur de deck",
+    "deckHeading": "Liste du deck",
+    "totalCardsLabel": "Total cartes",
+    "filtersDescription": "Les options de filtrage arrivent bientot.",
+    "noResults": "Aucune carte ne correspond a votre recherche.",
+    "cardsHeading": "Bibliotheque de cartes",
+    "costCurveHeading": "Courbe de cout",
+    "addButton": "Ajouter",
+    "searchPlaceholder": "Recherche par nom ou mot cle",
+    "filtersHeading": "Filtres"
+  },
   "cards": {
     "title": "Toutes les cartes",
     "empty": "Aucune carte pour le moment. Ajoutez des cartes dans Supabase pour les voir ici.",
