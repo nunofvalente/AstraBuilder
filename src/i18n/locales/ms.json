@@ -16,5 +16,18 @@
       "browse": "Lihat semua dek",
       "create": "Cipta dek"
     }
+  },
+  "cards": {
+    "title": "Semua Kad",
+    "empty": "Tiada kad buat masa ini. Tambah kad dalam Supabase untuk melihatnya di sini.",
+    "error": "Gagal memuatkan kad.",
+    "fields": {
+      "type": "Jenis",
+      "subtype": "Subjenis",
+      "cost": "Kos",
+      "attack": "Serangan",
+      "health": "Kesihatan",
+      "influence": "Pengaruh"
+    }
   }
 }

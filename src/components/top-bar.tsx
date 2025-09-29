@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
-
+import { PrimaryButton } from "@/components/primary-button";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/i18n/config";
 import { useTheme } from "@/theme/theme-provider";
 
@@ -114,6 +114,11 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   }
 
   const isDark = theme === "dark";
+  const toolbarTextClass = isDark ? "text-[color:var(--text-primary)]" : "text-white";
+  const toolbarSecondaryTextClass = isDark ? "text-[color:var(--text-secondary)]" : "text-white/80";
+  const menuTextClass = "text-[color:var(--text-primary)]";
+  const menuSecondaryTextClass = "text-[color:var(--text-secondary)]";
+  const barColorClass = isDark ? "bg-[color:var(--text-primary)]" : "bg-white";
   const themeLabel = isDark ? "Dark Mode" : "Light Mode";
   const trackClasses = `relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
     isDark ? "bg-[color:var(--accent)]/80" : "bg-[color:var(--surface-muted)]"
@@ -124,9 +129,10 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const languageLabel = LANGUAGE_LABELS[locale];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[color:var(--border)] bg-[var(--surface-overlay)] backdrop-blur">
+
+    <header className="sticky top-0 z-50 border-b border-transparent bg-[var(--surface-overlay)] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <span className="text-lg font-semibold text-[color:var(--text-primary)]">Logo Placeholder</span>
+        <span className={`text-lg font-semibold ${toolbarTextClass}`}>Logo Placeholder</span>
         <div className="flex items-center gap-4">
           <div className="relative" ref={languageMenuRef}>
             <button
@@ -134,10 +140,14 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
               aria-haspopup="menu"
               aria-expanded={isLanguageMenuOpen}
               onClick={toggleLanguageMenu}
-              className="flex items-center gap-2 rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+
+              className={`group flex items-center gap-2 rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${toolbarTextClass} hover:text-[color:var(--text-primary)] hover:bg-[var(--surface-muted)]`}
             >
               <span>{languageLabel}</span>
-              <span aria-hidden="true" className="text-xs text-[color:var(--text-secondary)]">
+              <span
+                aria-hidden="true"
+                className={`text-xs ${toolbarSecondaryTextClass} group-hover:text-[color:var(--text-secondary)]`}
+              >
                 {isLanguageMenuOpen ? "^" : "v"}
               </span>
             </button>
@@ -155,8 +165,10 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                       key={supportedLocale}
                       type="button"
                       onClick={() => handleLanguageSelect(supportedLocale)}
-                      className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${
-                        isActive ? "font-semibold text-[color:var(--text-primary)]" : "text-[color:var(--text-secondary)]"
+                  className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${
+                        isActive
+                          ? `text-sm font-semibold ${menuTextClass} bg-[color:var(--surface-muted)]`
+                          : `text-sm ${menuSecondaryTextClass}`
                       }`}
                       role="menuitemradio"
                       aria-checked={isActive}
@@ -168,12 +180,9 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            className="rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-          >
+          <PrimaryButton className="px-4" type="button">
             Sign in
-          </button>
+          </PrimaryButton>
           <div className="relative" ref={settingsMenuRef}>
             <button
               type="button"
@@ -184,9 +193,9 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
             >
               <span className="sr-only">Toggle settings menu</span>
               <span className="flex flex-col items-center justify-center gap-1">
-                <span className="block h-0.5 w-5 bg-[color:var(--text-primary)]"></span>
-                <span className="block h-0.5 w-5 bg-[color:var(--text-primary)]"></span>
-                <span className="block h-0.5 w-5 bg-[color:var(--text-primary)]"></span>
+                <span className={`block h-0.5 w-5 ${barColorClass}`}></span>
+                <span className={`block h-0.5 w-5 ${barColorClass}`}></span>
+                <span className={`block h-0.5 w-5 ${barColorClass}`}></span>
               </span>
             </button>
             {isMenuOpen ? (
@@ -197,7 +206,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                 <button
                   type="button"
                   onClick={handleSettingsClick}
-                  className="block w-full px-4 py-2 text-left text-sm text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)]"
+                  className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
                   role="menuitem"
                 >
                   Settings
@@ -206,10 +215,10 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                 <button
                   type="button"
                   onClick={handleThemeToggle}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)]"
+                  className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
                   role="menuitem"
                 >
-                  <span className="font-semibold text-[color:var(--text-primary)]">{themeLabel}</span>
+                  <span className={`font-semibold ${menuTextClass}`}>{themeLabel}</span>
                   <span className={trackClasses} aria-hidden="true">
                     <span
                       className="inline-block h-4 w-4 rounded-full bg-[color:var(--surface)] shadow transition-transform"
