@@ -21,7 +21,23 @@ type HomeDictionary = {
   };
 };
 
-type DictionaryModule = { default: HomeDictionary };
+type CardsDictionary = {
+  cards: {
+    title: string;
+    empty: string;
+    error: string;
+    fields: {
+      type: string;
+      subtype: string;
+      cost: string;
+      attack: string;
+      health: string;
+      influence: string;
+    };
+  };
+};
+
+type DictionaryModule = { default: HomeDictionary & CardsDictionary };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
 
@@ -32,7 +48,7 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = HomeDictionary;
+export type Dictionary = HomeDictionary & CardsDictionary;
 
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);

@@ -16,5 +16,18 @@
       "browse": "Voir tous les decks",
       "create": "Creer un deck"
     }
+  },
+  "cards": {
+    "title": "Toutes les cartes",
+    "empty": "Aucune carte pour le moment. Ajoutez des cartes dans Supabase pour les voir ici.",
+    "error": "Impossible de charger les cartes.",
+    "fields": {
+      "type": "Type",
+      "subtype": "Sous-type",
+      "cost": "Cout",
+      "attack": "Attaque",
+      "health": "Sante",
+      "influence": "Influence"
+    }
   }
 }
