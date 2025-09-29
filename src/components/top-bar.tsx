@@ -1,37 +1,55 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/i18n/config";
 import { useTheme } from "@/theme/theme-provider";
 
 type TopBarProps = {
+  locale?: Locale;
   onSettings?: () => void;
 };
 
-export function TopBar({ onSettings }: TopBarProps) {
+const LANGUAGE_LABELS: Record<Locale, string> = {
+  de: "German",
+  en: "English",
+  fr: "French",
+  ms: "Malay",
+};
+
+export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!isMenuOpen) {
+    if (!isMenuOpen && !isLanguageMenuOpen) {
       return;
     }
 
     function handleClickOutside(event: MouseEvent) {
-      if (!containerRef.current) {
-        return;
-      }
-
       const target = event.target as Node;
-      if (!containerRef.current.contains(target)) {
+      if (isMenuOpen && settingsMenuRef.current && !settingsMenuRef.current.contains(target)) {
         setIsMenuOpen(false);
+      }
+      if (isLanguageMenuOpen && languageMenuRef.current && !languageMenuRef.current.contains(target)) {
+        setIsLanguageMenuOpen(false);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsMenuOpen(false);
+        if (isMenuOpen) {
+          setIsMenuOpen(false);
+        }
+        if (isLanguageMenuOpen) {
+          setIsLanguageMenuOpen(false);
+        }
       }
     }
 
@@ -42,9 +60,10 @@ export function TopBar({ onSettings }: TopBarProps) {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMenuOpen]);
+  }, [isLanguageMenuOpen, isMenuOpen]);
 
   function toggleMenu() {
+    setIsLanguageMenuOpen(false);
     setIsMenuOpen((previous) => !previous);
   }
 
@@ -60,6 +79,40 @@ export function TopBar({ onSettings }: TopBarProps) {
     toggleTheme();
   }
 
+  function toggleLanguageMenu() {
+    setIsMenuOpen(false);
+    setIsLanguageMenuOpen((previous) => !previous);
+  }
+
+  function buildLocaleHref(targetLocale: Locale) {
+    if (!pathname || pathname === "/") {
+      return `/${targetLocale}`;
+    }
+
+    const segments = pathname.split("/").filter(Boolean);
+    if (segments.length === 0) {
+      return `/${targetLocale}`;
+    }
+
+    const [firstSegment, ...rest] = segments;
+    if (SUPPORTED_LOCALES.includes(firstSegment as Locale)) {
+      return `/${[targetLocale, ...rest].join("/")}`;
+    }
+
+    return `/${targetLocale}/${segments.join("/")}`;
+  }
+
+  function handleLanguageSelect(targetLocale: Locale) {
+    setIsLanguageMenuOpen(false);
+
+    if (targetLocale === locale) {
+      return;
+    }
+
+    const href = buildLocaleHref(targetLocale);
+    router.push(href);
+  }
+
   const isDark = theme === "dark";
   const themeLabel = isDark ? "Dark Mode" : "Light Mode";
   const trackClasses = `relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
@@ -68,19 +121,60 @@ export function TopBar({ onSettings }: TopBarProps) {
   const thumbStyle: CSSProperties = {
     transform: isDark ? "translateX(16px)" : "translateX(2px)",
   };
+  const languageLabel = LANGUAGE_LABELS[locale];
 
   return (
     <header className="sticky top-0 z-50 border-b border-[color:var(--border)] bg-[var(--surface-overlay)] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <span className="text-lg font-semibold text-[color:var(--text-primary)]">Logo Placeholder</span>
         <div className="flex items-center gap-4">
+          <div className="relative" ref={languageMenuRef}>
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={isLanguageMenuOpen}
+              onClick={toggleLanguageMenu}
+              className="flex items-center gap-2 rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            >
+              <span>{languageLabel}</span>
+              <span aria-hidden="true" className="text-xs text-[color:var(--text-secondary)]">
+                {isLanguageMenuOpen ? "^" : "v"}
+              </span>
+            </button>
+            {isLanguageMenuOpen ? (
+              <div
+                className="absolute right-0 mt-2 w-40 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] shadow-lg"
+                role="menu"
+              >
+                {SUPPORTED_LOCALES.map((supportedLocale) => {
+                  const label = LANGUAGE_LABELS[supportedLocale];
+                  const isActive = supportedLocale === locale;
+
+                  return (
+                    <button
+                      key={supportedLocale}
+                      type="button"
+                      onClick={() => handleLanguageSelect(supportedLocale)}
+                      className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${
+                        isActive ? "font-semibold text-[color:var(--text-primary)]" : "text-[color:var(--text-secondary)]"
+                      }`}
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             className="rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
           >
             Sign in
           </button>
-          <div className="relative" ref={containerRef}>
+          <div className="relative" ref={settingsMenuRef}>
             <button
               type="button"
               aria-haspopup="menu"
