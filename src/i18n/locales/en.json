@@ -46,5 +46,31 @@
       "health": "Health",
       "influence": "Influence"
     }
+  },
+  "auth": {
+    "signUp": {
+      "title": "Create your account",
+      "description": "Join AstraBuilder to start saving and sharing your decks.",
+      "dividerLabel": "Or continue with",
+      "form": {
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "confirmPasswordLabel": "Confirm password",
+        "passwordHint": "Use at least 8 characters.",
+        "submit": "Create account"
+      },
+      "google": {
+        "button": "Continue with Google"
+      },
+      "messages": {
+        "passwordMismatch": "Passwords do not match.",
+        "genericError": "We could not sign you up. Please try again.",
+        "checkInbox": "Check your inbox for a confirmation link to finish signing up."
+      },
+      "footer": {
+        "haveAccount": "Already have an account?",
+        "signInLink": "Sign in"
+      }
+    }
   }
 }
