@@ -32,8 +32,8 @@ export default async function LocaleLayout({
     <>
       <LangAttribute locale={locale} />
       <div className="min-h-screen bg-[color:var(--background)] transition-colors">
-        <TopBar />
-        <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
+        <TopBar locale={locale} />
+        <div className="mx-auto max-w-6xl px-4 pb-6">{children}</div>
       </div>
     </>
   );

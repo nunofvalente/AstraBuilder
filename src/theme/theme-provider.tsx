@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+import { DESIGN_TOKEN_KEYS, DESIGN_TOKENS, type DesignTokenName } from "./design-tokens";
+
 type Theme = "light" | "dark";
 
 type ThemeContextValue = {
@@ -31,13 +33,24 @@ function getInitialTheme(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+const TOKEN_VARIABLES = DESIGN_TOKEN_KEYS.reduce<Record<DesignTokenName, string>>((accumulator, token) => {
+  const cssVariable = `--${token.replace(/([A-Z])/g, "-$1").toLowerCase()}`;
+  accumulator[token] = cssVariable;
+  return accumulator;
+}, {} as Record<DesignTokenName, string>);
+
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
   const body = document.body;
+  const tokens = DESIGN_TOKENS[theme];
 
   root.dataset.theme = theme;
   body.dataset.theme = theme;
   root.style.colorScheme = theme;
+
+  DESIGN_TOKEN_KEYS.forEach((token) => {
+    root.style.setProperty(TOKEN_VARIABLES[token], tokens[token]);
+  });
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
