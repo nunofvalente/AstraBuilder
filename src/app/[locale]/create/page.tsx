@@ -6,6 +6,8 @@ import { isLocale } from '@/i18n/config';
 import { DeckBuilder } from './deck-builder-client';
 import { getStaticCards } from './deck-builder/data';
 
+export const dynamic = 'force-dynamic';
+
 type LocaleParams = {
   locale: string;
 };
