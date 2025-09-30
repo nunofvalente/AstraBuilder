@@ -36,7 +36,9 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deck, setDeck] = useState<Record<string, number>>({});
   const [cards, setCards] = useState<Card[]>([]);
-  const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(() => {
+  const [activeAffinities, setActiveAffinities] = useState<
+    Record<string, boolean>
+  >(() => {
     const initial: Record<string, boolean> = {};
     for (const filter of AFFINITY_FILTERS) {
       initial[filter.value] = true;
@@ -57,9 +59,9 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
 
       try {
         const { data, error } = await supabase
-          .from<CardRow>('cards')
+          .from('cards')
           .select(
-            'id,name,affinity,artist,rarity,number,type,subtype,cost,attack,health,influence,rules_text,description,image_url',
+            'id,name,affinity,artist,rarity,number,type,subtype,cost,attack,health,influence,rules_text,description,image_url'
           )
           .order('name', { ascending: true });
 
@@ -81,7 +83,8 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
           return;
         }
 
-        const message = error instanceof Error ? error.message : cardsCopy.error;
+        const message =
+          error instanceof Error ? error.message : cardsCopy.error;
         setCardsError(message);
         setCards([]);
       } finally {
@@ -105,7 +108,9 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
 
     setDeck((previous) => {
       const validIds = new Set(cards.map((card) => card.id));
-      const nextEntries = Object.entries(previous).filter(([cardId]) => validIds.has(cardId));
+      const nextEntries = Object.entries(previous).filter(([cardId]) =>
+        validIds.has(cardId)
+      );
 
       if (nextEntries.length === Object.keys(previous).length) {
         return previous;
@@ -136,7 +141,9 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
   };
 
   const activeAffinitySet = useMemo(() => {
-    const enabled = AFFINITY_FILTERS.filter((filter) => activeAffinities[filter.value]);
+    const enabled = AFFINITY_FILTERS.filter(
+      (filter) => activeAffinities[filter.value]
+    );
     if (enabled.length === AFFINITY_FILTERS.length) {
       return null;
     }
@@ -148,7 +155,8 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     const term = searchTerm.trim().toLowerCase();
 
     const filtered = cards.filter((card) => {
-      const matchesAffinity = !activeAffinitySet || activeAffinitySet.has(card.affinity);
+      const matchesAffinity =
+        !activeAffinitySet || activeAffinitySet.has(card.affinity);
       if (!matchesAffinity) {
         return false;
       }
@@ -169,7 +177,8 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
         }
       }
 
-      const affinityDiff = getAffinityIndex(a.affinity) - getAffinityIndex(b.affinity);
+      const affinityDiff =
+        getAffinityIndex(a.affinity) - getAffinityIndex(b.affinity);
       if (affinityDiff !== 0) {
         return affinityDiff;
       }
@@ -180,7 +189,10 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     return sorted;
   }, [cards, searchTerm, activeAffinitySet, sortOption]);
 
-  const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
+  const cardMap = useMemo(
+    () => new Map(cards.map((card) => [card.id, card])),
+    [cards]
+  );
 
   const deckEntries = useMemo<DeckEntry[]>(() => {
     return Object.entries(deck)
@@ -194,20 +206,35 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
       .filter((entry): entry is DeckEntry => Boolean(entry));
   }, [deck, cardMap]);
 
-  const totalCards = useMemo(() => deckEntries.reduce((sum, entry) => sum + entry.count, 0), [deckEntries]);
+  const totalCards = useMemo(
+    () => deckEntries.reduce((sum, entry) => sum + entry.count, 0),
+    [deckEntries]
+  );
 
-  const highestCost = useMemo(() => cards.reduce((max, card) => (card.cost > max ? card.cost : max), 0), [cards]);
+  const highestCost = useMemo(
+    () => cards.reduce((max, card) => (card.cost > max ? card.cost : max), 0),
+    [cards]
+  );
 
   const costBuckets = useMemo<CostBucket[]>(() => {
-    const bucketRange = Array.from({ length: Math.max(highestCost + 1, 1) }, (_, cost) => cost);
+    const bucketRange = Array.from(
+      { length: Math.max(highestCost + 1, 1) },
+      (_, cost) => cost
+    );
 
     return bucketRange.map((cost) => {
-      const count = deckEntries.reduce((sum, entry) => (entry.card.cost === cost ? sum + entry.count : sum), 0);
+      const count = deckEntries.reduce(
+        (sum, entry) => (entry.card.cost === cost ? sum + entry.count : sum),
+        0
+      );
       return { cost, count };
     });
   }, [deckEntries, highestCost]);
 
-  const maxBucketCount = costBuckets.reduce((max, bucket) => (bucket.count > max ? bucket.count : max), 0);
+  const maxBucketCount = costBuckets.reduce(
+    (max, bucket) => (bucket.count > max ? bucket.count : max),
+    0
+  );
 
   function handleAddCard(cardId: string) {
     if (!cardMap.has(cardId)) {
@@ -245,7 +272,10 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     setActiveAffinities((previous) => {
       const next: Record<string, boolean> = { ...previous };
       const totalFilters = AFFINITY_FILTERS.length;
-      const enabledBefore = AFFINITY_FILTERS.reduce((count, filter) => (next[filter.value] ? count + 1 : count), 0);
+      const enabledBefore = AFFINITY_FILTERS.reduce(
+        (count, filter) => (next[filter.value] ? count + 1 : count),
+        0
+      );
       const current = next[value] ?? true;
 
       if (enabledBefore === totalFilters && current) {
@@ -264,7 +294,10 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
 
       next[value] = !current;
 
-      const enabledAfter = AFFINITY_FILTERS.reduce((count, filter) => (next[filter.value] ? count + 1 : count), 0);
+      const enabledAfter = AFFINITY_FILTERS.reduce(
+        (count, filter) => (next[filter.value] ? count + 1 : count),
+        0
+      );
       if (enabledAfter === 0) {
         for (const filter of AFFINITY_FILTERS) {
           next[filter.value] = true;
@@ -275,8 +308,11 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     });
   }
 
-  const cardCountLabel = isLoadingCards ? '...' : `${filteredCards.length} / ${cards.length}`;
-  const errorMessage = cardsError != null ? cardsError || cardsCopy.error : null;
+  const cardCountLabel = isLoadingCards
+    ? '...'
+    : `${filteredCards.length} / ${cards.length}`;
+  const errorMessage =
+    cardsError != null ? cardsError || cardsCopy.error : null;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-0 overflow-hidden px-0 pb-0 pt-0 text-[color:var(--text-primary)]">
@@ -307,7 +343,9 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
                   <select
                     id="card-sort"
                     value={sortOption}
-                    onChange={(event) => setSortOption(event.target.value as SortOption)}
+                    onChange={(event) =>
+                      setSortOption(event.target.value as SortOption)
+                    }
                     className="rounded-md border border-[color:var(--border)] bg-transparent px-2 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                   >
                     {SORT_OPTIONS.map((option) => (
@@ -319,7 +357,10 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
                 </label>
               </div>
             </div>
-            <AffinityFilterBar activeAffinities={activeAffinities} onToggle={toggleAffinity} />
+            <AffinityFilterBar
+              activeAffinities={activeAffinities}
+              onToggle={toggleAffinity}
+            />
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
@@ -360,8 +401,3 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     </div>
   );
 }
-
-
-
-
-
