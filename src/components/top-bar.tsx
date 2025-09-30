@@ -264,7 +264,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
               </div>
             ) : null}
           </div>
-          {shouldShowSignInButton ? (
+          {/* {shouldShowSignInButton ? (
             <PrimaryButton
               className="px-4"
               type="button"
@@ -272,7 +272,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
             >
               Sign in
             </PrimaryButton>
-          ) : null}
+          ) : null} */}
           <div className="relative" ref={settingsMenuRef}>
             <button
               type="button"
