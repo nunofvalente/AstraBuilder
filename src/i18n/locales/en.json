@@ -32,7 +32,17 @@
     "costCurveHeading": "Cost curve",
     "addButton": "Add",
     "searchPlaceholder": "Search by name or keyword",
-    "filtersHeading": "Filters"
+    "filtersHeading": "Filters",
+    "menuButton": "Menu",
+    "exportOptionTTS": "Export to TTS",
+    "shareButton": "Share image",
+    "shareGenerating": "Generating image...",
+    "shareDownload": "Download image",
+    "shareCopy": "Copy image",
+    "shareCopySuccess": "Image copied to clipboard.",
+    "shareCopyError": "Unable to copy image. Please download instead.",
+    "shareEmpty": "Add cards to generate a share image.",
+    "shareError": "Unable to generate the share image. Please try again."
   },
   "cards": {
     "title": "All Cards",

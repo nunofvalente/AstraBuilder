@@ -32,7 +32,17 @@
     "costCurveHeading": "Kostenkurve",
     "addButton": "Hinzufugen",
     "searchPlaceholder": "Nach Name oder Stichwort suchen",
-    "filtersHeading": "Filter"
+    "filtersHeading": "Filter",
+    "menuButton": "Menü",
+    "exportOptionTTS": "Nach TTS exportieren",
+    "shareButton": "Bild teilen",
+    "shareGenerating": "Bild wird erstellt...",
+    "shareDownload": "Bild herunterladen",
+    "shareCopy": "Bild kopieren",
+    "shareCopySuccess": "Bild in die Zwischenablage kopiert.",
+    "shareCopyError": "Bild konnte nicht kopiert werden. Bitte herunterladen.",
+    "shareEmpty": "Füge Karten hinzu, um ein Bild zum Teilen zu erzeugen.",
+    "shareError": "Das Bild konnte nicht erstellt werden. Bitte versuche es erneut."
   },
   "cards": {
     "title": "Alle Karten",

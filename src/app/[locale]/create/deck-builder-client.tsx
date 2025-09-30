@@ -3,26 +3,31 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AffinityFilterBar } from './deck-builder/components/affinity-filter-bar';
+import { CardSearchBar } from './deck-builder/components/card-search-bar';
 import { CardLibrary } from './deck-builder/components/card-library';
+import { DeckMenuModal } from './deck-builder/components/deck-menu-modal';
 import { DeckPanel } from './deck-builder/components/deck-panel';
+import { SortMenu } from './deck-builder/components/sort-menu';
 import { ZoomOverlay } from './deck-builder/components/zoom-overlay';
 import {
   AFFINITY_FILTERS,
   AFFINITY_SORT_ORDER,
   CARD_SKELETON_COUNT,
 } from './deck-builder/constants';
-import type {
-  Card,
-  CardRow,
-  CostBucket,
-  DeckBuilderProps,
-  DeckEntry,
-} from './deck-builder/types';
+import type { Card, CardRow, CostBucket, DeckBuilderProps, DeckEntry } from './deck-builder/types';
 import { normaliseCard } from './deck-builder/utils';
 import { supabase } from '@/lib/supabase/supabaseClient';
 
+import {
+  buildSearchSuggestions,
+  doesCardMatchQuery,
+  parseSearchInput,
+  type SearchQuery,
+  type SearchSuggestion,
+} from './deck-builder/search';
+
 const SORT_OPTIONS = [
-  { value: 'affinity', label: 'Affinity (Nox first)' },
+  { value: 'affinity', label: 'Affinity' },
   { value: 'number', label: 'Card number' },
 ] as const;
 
@@ -30,10 +35,12 @@ type SortOption = (typeof SORT_OPTIONS)[number]['value'];
 
 const DEFAULT_ZOOM_LABEL = 'Zoom';
 
+
 export function DeckBuilder({ dictionary }: DeckBuilderProps) {
   const zoomButtonLabel = DEFAULT_ZOOM_LABEL;
   const { builder, cards: cardsCopy } = dictionary;
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilters, setActiveFilters] = useState<SearchQuery[]>([]);
   const [deck, setDeck] = useState<Record<string, number>>({});
   const [cards, setCards] = useState<Card[]>([]);
   const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(() => {
@@ -47,6 +54,8 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
   const [isLoadingCards, setIsLoadingCards] = useState(true);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
+  const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -57,7 +66,7 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
 
       try {
         const { data, error } = await supabase
-          .from<CardRow>('cards')
+          .from('cards')
           .select(
             'id,name,affinity,artist,rarity,number,type,subtype,cost,attack,health,influence,rules_text,description,image_url',
           )
@@ -130,6 +139,21 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [zoomCard]);
 
+  useEffect(() => {
+    if (!isMenuModalOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsMenuModalOpen(false);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMenuModalOpen]);
+
   const getAffinityIndex = (value: string) => {
     const index = AFFINITY_SORT_ORDER.indexOf(value);
     return index === -1 ? AFFINITY_SORT_ORDER.length : index;
@@ -144,20 +168,34 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     return new Set(enabled.map((filter) => filter.value));
   }, [activeAffinities]);
 
-  const filteredCards = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+  const { queries: searchQueries, terms: searchTerms } = useMemo(() => parseSearchInput(searchTerm), [searchTerm]);
 
+  const combinedQueries = useMemo(() => [...activeFilters, ...searchQueries], [activeFilters, searchQueries]);
+
+  const searchSuggestions = useMemo(() => buildSearchSuggestions(searchTerm), [searchTerm]);
+
+  const filteredCards = useMemo(() => {
     const filtered = cards.filter((card) => {
       const matchesAffinity = !activeAffinitySet || activeAffinitySet.has(card.affinity);
       if (!matchesAffinity) {
         return false;
       }
 
-      if (term.length === 0) {
+      if (combinedQueries.length === 0 && searchTerms.length === 0) {
         return true;
       }
 
-      return card.searchContent.includes(term);
+      const matchesStructured = combinedQueries.every((query) => doesCardMatchQuery(card, query));
+      if (!matchesStructured) {
+        return false;
+      }
+
+      if (searchTerms.length === 0) {
+        return true;
+      }
+
+      const lowerContent = card.searchContent;
+      return searchTerms.every((term) => lowerContent.includes(term));
     });
 
     const sorted = [...filtered].sort((a, b) => {
@@ -178,7 +216,7 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     });
 
     return sorted;
-  }, [cards, searchTerm, activeAffinitySet, sortOption]);
+  }, [cards, combinedQueries, searchTerms, activeAffinitySet, sortOption]);
 
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
 
@@ -214,10 +252,17 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
       return;
     }
 
-    setDeck((previous) => ({
-      ...previous,
-      [cardId]: (previous[cardId] ?? 0) + 1,
-    }));
+    setDeck((previous) => {
+      const current = previous[cardId] ?? 0;
+      if (current >= 3) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [cardId]: current + 1,
+      };
+    });
   }
 
   function handleRemoveCard(cardId: string) {
@@ -237,9 +282,31 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     });
   }
 
-  function openZoom(card: Card) {
-    setZoomCard(card);
+  function handleZoom(card: Card | null, variant: 'default' | 'compact' = 'default') {
+    if (card) {
+      setZoomVariant(variant);
+      setZoomCard(card);
+      return;
+    }
+
+    setZoomCard(null);
+    setZoomVariant('default');
   }
+
+  function handleSortChange(nextOption: string) {
+    if (nextOption === 'affinity' || nextOption === 'number') {
+      setSortOption(nextOption);
+    }
+  }
+
+  function openMenu() {
+    setIsMenuModalOpen(true);
+  }
+
+  function closeMenu() {
+    setIsMenuModalOpen(false);
+  }
+
 
   function toggleAffinity(value: string) {
     setActiveAffinities((previous) => {
@@ -275,54 +342,72 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     });
   }
 
+  function handleSuggestionSelect(suggestionValue: string) {
+    setSearchTerm((previous) => {
+      if (!previous) {
+        return suggestionValue;
+      }
+
+      const lines = previous.split(/\n/);
+      lines[lines.length - 1] = suggestionValue;
+      return lines.join('\n');
+    });
+  }
+
+  function commitSearchQueries() {
+    const { queries } = parseSearchInput(searchTerm);
+    if (queries.length === 0) {
+      return;
+    }
+
+    setActiveFilters((previous) => {
+      const existingKeys = new Set(previous.map((query) => `${query.field.key}:${query.value.toLowerCase()}`));
+      const appended: SearchQuery[] = [];
+      for (const query of queries) {
+        const key = `${query.field.key}:${query.value.toLowerCase()}`;
+        if (!existingKeys.has(key)) {
+          appended.push(query);
+        }
+      }
+
+      if (appended.length === 0) {
+        return previous;
+      }
+
+      return [...previous, ...appended];
+    });
+
+    setSearchTerm('');
+  }
+
+  function removeFilter(index: number) {
+    setActiveFilters((previous) => previous.filter((_, currentIndex) => currentIndex !== index));
+  }
+
   const cardCountLabel = isLoadingCards ? '...' : `${filteredCards.length} / ${cards.length}`;
   const errorMessage = cardsError != null ? cardsError || cardsCopy.error : null;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-0 overflow-hidden px-0 pb-0 pt-0 text-[color:var(--text-primary)]">
-      <div className="flex flex-1 min-h-0 flex-col gap-0 lg:flex-row lg:items-stretch lg:gap-0 lg:min-h-0">
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)]">
-          <div className="border-b border-[color:var(--border)] px-4 py-4">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="flex min-w-0 flex-1">
-                <input
-                  id="card-search"
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder={builder.searchPlaceholder}
-                  aria-label={builder.searchLabel}
-                  className="w-full border border-[color:var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
-                />
-              </div>
-              <div className="flex flex-col items-end gap-2 text-xs text-[color:var(--text-secondary)]">
-                <div className="flex flex-col items-end">
-                  <span>Library: {cardCountLabel}</span>
-                  <span>
-                    {builder.totalCardsLabel}: {totalCards}
-                  </span>
-                </div>
-                <label htmlFor="card-sort" className="flex items-center gap-2">
-                  <span className="uppercase tracking-wide">Sort</span>
-                  <select
-                    id="card-sort"
-                    value={sortOption}
-                    onChange={(event) => setSortOption(event.target.value as SortOption)}
-                    className="rounded-md border border-[color:var(--border)] bg-transparent px-2 py-1 text-xs text-[color:var(--text-primary)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-                  >
-                    {SORT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
+      <div className="flex flex-1 min-h-0 flex-row items-stretch gap-0">
+        <section className="flex min-h-0 min-w-0 basis-1/2 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)] xl:basis-2/3">
+          <CardSearchBar
+            searchTerm={searchTerm}
+            placeholder={builder.searchPlaceholder}
+            ariaLabel={builder.searchLabel}
+            libraryCountLabel={cardCountLabel}
+            suggestions={searchSuggestions}
+            filters={activeFilters}
+            onSearchTermChange={setSearchTerm}
+            onSubmit={commitSearchQueries}
+            onSuggestionSelect={handleSuggestionSelect}
+            onRemoveFilter={removeFilter}
+          >
             <AffinityFilterBar activeAffinities={activeAffinities} onToggle={toggleAffinity} />
-          </div>
+            <SortMenu options={SORT_OPTIONS} value={sortOption} onChange={handleSortChange} />
+          </CardSearchBar>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
             <CardLibrary
               cards={filteredCards}
               deck={deck}
@@ -333,7 +418,7 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
               addButtonLabel={builder.addButton}
               zoomButtonLabel={zoomButtonLabel}
               onAdd={handleAddCard}
-              onZoom={openZoom}
+              onZoom={handleZoom}
             />
           </div>
         </section>
@@ -350,18 +435,36 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
             removeButton: builder.removeButton,
             costCurveHeading: builder.costCurveHeading,
             costCurveEmpty: builder.costCurveEmpty,
+            menuButton: builder.menuButton,
+            exportOptionTTS: builder.exportOptionTTS,
           }}
           onRemove={handleRemoveCard}
-          onZoom={openZoom}
+          onZoom={handleZoom}
+          onOpenMenu={openMenu}
         />
       </div>
 
-      <ZoomOverlay card={zoomCard} onClose={() => setZoomCard(null)} />
+      <ZoomOverlay card={zoomCard} variant={zoomVariant} onClose={() => handleZoom(null)} />
+
+      <DeckMenuModal
+        isOpen={isMenuModalOpen}
+        onClose={closeMenu}
+        deckEntries={deckEntries}
+        totalCards={totalCards}
+        labels={{
+          deckHeading: builder.deckHeading,
+          totalCardsLabel: builder.totalCardsLabel,
+          exportOptionTTS: builder.exportOptionTTS,
+          shareButton: builder.shareButton,
+          shareGenerating: builder.shareGenerating,
+          shareDownload: builder.shareDownload,
+          shareCopy: builder.shareCopy,
+          shareCopySuccess: builder.shareCopySuccess,
+          shareCopyError: builder.shareCopyError,
+          shareEmpty: builder.shareEmpty,
+          shareError: builder.shareError,
+        }}
+      />
     </div>
   );
 }
-
-
-
-
-

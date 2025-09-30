@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 
 import type { Card, CostBucket, DeckEntry } from '../types';
@@ -14,17 +16,42 @@ export type DeckPanelProps = {
     removeButton: string;
     costCurveHeading: string;
     costCurveEmpty: string;
+    menuButton: string;
+    exportOptionTTS: string;
   };
   onRemove: (cardId: string) => void;
-  onZoom: (card: Card) => void;
+  onZoom: (card: Card | null, variant?: 'default' | 'compact') => void;
+  onOpenMenu: () => void;
 };
 
-export function DeckPanel({ deckEntries, totalCards, costBuckets, maxBucketCount, labels, onRemove, onZoom }: DeckPanelProps) {
+export function DeckPanel({ deckEntries, totalCards, costBuckets, maxBucketCount, labels, onRemove, onZoom, onOpenMenu }: DeckPanelProps) {
   return (
-    <aside className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)]">
+    <aside className="flex min-h-0 min-w-0 basis-1/2 flex-1 flex-col xl:basis-1/3">
+      <section className="relative z-10 flex min-h-0 flex-1 flex-col overflow-visible rounded-none border border-[color:var(--border)] bg-[color:var(--surface)]">
         <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
-          <h2 className="text-lg font-semibold">{labels.deckHeading}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">{labels.deckHeading}</h2>
+            <button
+              type="button"
+              onClick={onOpenMenu}
+              className="flex items-center gap-2 rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-on-accent)] transition-colors hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            >
+              <span>{labels.menuButton}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
           <span className="text-xs text-[color:var(--text-secondary)]">
             {labels.totalCardsLabel}: {totalCards}
           </span>
@@ -58,39 +85,32 @@ export function DeckPanel({ deckEntries, totalCards, costBuckets, maxBucketCount
         {deckEntries.length === 0 ? (
           <p className="px-4 py-6 text-sm text-[color:var(--text-secondary)]">{labels.emptyDeck}</p>
         ) : (
-          <div className="deck-scroll flex-1 min-h-0 overflow-y-auto px-4 pb-4">
+          <div className="deck-scroll flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
             <ul className="flex flex-col gap-3">
               {deckEntries.map(({ card, count }) => (
                 <li
                   key={card.id}
                   className="group flex items-center gap-3 rounded-none border border-[color:var(--border)] bg-[color:var(--surface-muted)]/60 p-2"
                 >
-                  <div className="relative h-20 w-14 flex-shrink-0 overflow-hidden rounded-none">
-                    <Image
-                      src={card.imageSrc}
-                      alt={card.name}
-                      width={120}
-                      height={168}
-                      className="h-full w-full select-none object-cover"
-                      sizes="120px"
-                    />
+                  <div className="relative h-28 w-20 flex-shrink-0 overflow-hidden rounded-none lg:h-24 lg:w-16">
                     <button
                       type="button"
                       onClick={() => onZoom(card)}
+                      onMouseEnter={() => onZoom(card, 'compact')}
+                      onMouseLeave={() => onZoom(null)}
+                      onFocus={() => onZoom(card, 'compact')}
+                      onBlur={() => onZoom(null)}
                       aria-label={`Zoom ${card.name}`}
-                      className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white opacity-0 transition hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100"
+                      className="group/image relative block h-full w-full overflow-hidden rounded-none focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        className="h-3 w-3"
-                      >
-                        <path d="m21 21-4.35-4.35" />
-                        <circle cx="11" cy="11" r="6" />
-                      </svg>
+                      <Image
+                        src={card.imageSrc}
+                        alt={card.name}
+                        width={200}
+                        height={280}
+                        className="h-full w-full select-none object-cover transition-transform duration-150 group-hover/image:scale-110"
+                        sizes="200px"
+                      />
                     </button>
                   </div>
                   <div className="min-w-0 flex-1">

@@ -5,16 +5,34 @@ import type { Card } from '../types';
 export type ZoomOverlayProps = {
   card: Card | null;
   onClose: () => void;
+  variant?: 'default' | 'compact';
 };
 
-export function ZoomOverlay({ card, onClose }: ZoomOverlayProps) {
+export function ZoomOverlay({ card, onClose, variant = 'default' }: ZoomOverlayProps) {
   if (!card) {
     return null;
   }
 
+  if (variant === 'compact') {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center px-4">
+        <div className="overflow-hidden rounded-none bg-[color:var(--surface)]/95 p-3 shadow-2xl">
+          <Image
+            src={card.imageSrc}
+            alt={card.name}
+            width={400}
+            height={560}
+            className="h-auto w-full select-none rounded-none"
+            sizes="400px"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" role="dialog" aria-modal="true">
-      <div className="relative w-full max-w-4xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6" role="dialog" aria-modal="true">
+      <div className="relative w-full max-w-[92vw] sm:max-w-[30rem]">
         <button
           type="button"
           onClick={onClose}
@@ -29,12 +47,11 @@ export function ZoomOverlay({ card, onClose }: ZoomOverlayProps) {
           <Image
             src={card.imageSrc}
             alt={card.name}
-            width={480}
-            height={672}
+            width={400}
+            height={560}
             className="h-auto w-full select-none rounded-none"
-            sizes="(min-width: 1280px) 480px, 90vw"
+            sizes="(min-width: 640px) 400px, 92vw"
           />
-          <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{card.detailLabel}</p>
         </div>
       </div>
     </div>
