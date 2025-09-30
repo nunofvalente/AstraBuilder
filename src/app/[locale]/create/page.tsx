@@ -1,4 +1,4 @@
-﻿import { notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
@@ -22,5 +22,9 @@ export default async function CreateDeckPage({ params }: CreateDeckPageProps) {
 
   const dictionary = await getDictionary(locale);
 
-  return <DeckBuilder dictionary={dictionary} />;
+  return (
+    <div className="flex h-full flex-1 min-h-0 flex-col overflow-hidden">
+      <DeckBuilder dictionary={dictionary} />
+    </div>
+  );
 }
