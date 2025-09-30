@@ -34,7 +34,15 @@
     "searchPlaceholder": "Recherche par nom ou mot cle",
     "filtersHeading": "Filtres",
     "menuButton": "Menu",
-    "exportOptionTTS": "Exporter vers TTS"
+    "exportOptionTTS": "Exporter vers TTS",
+    "shareButton": "Partager l'image",
+    "shareGenerating": "Génération de l'image...",
+    "shareDownload": "Télécharger l'image",
+    "shareCopy": "Copier l'image",
+    "shareCopySuccess": "Image copiée dans le presse-papiers.",
+    "shareCopyError": "Impossible de copier l'image. Veuillez télécharger à la place.",
+    "shareEmpty": "Ajoutez des cartes pour générer une image à partager.",
+    "shareError": "Impossible de générer l'image. Veuillez réessayer."
   },
   "cards": {
     "title": "Toutes les cartes",

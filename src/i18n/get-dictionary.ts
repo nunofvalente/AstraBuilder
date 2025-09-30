@@ -40,6 +40,14 @@ type BuilderDictionary = {
     noResults: string;
     menuButton: string;
     exportOptionTTS: string;
+    shareButton: string;
+    shareGenerating: string;
+    shareDownload: string;
+    shareCopy: string;
+    shareCopySuccess: string;
+    shareCopyError: string;
+    shareEmpty: string;
+    shareError: string;
   };
 };
 

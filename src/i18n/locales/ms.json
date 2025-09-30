@@ -34,7 +34,15 @@
     "searchPlaceholder": "Cari mengikut nama atau kata kunci",
     "filtersHeading": "Penapis",
     "menuButton": "Menu",
-    "exportOptionTTS": "Eksport ke TTS"
+    "exportOptionTTS": "Eksport ke TTS",
+    "shareButton": "Kongsi imej",
+    "shareGenerating": "Menjana imej...",
+    "shareDownload": "Muat turun imej",
+    "shareCopy": "Salin imej",
+    "shareCopySuccess": "Imej disalin ke papan klip.",
+    "shareCopyError": "Tidak dapat menyalin imej. Sila muat turun sahaja.",
+    "shareEmpty": "Tambah kad untuk menjana imej kongsi.",
+    "shareError": "Tidak dapat menjana imej. Cuba lagi."
   },
   "cards": {
     "title": "Semua Kad",

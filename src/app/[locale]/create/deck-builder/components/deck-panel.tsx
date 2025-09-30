@@ -24,16 +24,7 @@ export type DeckPanelProps = {
   onOpenMenu: () => void;
 };
 
-export function DeckPanel({
-  deckEntries,
-  totalCards,
-  costBuckets,
-  maxBucketCount,
-  labels,
-  onRemove,
-  onZoom,
-  onOpenMenu,
-}: DeckPanelProps) {
+export function DeckPanel({ deckEntries, totalCards, costBuckets, maxBucketCount, labels, onRemove, onZoom, onOpenMenu }: DeckPanelProps) {
   return (
     <aside className="flex min-h-0 min-w-0 basis-1/2 flex-1 flex-col xl:basis-1/3">
       <section className="relative z-10 flex min-h-0 flex-1 flex-col overflow-visible rounded-none border border-[color:var(--border)] bg-[color:var(--surface)]">

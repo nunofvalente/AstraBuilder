@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 const footerBackgroundClass = "bg-[#2b2927]";
@@ -42,10 +43,30 @@ export function Footer() {
             <h2 id="disclaimer-title" className="text-xl font-semibold text-[color:var(--text-primary)]">
               Disclaimer
             </h2>
-            <p className="mt-4 text-sm text-[color:var(--text-secondary)]">
-              AstraBuilder is a fan-made deck building experience designed for demonstration purposes only. Card data
-              shown here is placeholder content and should not be considered official or final.
-            </p>
+            <div className="mt-4 space-y-3 text-sm text-[color:var(--text-secondary)]">
+              <p>
+                AstraBuilder is an unofficial, fan-made deckbuilding companion for{' '}
+                <Link
+                  href="https://www.kickstarter.com/projects/echoesofastra/echoes-of-astra-tcg"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-[color:var(--accent)] hover:underline"
+                >
+                  Echoes of Astra
+                </Link>
+                , an independent trading card game currently on Kickstarter.
+              </p>
+              <p>
+                All card names, artwork, rules text, and related intellectual property are owned by the Echoes of Astra
+                creators. They are reproduced here purely for community discussion and prototyping. This project is not
+                endorsed by, or affiliated with, the Echoes of Astra team, and no copyright ownership is claimed.
+              </p>
+              <p>
+                AstraBuilder is a free, non-commercial tool. It may not be used for monetary gain, resale, or any
+                activity that infringes upon the rights of the original creators. Please support the official release by
+                backing the Kickstarter campaign.
+              </p>
+            </div>
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
