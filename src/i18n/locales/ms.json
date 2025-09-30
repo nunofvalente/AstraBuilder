@@ -32,7 +32,9 @@
     "costCurveHeading": "Keluk kos",
     "addButton": "Tambah",
     "searchPlaceholder": "Cari mengikut nama atau kata kunci",
-    "filtersHeading": "Penapis"
+    "filtersHeading": "Penapis",
+    "menuButton": "Menu",
+    "exportOptionTTS": "Eksport ke TTS"
   },
   "cards": {
     "title": "Semua Kad",

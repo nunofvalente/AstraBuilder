@@ -32,7 +32,9 @@
     "costCurveHeading": "Cost curve",
     "addButton": "Add",
     "searchPlaceholder": "Search by name or keyword",
-    "filtersHeading": "Filters"
+    "filtersHeading": "Filters",
+    "menuButton": "Menu",
+    "exportOptionTTS": "Export to TTS"
   },
   "cards": {
     "title": "All Cards",

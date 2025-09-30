@@ -45,25 +45,31 @@ export function resolveAffinity(value: string): string {
 export function normaliseCard(row: CardRow, index: number): Card {
   const safeName = safeText(row.name) || 'Card';
   const safeType = safeText(row.type) || 'Unknown';
+  const safeSubtype = safeText(row.subtype);
+  const safeRarity = safeText(row.rarity);
+  const safeArtist = safeText(row.artist);
+  const safeRulesText = safeText(row.rules_text);
+  const safeDescription = safeText(row.description);
   const affinity = resolveAffinity(safeText(row.affinity));
   const cardNumber = typeof row.number === 'number' ? row.number : null;
   const cost = toNumber(row.cost);
   const attack = toNumber(row.attack);
   const health = toNumber(row.health);
+  const influence = typeof row.influence === 'number' && Number.isFinite(row.influence) ? row.influence : null;
   const gradient = FALLBACK_GRADIENTS[index % FALLBACK_GRADIENTS.length];
   const imageSrc = safeText(row.image_url) || createCardArtwork(safeName, gradient[0], gradient[1]);
 
   const searchContent = [
     safeName,
     safeType,
-    safeText(row.subtype),
+    safeSubtype,
     affinity,
-    safeText(row.rarity),
-    safeText(row.artist),
-    safeText(row.rules_text),
-    safeText(row.description),
+    safeRarity,
+    safeArtist,
+    safeRulesText,
+    safeDescription,
     row.number ? String(row.number) : '',
-    row.influence ? String(row.influence) : '',
+    influence != null ? String(influence) : '',
     cost ? String(cost) : '',
     attack ? String(attack) : '',
     health ? String(health) : '',
@@ -91,6 +97,12 @@ export function normaliseCard(row: CardRow, index: number): Card {
     cost,
     attack,
     health,
+    subtype: safeSubtype,
+    rarity: safeRarity,
+    artist: safeArtist,
+    influence,
+    rulesText: safeRulesText,
+    description: safeDescription,
     imageSrc,
     searchContent,
     detailLabel,

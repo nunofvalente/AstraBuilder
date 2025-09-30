@@ -32,7 +32,9 @@
     "costCurveHeading": "Kostenkurve",
     "addButton": "Hinzufugen",
     "searchPlaceholder": "Nach Name oder Stichwort suchen",
-    "filtersHeading": "Filter"
+    "filtersHeading": "Filter",
+    "menuButton": "Menü",
+    "exportOptionTTS": "Nach TTS exportieren"
   },
   "cards": {
     "title": "Alle Karten",

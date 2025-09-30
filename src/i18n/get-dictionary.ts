@@ -38,6 +38,8 @@ type BuilderDictionary = {
     addButton: string;
     removeButton: string;
     noResults: string;
+    menuButton: string;
+    exportOptionTTS: string;
   };
 };
 
@@ -103,4 +105,3 @@ export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);
 }
-

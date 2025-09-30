@@ -31,6 +31,12 @@ export type Card = {
   cost: number;
   attack: number;
   health: number;
+  subtype: string;
+  rarity: string;
+  artist: string;
+  influence: number | null;
+  rulesText: string;
+  description: string;
   imageSrc: string;
   searchContent: string;
   detailLabel: string;
@@ -52,4 +58,3 @@ export type AffinityFilter = {
   filledIcon: string;
   disabledIcon: string;
 };
-
