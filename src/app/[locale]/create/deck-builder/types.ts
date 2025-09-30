@@ -2,6 +2,8 @@ import type { Dictionary } from '@/i18n/get-dictionary';
 
 export type DeckBuilderProps = {
   dictionary: Dictionary;
+  initialCards: Card[];
+  initialError: string | null;
 };
 
 export type CardRow = {

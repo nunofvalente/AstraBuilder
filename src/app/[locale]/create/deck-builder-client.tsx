@@ -14,10 +14,7 @@ import {
   AFFINITY_SORT_ORDER,
   CARD_SKELETON_COUNT,
 } from './deck-builder/constants';
-import type { Card, CardRow, CostBucket, DeckBuilderProps, DeckEntry } from './deck-builder/types';
-import { normaliseCard } from './deck-builder/utils';
-import { supabase } from '@/lib/supabase/supabaseClient';
-
+import type { Card, CostBucket, DeckBuilderProps, DeckEntry } from './deck-builder/types';
 import {
   buildSearchSuggestions,
   doesCardMatchQuery,
@@ -36,13 +33,13 @@ type SortOption = (typeof SORT_OPTIONS)[number]['value'];
 const DEFAULT_ZOOM_LABEL = 'Zoom';
 
 
-export function DeckBuilder({ dictionary }: DeckBuilderProps) {
+export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuilderProps) {
   const zoomButtonLabel = DEFAULT_ZOOM_LABEL;
   const { builder, cards: cardsCopy } = dictionary;
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<SearchQuery[]>([]);
   const [deck, setDeck] = useState<Record<string, number>>({});
-  const [cards, setCards] = useState<Card[]>([]);
+  const cards = useMemo(() => initialCards, [initialCards]);
   const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const filter of AFFINITY_FILTERS) {
@@ -51,61 +48,10 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     return initial;
   });
   const [sortOption, setSortOption] = useState<SortOption>('affinity');
-  const [isLoadingCards, setIsLoadingCards] = useState(true);
-  const [cardsError, setCardsError] = useState<string | null>(null);
+  const cardsError = initialError;
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadCards() {
-      setIsLoadingCards(true);
-      setCardsError(null);
-
-      try {
-        const { data, error } = await supabase
-          .from('cards')
-          .select(
-            'id,name,affinity,artist,rarity,number,type,subtype,cost,attack,health,influence,rules_text,description,image_url',
-          )
-          .order('name', { ascending: true });
-
-        if (!isMounted) {
-          return;
-        }
-
-        if (error) {
-          setCardsError(error.message ?? cardsCopy.error);
-          setCards([]);
-          return;
-        }
-
-        const rows = (data ?? []) as CardRow[];
-        const nextCards = rows.map((row, index) => normaliseCard(row, index));
-        setCards(nextCards);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        const message = error instanceof Error ? error.message : cardsCopy.error;
-        setCardsError(message);
-        setCards([]);
-      } finally {
-        if (isMounted) {
-          setIsLoadingCards(false);
-        }
-      }
-    }
-
-    void loadCards();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [cardsCopy.error]);
 
   useEffect(() => {
     if (cards.length === 0) {
@@ -384,7 +330,7 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
     setActiveFilters((previous) => previous.filter((_, currentIndex) => currentIndex !== index));
   }
 
-  const cardCountLabel = isLoadingCards ? '...' : `${filteredCards.length} / ${cards.length}`;
+  const cardCountLabel = `${filteredCards.length} / ${cards.length}`;
   const errorMessage = cardsError != null ? cardsError || cardsCopy.error : null;
 
   return (
@@ -411,7 +357,7 @@ export function DeckBuilder({ dictionary }: DeckBuilderProps) {
             <CardLibrary
               cards={filteredCards}
               deck={deck}
-              isLoading={isLoadingCards}
+              isLoading={false}
               errorMessage={errorMessage}
               noResultsLabel={builder.noResults}
               skeletonCount={CARD_SKELETON_COUNT}
