@@ -48,7 +48,13 @@ export const AFFINITY_FILTERS: ReadonlyArray<AffinityFilter> = [
   },
 ] as const;
 
-export type AffinityName = 'Caelum' | 'Lux' | 'Neutral' | 'Nox' | 'Solara' | 'Terra';
+export type AffinityName =
+  | 'Caelum'
+  | 'Lux'
+  | 'Neutral'
+  | 'Nox'
+  | 'Solara'
+  | 'Terra';
 
 export type AffinityColorScheme = {
   baseColor: string;
@@ -60,63 +66,66 @@ export type AffinityColorScheme = {
   borderColor: string;
 };
 
-export const AFFINITY_COLOR_SCHEMES: Record<AffinityName | 'Default', AffinityColorScheme> = {
+export const AFFINITY_COLOR_SCHEMES: Record<
+  AffinityName | 'Default',
+  AffinityColorScheme
+> = {
   Caelum: {
-    baseColor: '#52A6BF',
+    baseColor: '#020712',
     gradient:
-      'linear-gradient(90deg, rgba(82,166,191,1) 0%, rgba(116,191,216,1) 65%, rgba(164,221,240,1) 76%, rgba(190,240,251,1) 100%)',
-    textColor: '#0C2B35',
-    mutedTextColor: '#165A6E',
+      'linear-gradient(148deg, rgba(2, 7, 18, 1) 0%, rgba(0, 27, 56, 1) 27%, rgba(22, 40, 64, 1) 48%, rgba(39, 55, 84, 1) 65%, rgba(34, 65, 107, 1) 86%)',
+    textColor: '#E6F2FF', // light icy blue
+    mutedTextColor: '#AFCBE6', // softer desaturated blue
     chipBackground: 'rgba(0, 0, 0, 0.35)',
     chipTextColor: '#FFFFFF',
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   Lux: {
-    baseColor: '#D5C694',
+    baseColor: '#1C1C1A',
     gradient:
-      'linear-gradient(90deg, rgba(213,198,148,1) 0%, rgba(238,228,171,1) 65%, rgba(255,254,189,1) 76%)',
-    textColor: '#3A2E07',
-    mutedTextColor: '#5A4810',
+      'linear-gradient(148deg, rgba(28, 28, 26, 1) 0%, rgba(59, 57, 50, 1) 27%, rgba(97, 91, 79, 1) 48%, rgba(102, 97, 85, 1) 65%, rgba(122, 119, 99, 1) 86%)',
+    textColor: '#F9F6E5', // bright parchment white
+    mutedTextColor: '#D6CFAF', // soft tan for secondary
     chipBackground: 'rgba(0, 0, 0, 0.35)',
     chipTextColor: '#FFFFFF',
     borderColor: 'rgba(92, 72, 16, 0.3)',
   },
   Neutral: {
-    baseColor: '#778E8F',
+    baseColor: '#1A1513',
     gradient:
-      'linear-gradient(148deg, rgba(119,142,143,1) 0%, rgba(141,163,163,1) 38%, rgba(173,197,198,1) 53%, rgba(223,240,239,1) 81%, rgba(227,243,242,1) 93%)',
-    textColor: '#0F2628',
-    mutedTextColor: '#2D4F51',
+      'linear-gradient(148deg, rgba(26, 21, 19, 1) 0%, rgba(46, 43, 41, 1) 20%, rgba(51, 51, 48, 1) 40%, rgba(54, 53, 50, 1) 60%, rgba(67, 69, 66, 1) 80%)',
+    textColor: '#F2F2F2', // high-contrast near-white
+    mutedTextColor: '#B5B5B5', // neutral gray
     chipBackground: 'rgba(0, 0, 0, 0.35)',
     chipTextColor: '#FFFFFF',
     borderColor: 'rgba(15, 38, 40, 0.2)',
   },
   Nox: {
-    baseColor: '#82449A',
+    baseColor: '#050105',
     gradient:
-      'linear-gradient(148deg, rgba(130,68,154,1) 0%, rgba(140,68,157,1) 35%, rgba(192,144,197,1) 76%, rgba(222,195,221,1) 91%)',
-    textColor: '#FDF5FF',
-    mutedTextColor: '#E3C8ED',
+      'linear-gradient(148deg, rgba(5, 1, 5, 1) 0%, rgba(16, 2, 23, 1) 20%, rgba(49, 35, 56, 1) 40%, rgba(69, 37, 67, 1) 60%, rgba(99, 37, 82, 1) 80%)',
+    textColor: '#F8ECFB', // lavender white
+    mutedTextColor: '#D9BCE4', // muted lavender
     chipBackground: 'rgba(0, 0, 0, 0.35)',
     chipTextColor: '#FFFFFF',
     borderColor: 'rgba(255, 255, 255, 0.35)',
   },
   Solara: {
-    baseColor: '#BB3F20',
+    baseColor: '#140000',
     gradient:
-      'linear-gradient(148deg, rgba(187,63,32,1) 0%, rgba(242,92,49,1) 39%, rgba(239,135,102,1) 64%, rgba(251,200,183,1) 88%)',
-    textColor: '#FFF5F2',
+      'linear-gradient(148deg, rgba(20, 0, 0, 1) 0%, rgba(51, 0, 0, 1) 20%, rgba(87, 12, 0, 1) 40%, rgba(84, 15, 0, 1) 60%, rgba(97, 24, 11, 1) 80%)',
+    textColor: '#FFF5F2', // already good
     mutedTextColor: '#FBD4C7',
     chipBackground: 'rgba(0, 0, 0, 0.35)',
     chipTextColor: '#FFFFFF',
     borderColor: 'rgba(255, 255, 255, 0.32)',
   },
   Terra: {
-    baseColor: '#6C9555',
+    baseColor: '#000F07',
     gradient:
-      'linear-gradient(148deg, rgba(108,149,85,1) 0%, rgba(143,210,114,1) 39%, rgba(194,225,185,1) 64%, rgba(218,236,211,1) 88%)',
-    textColor: '#143015',
-    mutedTextColor: '#355F2E',
+      'linear-gradient(148deg, rgba(0, 15, 7, 1) 0%, rgba(0, 33, 19, 1) 20%, rgba(0, 54, 37, 1) 40%, rgba(27, 64, 47, 1) 60%, rgba(58, 89, 72, 1) 80%)',
+    textColor: '#E5F7EA', // soft pale green
+    mutedTextColor: '#B1D4B8', // muted mint
     chipBackground: 'rgba(0, 0, 0, 0.35)',
     chipTextColor: '#FFFFFF',
     borderColor: 'rgba(20, 48, 21, 0.24)',
@@ -150,7 +159,14 @@ export const FALLBACK_GRADIENTS: Array<[string, string]> = [
 
 export const CARD_SKELETON_COUNT = 8;
 
-export const AFFINITY_SORT_ORDER = ['Nox', 'Caelum', 'Lux', 'Solara', 'Neutral', 'Terra'];
+export const AFFINITY_SORT_ORDER = [
+  'Nox',
+  'Caelum',
+  'Lux',
+  'Solara',
+  'Neutral',
+  'Terra',
+];
 
 export const CARD_IMAGE_SIZES =
   '(min-width: 1600px) 12vw, (min-width: 1280px) 14vw, (min-width: 1024px) 20vw, (min-width: 640px) 40vw, 90vw';
