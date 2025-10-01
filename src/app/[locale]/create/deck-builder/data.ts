@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import cardsData from '@/data/cards.json';
+import devCardsData from '@/data/cards-dev.json';
 import type { Card, CardRow } from './types';
 import { normaliseCard } from './utils';
 
@@ -10,6 +11,7 @@ type CardsFile = {
 };
 
 const typedData = cardsData as CardsFile;
+const devTypedData = devCardsData as CardsFile;
 
 const SUPABASE_COLUMNS =
   'id,name,affinity,artist,rarity,number,type,subtype,cost,attack,health,influence,rules_text,description,image_url';
@@ -30,6 +32,11 @@ function createSupabaseClient() {
 }
 
 export async function getStaticCards(): Promise<{ cards: Card[]; error: string | null }> {
+  const useDevCards = process.env.NEXT_PUBLIC_USE_DEV_CARDS === 'true';
+  if (useDevCards) {
+    return { cards: devTypedData.cards, error: null };
+  }
+
   const fallbackCards = typedData.cards;
   const supabase = createSupabaseClient();
 
