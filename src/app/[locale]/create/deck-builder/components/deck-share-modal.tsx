@@ -85,14 +85,20 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
       }
 
       try {
-        const htmlToImage = await import('html-to-image');
+        const htmlToImageModule = await import('html-to-image').catch(async () => import('html-to-image/dist/html-to-image.js'));
+        const toPng =
+          (htmlToImageModule as typeof import('html-to-image')).toPng ??
+          ((htmlToImageModule as { default?: typeof import('html-to-image') }).default?.toPng ?? null);
+        if (!toPng) {
+          throw new Error('html-to-image export not found');
+        }
         let backgroundColor = '#ffffff';
         if (typeof window !== 'undefined') {
           const surface = getComputedStyle(document.body).getPropertyValue('--surface').trim();
           backgroundColor = surface || backgroundColor;
         }
 
-        const dataUrl = await htmlToImage.toPng(sharePreviewRef.current, {
+        const dataUrl = await toPng(sharePreviewRef.current, {
           pixelRatio: 1.2,
           cacheBust: true,
           backgroundColor,
