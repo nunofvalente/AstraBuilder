@@ -13,7 +13,7 @@ export type CardLibraryProps = {
   addButtonLabel: string;
   zoomButtonLabel: string;
   onAdd: (cardId: string) => void;
-  onZoom: (card: Card | null, variant?: 'default' | 'compact') => void;
+  onZoom: (card: Card | null, variant?: 'default' | 'compact', anchorRect?: DOMRect | null) => void;
 };
 
 export function CardLibrary({

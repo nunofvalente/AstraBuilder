@@ -11,6 +11,7 @@ import { DeckShareModal } from './deck-builder/components/deck-share-modal';
 import { DeckPanel } from './deck-builder/components/deck-panel';
 import { SortMenu } from './deck-builder/components/sort-menu';
 import { ZoomOverlay } from './deck-builder/components/zoom-overlay';
+import type { ZoomAnchor } from './deck-builder/components/zoom-overlay';
 import {
   AFFINITY_FILTERS,
   AFFINITY_SORT_ORDER,
@@ -54,6 +55,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   const cardsError = initialError;
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
+  const [zoomAnchor, setZoomAnchor] = useState<ZoomAnchor | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -251,15 +253,35 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
     });
   }
 
-  function handleZoom(card: Card | null, variant: 'default' | 'compact' = 'default') {
+  function handleZoom(
+    card: Card | null,
+    variant: 'default' | 'compact' = 'default',
+    anchorRect: DOMRect | null = null
+  ) {
     if (card) {
       setZoomVariant(variant);
       setZoomCard(card);
+      if (variant === 'compact' && anchorRect) {
+        const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : anchorRect.right;
+        const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : anchorRect.bottom;
+
+        setZoomAnchor({
+          top: anchorRect.top,
+          left: anchorRect.left,
+          width: anchorRect.width,
+          height: anchorRect.height,
+          viewportWidth,
+          viewportHeight,
+        });
+      } else {
+        setZoomAnchor(null);
+      }
       return;
     }
 
     setZoomCard(null);
     setZoomVariant('default');
+    setZoomAnchor(null);
   }
 
   function handleSortChange(nextOption: string) {
@@ -439,7 +461,12 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
         />
       </div>
 
-      <ZoomOverlay card={zoomCard} variant={zoomVariant} onClose={() => handleZoom(null)} />
+      <ZoomOverlay
+        card={zoomCard}
+        variant={zoomVariant}
+        anchor={zoomAnchor}
+        onClose={() => handleZoom(null)}
+      />
 
       <DeckImportModal
         isOpen={isImportModalOpen}

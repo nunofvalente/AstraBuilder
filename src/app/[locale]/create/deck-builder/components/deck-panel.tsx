@@ -27,7 +27,7 @@ export type DeckPanelProps = {
     menuSave: string;
   };
   onRemove: (cardId: string) => void;
-  onZoom: (card: Card | null, variant?: 'default' | 'compact') => void;
+  onZoom: (card: Card | null, variant?: 'default' | 'compact', anchorRect?: DOMRect | null) => void;
   onMenuSelect: (action: 'import' | 'export' | 'share' | 'save') => void;
   isCostCurveVisible: boolean;
   onToggleCostCurve: () => void;
@@ -302,9 +302,13 @@ export function DeckPanel({
                     <button
                       type="button"
                       onClick={() => onZoom(card)}
-                      onMouseEnter={() => onZoom(card, 'compact')}
+                      onMouseEnter={(event) =>
+                        onZoom(card, 'compact', event.currentTarget.getBoundingClientRect())
+                      }
                       onMouseLeave={() => onZoom(null)}
-                      onFocus={() => onZoom(card, 'compact')}
+                      onFocus={(event) =>
+                        onZoom(card, 'compact', event.currentTarget.getBoundingClientRect())
+                      }
                       onBlur={() => onZoom(null)}
                       aria-label={`Zoom ${card.name}`}
                       className="group/image relative block h-full w-full overflow-hidden rounded-none focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
