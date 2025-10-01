@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { AffinityFilterBar } from './deck-builder/components/affinity-filter-bar';
 import { CardSearchBar } from './deck-builder/components/card-search-bar';
 import { CardLibrary } from './deck-builder/components/card-library';
-import { DeckMenuModal } from './deck-builder/components/deck-menu-modal';
+import { DeckExportModal } from './deck-builder/components/deck-export-modal';
+import { DeckImportModal } from './deck-builder/components/deck-import-modal';
+import { DeckShareModal } from './deck-builder/components/deck-share-modal';
 import { DeckPanel } from './deck-builder/components/deck-panel';
 import { SortMenu } from './deck-builder/components/sort-menu';
 import { ZoomOverlay } from './deck-builder/components/zoom-overlay';
@@ -52,7 +54,10 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   const cardsError = initialError;
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
-  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isCostCurveVisible, setIsCostCurveVisible] = useState(true);
 
   useEffect(() => {
     if (cards.length === 0) {
@@ -85,21 +90,6 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [zoomCard]);
-
-  useEffect(() => {
-    if (!isMenuModalOpen) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsMenuModalOpen(false);
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMenuModalOpen]);
 
   const getAffinityIndex = (value: string) => {
     const index = AFFINITY_SORT_ORDER.indexOf(value);
@@ -278,14 +268,33 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
     }
   }
 
-  function openMenu() {
-    setIsMenuModalOpen(true);
+  function toggleCostCurve() {
+    setIsCostCurveVisible((previous) => !previous);
   }
 
-  function closeMenu() {
-    setIsMenuModalOpen(false);
+  function handleMenuSelect(action: 'import' | 'export' | 'share' | 'save') {
+    switch (action) {
+      case 'import':
+        setIsImportModalOpen(true);
+        break;
+      case 'export':
+        setIsExportModalOpen(true);
+        break;
+      case 'share':
+        setIsShareModalOpen(true);
+        break;
+      case 'save':
+        console.warn('Deck saving is not yet available.');
+        break;
+      default:
+        break;
+    }
   }
 
+  function handleImportDeck(importedDeck: Record<string, number>) {
+    setDeck(importedDeck);
+    setIsImportModalOpen(false);
+  }
 
   function toggleAffinity(value: string) {
     setActiveAffinities((previous) => {
@@ -414,26 +423,63 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
             removeButton: builder.removeButton,
             costCurveHeading: builder.costCurveHeading,
             costCurveEmpty: builder.costCurveEmpty,
+            showCostCurve: builder.showCostCurve,
+            hideCostCurve: builder.hideCostCurve,
             menuButton: builder.menuButton,
-            exportOptionTTS: builder.exportOptionTTS,
+            menuImport: builder.menuImport,
+            menuExport: builder.menuExport,
+            menuShare: builder.menuShare,
+            menuSave: builder.menuSave,
           }}
           onRemove={handleRemoveCard}
           onZoom={handleZoom}
-          onOpenMenu={openMenu}
+          onMenuSelect={handleMenuSelect}
+          isCostCurveVisible={isCostCurveVisible}
+          onToggleCostCurve={toggleCostCurve}
         />
       </div>
 
       <ZoomOverlay card={zoomCard} variant={zoomVariant} onClose={() => handleZoom(null)} />
 
-      <DeckMenuModal
-        isOpen={isMenuModalOpen}
-        onClose={closeMenu}
+      <DeckImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        cards={cards}
+        onImport={handleImportDeck}
+        labels={{
+          heading: builder.importHeading,
+          instructions: builder.importInstructions,
+          placeholder: builder.importPlaceholder,
+          uploadLabel: builder.importUploadLabel,
+          importButton: builder.importButton,
+          cancelButton: builder.importCancel,
+          errorInvalid: builder.importErrorInvalid,
+          errorUnknown: builder.importErrorUnknown,
+          errorEmpty: builder.importErrorEmpty,
+        }}
+      />
+
+      <DeckExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        deckEntries={deckEntries}
+        labels={{
+          exportOptionTTS: builder.exportOptionTTS,
+          emptyDeck: builder.emptyDeck,
+          exportCopy: builder.exportCopy,
+          exportCopySuccess: builder.exportCopySuccess,
+          exportCopyError: builder.exportCopyError,
+        }}
+      />
+
+      <DeckShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
         deckEntries={deckEntries}
         totalCards={totalCards}
         labels={{
           deckHeading: builder.deckHeading,
           totalCardsLabel: builder.totalCardsLabel,
-          exportOptionTTS: builder.exportOptionTTS,
           shareButton: builder.shareButton,
           shareGenerating: builder.shareGenerating,
           shareDownload: builder.shareDownload,
