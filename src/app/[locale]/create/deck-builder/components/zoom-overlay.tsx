@@ -2,28 +2,104 @@ import Image from 'next/image';
 
 import type { Card } from '../types';
 
+export type ZoomAnchor = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  viewportWidth: number;
+  viewportHeight: number;
+};
+
 export type ZoomOverlayProps = {
   card: Card | null;
   onClose: () => void;
   variant?: 'default' | 'compact';
+  anchor?: ZoomAnchor | null;
 };
 
-export function ZoomOverlay({ card, onClose, variant = 'default' }: ZoomOverlayProps) {
+const EDGE_MARGIN = 16;
+const GAP = 12;
+const COMPACT_MAX_WIDTH = 26 * 16; // 26rem expressed in px
+const IMAGE_ASPECT_RATIO = 560 / 400;
+const PADDING_VERTICAL = 24; // padding from p-3 (12px top/bottom)
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function ZoomOverlay({ card, onClose, variant = 'default', anchor = null }: ZoomOverlayProps) {
   if (!card) {
     return null;
   }
 
   if (variant === 'compact') {
+    const canAnchor =
+      anchor != null &&
+      anchor.viewportWidth > EDGE_MARGIN * 2 &&
+      anchor.viewportHeight > EDGE_MARGIN * 2;
+
+    let widthValue = 'min(26rem, calc(100vw - 2rem))';
+    let positionStyle: { [key: string]: string } = {
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+    };
+
+    if (canAnchor && anchor) {
+      const viewportWidth = anchor.viewportWidth;
+      const viewportHeight = anchor.viewportHeight;
+      const containerWidth = Math.min(COMPACT_MAX_WIDTH, Math.max(viewportWidth - EDGE_MARGIN * 2, 0));
+      const estimatedHeight = Math.min(
+        viewportHeight - EDGE_MARGIN * 2,
+        containerWidth * IMAGE_ASPECT_RATIO + PADDING_VERTICAL
+      );
+
+      if (containerWidth > 0 && estimatedHeight > 0) {
+        const availableRight = viewportWidth - (anchor.left + anchor.width);
+        const availableLeft = anchor.left;
+
+        let left = anchor.left + anchor.width + GAP;
+        if (availableRight >= containerWidth + GAP) {
+          left = anchor.left + anchor.width + GAP;
+        } else if (availableLeft >= containerWidth + GAP) {
+          left = anchor.left - containerWidth - GAP;
+        } else {
+          left = clamp(
+            anchor.left + anchor.width / 2 - containerWidth / 2,
+            EDGE_MARGIN,
+            viewportWidth - EDGE_MARGIN - containerWidth
+          );
+        }
+
+        const top = clamp(anchor.top, EDGE_MARGIN, viewportHeight - EDGE_MARGIN - estimatedHeight);
+
+        positionStyle = {
+          top: `${Math.round(top)}px`,
+          left: `${Math.round(left)}px`,
+          transform: 'none',
+        };
+        widthValue = `${Math.round(containerWidth)}px`;
+      }
+    }
+
     return (
-      <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center px-4">
-        <div className="overflow-hidden rounded-none bg-[color:var(--surface)]/95 p-3 shadow-2xl">
+      <div className="pointer-events-none fixed inset-0 z-40">
+        <div
+          className="absolute overflow-hidden rounded-none bg-[color:var(--surface)]/95 p-3 shadow-2xl"
+          style={{
+            maxWidth: 'min(26rem, calc(100vw - 2rem))',
+            width: widthValue,
+            ...positionStyle,
+          }}
+        >
           <Image
             src={card.imageSrc}
             alt={card.name}
             width={400}
             height={560}
-            className="h-auto w-full select-none rounded-none"
-            sizes="400px"
+            className="h-auto max-h-[80vh] w-full select-none rounded-none"
+            sizes="(max-width: 768px) 80vw, 416px"
           />
         </div>
       </div>
