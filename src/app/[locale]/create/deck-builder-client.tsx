@@ -26,6 +26,7 @@ import {
 const SORT_OPTIONS = [
   { value: 'affinity', label: 'Affinity' },
   { value: 'number', label: 'Card number' },
+  { value: 'cost', label: 'Cost' },
 ] as const;
 
 type SortOption = (typeof SORT_OPTIONS)[number]['value'];
@@ -151,6 +152,18 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
         if (aNumber !== bNumber) {
           return aNumber - bNumber;
         }
+      } else if (sortOption === 'cost') {
+        if (a.cost !== b.cost) {
+          return a.cost - b.cost;
+        }
+
+        const aNumber = a.number ?? Number.POSITIVE_INFINITY;
+        const bNumber = b.number ?? Number.POSITIVE_INFINITY;
+        if (aNumber !== bNumber) {
+          return aNumber - bNumber;
+        }
+
+        return a.name.localeCompare(b.name);
       }
 
       const affinityDiff = getAffinityIndex(a.affinity) - getAffinityIndex(b.affinity);
@@ -158,7 +171,14 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
         return affinityDiff;
       }
 
-      return a.name.localeCompare(b.name);
+      const nameDiff = a.name.localeCompare(b.name);
+      if (nameDiff !== 0) {
+        return nameDiff;
+      }
+
+      const aNumber = a.number ?? Number.POSITIVE_INFINITY;
+      const bNumber = b.number ?? Number.POSITIVE_INFINITY;
+      return aNumber - bNumber;
     });
 
     return sorted;
@@ -175,7 +195,20 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
         }
         return { card, count };
       })
-      .filter((entry): entry is DeckEntry => Boolean(entry));
+      .filter((entry): entry is DeckEntry => Boolean(entry))
+      .sort((a, b) => {
+        if (a.card.cost !== b.card.cost) {
+          return a.card.cost - b.card.cost;
+        }
+
+        const aNumber = a.card.number ?? Number.POSITIVE_INFINITY;
+        const bNumber = b.card.number ?? Number.POSITIVE_INFINITY;
+        if (aNumber !== bNumber) {
+          return aNumber - bNumber;
+        }
+
+        return a.card.name.localeCompare(b.card.name);
+      });
   }, [deck, cardMap]);
 
   const totalCards = useMemo(() => deckEntries.reduce((sum, entry) => sum + entry.count, 0), [deckEntries]);
@@ -240,8 +273,8 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   }
 
   function handleSortChange(nextOption: string) {
-    if (nextOption === 'affinity' || nextOption === 'number') {
-      setSortOption(nextOption);
+    if (SORT_OPTIONS.some((option) => option.value === nextOption)) {
+      setSortOption(nextOption as SortOption);
     }
   }
 
