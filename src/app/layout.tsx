@@ -17,7 +17,6 @@ const geistMono = Geist_Mono({
 
 const metadataTitle = 'AstraBuilder';
 const metadataDescription = 'Deckbuilding website for Echoes of Astra';
-const metadataImage = '/images/astrabuilder_logo.png';
 const metadataIcon = '/favicon.png';
 
 export const metadata: Metadata = {
@@ -26,16 +25,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: metadataTitle,
     description: metadataDescription,
-    images: [{ url: metadataImage }],
   },
   icons: {
     icon: metadataIcon,
   },
   twitter: {
-    card: 'summary_large_image',
+    card: 'summary',
     title: metadataTitle,
     description: metadataDescription,
-    images: [metadataImage],
   },
 };
 
