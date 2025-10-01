@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { getAffinityColorScheme } from '../constants';
 import type { DeckEntry } from '../types';
 
-type DeckMenuModalProps = {
+type DeckShareModalProps = {
   isOpen: boolean;
   onClose: () => void;
   deckEntries: DeckEntry[];
@@ -12,7 +13,6 @@ type DeckMenuModalProps = {
   labels: {
     deckHeading: string;
     totalCardsLabel: string;
-    exportOptionTTS: string;
     shareButton: string;
     shareGenerating: string;
     shareDownload: string;
@@ -24,10 +24,8 @@ type DeckMenuModalProps = {
   };
 };
 
-export function DeckMenuModal({ isOpen, onClose, deckEntries, totalCards, labels }: DeckMenuModalProps) {
+export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, labels }: DeckShareModalProps) {
   const sharePreviewRef = useRef<HTMLDivElement | null>(null);
-  const [exportContent, setExportContent] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
   const [shareCopyStatus, setShareCopyStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -48,83 +46,82 @@ export function DeckMenuModal({ isOpen, onClose, deckEntries, totalCards, labels
       return;
     }
 
-    setExportContent(null);
-    setCopyStatus('idle');
     setIsGeneratingShare(false);
     setShareImageUrl(null);
     setShareCopyStatus('idle');
     setShareError(null);
   }, [isOpen]);
 
-  if (!isOpen) {
-    return null;
-  }
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
 
-  async function handleExportTTS() {
     if (!hasDeck) {
+      setShareImageUrl(null);
+      setShareCopyStatus('idle');
+      setShareError(labels.shareEmpty);
+      setIsGeneratingShare(false);
       return;
     }
 
-    const payload = deckEntries.map(({ card, count }) => ({ count, name: card.name }));
-    const json = JSON.stringify(payload, null, 2);
-    setExportContent(json);
-    setCopyStatus('idle');
-  }
+    let cancelled = false;
+    setShareError(null);
+    setShareCopyStatus('idle');
+    setShareImageUrl(null);
+    setIsGeneratingShare(true);
 
-  async function handleCopyExport() {
-    if (!exportContent) {
-      return;
-    }
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(exportContent);
-        setCopyStatus('success');
+    const frame = requestAnimationFrame(async () => {
+      if (cancelled) {
         return;
       }
-    } catch (error) {
-      // fall through to prompt
-    }
 
-    const didCopy = window.prompt('Copy the export JSON:', exportContent);
-    setCopyStatus(didCopy != null ? 'success' : 'error');
-  }
-
-  async function handleGenerateShareImage() {
-    if (!hasDeck) {
-      setShareError(labels.shareEmpty);
-      return;
-    }
-
-    if (!sharePreviewRef.current) {
-      setShareError(labels.shareError);
-      return;
-    }
-
-    setIsGeneratingShare(true);
-    setShareError(null);
-    setShareImageUrl(null);
-
-    try {
-      const htmlToImage = await import('html-to-image');
-      let backgroundColor = '#ffffff';
-      if (typeof window !== 'undefined') {
-        const surface = getComputedStyle(document.body).getPropertyValue('--surface').trim();
-        backgroundColor = surface || backgroundColor;
+      if (!sharePreviewRef.current) {
+        if (!cancelled) {
+          setShareError(labels.shareError);
+          setIsGeneratingShare(false);
+        }
+        return;
       }
-      const dataUrl = await htmlToImage.toPng(sharePreviewRef.current, {
-        pixelRatio: 1.2,
-        cacheBust: true,
-        backgroundColor,
-      });
-      setShareImageUrl(dataUrl);
-      setShareCopyStatus('idle');
-    } catch (error) {
-      const message = error instanceof Error && error.message ? error.message : labels.shareError;
-      setShareError(`${labels.shareError} (${message})`);
-    } finally {
-      setIsGeneratingShare(false);
-    }
+
+      try {
+        const htmlToImage = await import('html-to-image');
+        let backgroundColor = '#ffffff';
+        if (typeof window !== 'undefined') {
+          const surface = getComputedStyle(document.body).getPropertyValue('--surface').trim();
+          backgroundColor = surface || backgroundColor;
+        }
+
+        const dataUrl = await htmlToImage.toPng(sharePreviewRef.current, {
+          pixelRatio: 1.2,
+          cacheBust: true,
+          backgroundColor,
+        });
+
+        if (!cancelled) {
+          setShareImageUrl(dataUrl);
+          setShareCopyStatus('idle');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error && error.message ? error.message : labels.shareError;
+          setShareError(`${labels.shareError} (${message})`);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsGeneratingShare(false);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [isOpen, hasDeck, deckEntries, labels.shareEmpty, labels.shareError]);
+
+  if (!isOpen) {
+    return null;
   }
 
   function handleDownloadShareImage() {
@@ -180,56 +177,14 @@ export function DeckMenuModal({ isOpen, onClose, deckEntries, totalCards, labels
             </button>
           </div>
 
-          <div className="mt-4 flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={handleExportTTS}
-              disabled={!hasDeck}
-              className={`inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
-                !hasDeck
-                  ? 'cursor-not-allowed border border-[color:var(--border)] text-[color:var(--text-secondary)]/60'
-                  : 'border border-[color:var(--accent)] text-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-[color:var(--text-on-accent)]'
-              }`}
-            >
-              {labels.exportOptionTTS}
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerateShareImage}
-              disabled={!hasDeck || isGeneratingShare}
-              className={`inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
-                !hasDeck || isGeneratingShare
-                  ? 'cursor-not-allowed border border-[color:var(--border)] text-[color:var(--text-secondary)]/60'
-                  : 'border border-[color:var(--accent)] text-[color:var(--accent)] hover:bg-[color:var(--accent)] hover:text-[color:var(--text-on-accent)]'
-              }`}
-            >
-              {isGeneratingShare ? labels.shareGenerating : labels.shareButton}
-            </button>
-            {!hasDeck ? <span className="text-xs text-[color:var(--text-secondary)]">{labels.shareEmpty}</span> : null}
-            {shareError ? <span className="text-xs text-[color:var(--accent)]">{shareError}</span> : null}
+          <div className="mt-4 flex flex-col gap-2">
+            {isGeneratingShare ? (
+              <span className="text-sm text-[color:var(--text-secondary)]">{labels.shareGenerating}</span>
+            ) : null}
+            {shareError ? (
+              <span className="text-xs text-[color:var(--accent)]">{shareError}</span>
+            ) : null}
           </div>
-
-          {exportContent ? (
-            <div className="mt-6 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-[color:var(--text-primary)]">{labels.exportOptionTTS}</h4>
-                <button
-                  type="button"
-                  onClick={handleCopyExport}
-                  className="rounded-md border border-[color:var(--border)] px-2 py-1 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-muted)]"
-                >
-                  Copy
-                </button>
-              </div>
-              <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/60 p-3 text-xs text-[color:var(--text-primary)]">{exportContent}</pre>
-              {copyStatus === 'success' ? (
-                <span className="text-xs text-[color:var(--text-secondary)]">Copied to clipboard.</span>
-              ) : null}
-              {copyStatus === 'error' ? (
-                <span className="text-xs text-[color:var(--accent)]">Unable to copy automatically. Please copy manually.</span>
-              ) : null}
-            </div>
-          ) : null}
 
           {shareImageUrl ? (
             <div className="mt-6 flex flex-col gap-3">
@@ -290,22 +245,38 @@ export function DeckMenuModal({ isOpen, onClose, deckEntries, totalCards, labels
                   <span className="text-xs text-neutral-500">{section.entries.length} cards</span>
                 </header>
                 <ul className="mt-3 grid grid-cols-2 gap-3">
-                  {section.entries.map(({ card, count }) => (
-                    <li
-                      key={`share-${category}-${card.id}`}
-                      className="flex items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3"
-                    >
-                      <div className="min-w-0 pr-3">
-                        <p className="truncate text-sm font-semibold text-neutral-900">{card.name}</p>
-                        <p className="truncate text-xs text-neutral-500">
-                          {card.subtype ? `${card.subtype}` : card.type}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-[color:var(--accent)] px-3 py-1 text-xs font-semibold text-[color:var(--text-on-accent)]">
-                        x{count}
-                      </span>
-                    </li>
-                  ))}
+                  {section.entries.map(({ card, count }) => {
+                    const scheme = getAffinityColorScheme(card.affinity);
+                    return (
+                      <li
+                        key={`share-${category}-${card.id}`}
+                        className="flex items-center justify-between rounded-lg border px-4 py-3"
+                        style={{
+                          background: scheme.gradient,
+                          borderColor: scheme.borderColor,
+                          color: scheme.textColor,
+                        }}
+                      >
+                        <div className="min-w-0 pr-3">
+                          <p className="truncate text-sm font-semibold" style={{ color: scheme.textColor }}>
+                            {card.name}
+                          </p>
+                          <p className="truncate text-xs" style={{ color: scheme.mutedTextColor }}>
+                            {card.subtype ? `${card.subtype}` : card.type}
+                          </p>
+                        </div>
+                        <span
+                          className="rounded-full px-3 py-1 text-xs font-semibold"
+                          style={{
+                            backgroundColor: scheme.chipBackground,
+                            color: scheme.chipTextColor,
+                          }}
+                        >
+                          x{count}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             );
