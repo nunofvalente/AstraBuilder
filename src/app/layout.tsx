@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 const metadataTitle = 'AstraBuilder';
 const metadataDescription = 'Deckbuilding website for Echoes of Astra';
-const metadataIcon = '/favicon.png';
+const metadataIcon = '/favicon.ico';
 
 export const metadata: Metadata = {
   title: metadataTitle,
