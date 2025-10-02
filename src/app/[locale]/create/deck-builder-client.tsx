@@ -256,22 +256,26 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   function handleZoom(
     card: Card | null,
     variant: 'default' | 'compact' = 'default',
-    anchorRect: DOMRect | null = null
+    anchorRect: ZoomAnchor | null = null
   ) {
     if (card) {
       setZoomVariant(variant);
       setZoomCard(card);
       if (variant === 'compact' && anchorRect) {
-        const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : anchorRect.right;
-        const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : anchorRect.bottom;
+        const viewportWidth =
+          typeof window !== 'undefined' ? window.innerWidth : anchorRect.viewportWidth;
+        const viewportHeight =
+          typeof window !== 'undefined' ? window.innerHeight : anchorRect.viewportHeight;
 
         setZoomAnchor({
           top: anchorRect.top,
           left: anchorRect.left,
           width: anchorRect.width,
           height: anchorRect.height,
-          viewportWidth,
-          viewportHeight,
+          viewportWidth: viewportWidth ?? anchorRect.viewportWidth,
+          viewportHeight: viewportHeight ?? anchorRect.viewportHeight,
+          pointerX: anchorRect.pointerX ?? anchorRect.left + anchorRect.width / 2,
+          pointerY: anchorRect.pointerY ?? anchorRect.top + anchorRect.height / 2,
         });
       } else {
         setZoomAnchor(null);
@@ -443,6 +447,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
             totalCardsLabel: builder.totalCardsLabel,
             emptyDeck: builder.emptyDeck,
             removeButton: builder.removeButton,
+            addButton: builder.addButton,
             costCurveHeading: builder.costCurveHeading,
             costCurveEmpty: builder.costCurveEmpty,
             showCostCurve: builder.showCostCurve,
@@ -453,6 +458,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
             menuShare: builder.menuShare,
             menuSave: builder.menuSave,
           }}
+          onAdd={handleAddCard}
           onRemove={handleRemoveCard}
           onZoom={handleZoom}
           onMenuSelect={handleMenuSelect}
