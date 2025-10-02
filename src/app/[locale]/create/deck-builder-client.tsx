@@ -59,7 +59,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isCostCurveVisible, setIsCostCurveVisible] = useState(true);
+  const [isCostCurveVisible, setIsCostCurveVisible] = useState(true);\r\n  const [activeMobilePane, setActiveMobilePane] = useState<'catalogue' | 'deck'>('catalogue');
 
   useEffect(() => {
     if (cards.length === 0) {
@@ -399,12 +399,12 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   }
 
   const cardCountLabel = `${filteredCards.length} / ${cards.length}`;
-  const errorMessage = cardsError != null ? cardsError || cardsCopy.error : null;
+  const errorMessage = cardsError != null ? cardsError || cardsCopy.error : null;\r\n  const isCatalogueVisible = activeMobilePane === 'catalogue';\r\n  const isDeckVisible = activeMobilePane === 'deck';
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-0 overflow-hidden px-0 pb-0 pt-0 text-[color:var(--text-primary)]">
-      <div className="flex flex-1 min-h-0 flex-row items-stretch gap-0">
-        <section className="flex min-h-0 min-w-0 basis-1/2 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)] xl:basis-2/3">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-0 overflow-hidden px-0 pb-20 pt-0 text-[color:var(--text-primary)] lg:pb-0">
+      <div className="flex flex-1 min-h-0 flex-col items-stretch gap-0 lg:flex-row">
+        <section\r\n          className={\ min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)] lg:flex lg:basis-2/3}\r\n        >
           <CardSearchBar
             searchTerm={searchTerm}
             placeholder={builder.searchPlaceholder}
@@ -437,7 +437,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
           </div>
         </section>
 
-        <DeckPanel
+        <div\r\n          className={\ min-h-0 flex-1 flex-col lg:flex lg:min-h-0 lg:min-w-0 lg:basis-1/3}\r\n        >\r\n          <DeckPanel
           deckEntries={deckEntries}
           totalCards={totalCards}
           costBuckets={costBuckets}

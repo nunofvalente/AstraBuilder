@@ -24,7 +24,7 @@ function CostCurve({ className = '', costBuckets, maxBucketCount, totalCards, he
   const visibleBuckets = costBuckets.filter((bucket) => bucket.count > 0);
   const bucketsToRender = visibleBuckets.length > 0 ? visibleBuckets : costBuckets;
 
-  return (
+  const rootClassName = ['flex min-h-0 min-w-0 flex-1 flex-col lg:basis-1/2 xl:basis-1/3', className]\r\n    .filter(Boolean)\r\n    .join(' ');\r\n\r\n  return (
     <div className={className}>
       <h3 className="text-sm font-semibold text-[color:var(--text-primary)] min-[1920px]:text-base">{heading}</h3>
       {totalCards === 0 ? (
@@ -79,6 +79,7 @@ export type DeckPanelProps = {
   onMenuSelect: (action: 'import' | 'export' | 'share' | 'save') => void;
   isCostCurveVisible: boolean;
   onToggleCostCurve: () => void;
+  className?: string;
 };
 
 export function DeckPanel({
@@ -93,6 +94,7 @@ export function DeckPanel({
   onMenuSelect,
   isCostCurveVisible,
   onToggleCostCurve,
+  className = '',
 }: DeckPanelProps) {
   const costCurveToggleLabel = isCostCurveVisible ? labels.hideCostCurve : labels.showCostCurve;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -233,10 +235,10 @@ export function DeckPanel({
   }
 
   return (
-    <aside className="flex min-h-0 min-w-0 basis-1/2 flex-1 flex-col xl:basis-1/3">
+    <aside className={rootClassName}>
       <section className="relative z-10 flex min-h-0 flex-1 flex-col overflow-visible rounded-none border border-[color:var(--border)] bg-[color:var(--surface)]">
         <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold">{labels.deckHeading}</h2>
             <div className="relative" ref={menuContainerRef}>
               <button
