@@ -59,7 +59,8 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isCostCurveVisible, setIsCostCurveVisible] = useState(true);
+  const [isCostCurveVisible, setIsCostCurveVisible] = useState(false);
+  const [activeMobilePane, setActiveMobilePane] = useState<'catalogue' | 'deck'>('catalogue');
 
   useEffect(() => {
     if (cards.length === 0) {
@@ -400,11 +401,15 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
 
   const cardCountLabel = `${filteredCards.length} / ${cards.length}`;
   const errorMessage = cardsError != null ? cardsError || cardsCopy.error : null;
+  const isCatalogueVisible = activeMobilePane === 'catalogue';
+  const isDeckVisible = activeMobilePane === 'deck';
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-0 overflow-hidden px-0 pb-0 pt-0 text-[color:var(--text-primary)]">
-      <div className="flex flex-1 min-h-0 flex-row items-stretch gap-0">
-        <section className="flex min-h-0 min-w-0 basis-1/2 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)] xl:basis-2/3">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-0 overflow-hidden px-0 pb-20 pt-0 text-[color:var(--text-primary)] lg:pb-0">
+      <div className="flex flex-1 min-h-0 flex-col items-stretch gap-0 lg:flex-row">
+        <section
+          className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)] ${isCatalogueVisible ? 'flex' : 'hidden'} lg:flex lg:basis-1/2 xl:basis-3/5 min-[1920px]:basis-2/3`}
+        >
           <CardSearchBar
             searchTerm={searchTerm}
             placeholder={builder.searchPlaceholder}
@@ -437,35 +442,74 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
           </div>
         </section>
 
-        <DeckPanel
-          deckEntries={deckEntries}
-          totalCards={totalCards}
-          costBuckets={costBuckets}
-          maxBucketCount={maxBucketCount}
-          labels={{
-            deckHeading: builder.deckHeading,
-            totalCardsLabel: builder.totalCardsLabel,
-            emptyDeck: builder.emptyDeck,
-            removeButton: builder.removeButton,
-            addButton: builder.addButton,
-            costCurveHeading: builder.costCurveHeading,
-            costCurveEmpty: builder.costCurveEmpty,
-            showCostCurve: builder.showCostCurve,
-            hideCostCurve: builder.hideCostCurve,
-            menuButton: builder.menuButton,
-            menuImport: builder.menuImport,
-            menuExport: builder.menuExport,
-            menuShare: builder.menuShare,
-            menuSave: builder.menuSave,
-          }}
-          onAdd={handleAddCard}
-          onRemove={handleRemoveCard}
-          onZoom={handleZoom}
-          onMenuSelect={handleMenuSelect}
-          isCostCurveVisible={isCostCurveVisible}
-          onToggleCostCurve={toggleCostCurve}
-        />
+        <div
+          className={`min-h-0 flex-1 flex-col ${isDeckVisible ? 'flex' : 'hidden'} lg:flex lg:min-h-0 lg:min-w-0 lg:basis-1/2 xl:basis-2/5 min-[1920px]:basis-1/3`}
+        >
+          <DeckPanel
+            deckEntries={deckEntries}
+            totalCards={totalCards}
+            costBuckets={costBuckets}
+            maxBucketCount={maxBucketCount}
+            labels={{
+              deckHeading: builder.deckHeading,
+              totalCardsLabel: builder.totalCardsLabel,
+              emptyDeck: builder.emptyDeck,
+              removeButton: builder.removeButton,
+              addButton: builder.addButton,
+              costCurveHeading: builder.costCurveHeading,
+              costCurveEmpty: builder.costCurveEmpty,
+              showCostCurve: builder.showCostCurve,
+              hideCostCurve: builder.hideCostCurve,
+              menuButton: builder.menuButton,
+              menuImport: builder.menuImport,
+              menuExport: builder.menuExport,
+              menuShare: builder.menuShare,
+              menuSave: builder.menuSave,
+            }}
+            onAdd={handleAddCard}
+            onRemove={handleRemoveCard}
+            onZoom={handleZoom}
+            onMenuSelect={handleMenuSelect}
+            isCostCurveVisible={isCostCurveVisible}
+            onToggleCostCurve={toggleCostCurve}
+            className="w-full lg:w-auto"
+          />
+        </div>
       </div>
+
+      <nav className="lg:hidden border-t border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3">
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveMobilePane('catalogue')}
+            aria-pressed={isCatalogueVisible}
+            className={`flex w-full flex-col items-center justify-center gap-1 rounded-md border px-3 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+              isCatalogueVisible
+                ? 'border-[color:var(--border)] bg-[color:var(--surface-muted)] text-[color:var(--text-primary)]'
+                : 'border-transparent text-[color:var(--text-secondary)]'
+            }`}
+          >
+            <span>{builder.cardsHeading}</span>
+            <span className="text-[11px] font-normal text-[color:var(--text-secondary)]">{cardCountLabel}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMobilePane('deck')}
+            aria-pressed={isDeckVisible}
+            className={`flex w-full flex-col items-center justify-center gap-1 rounded-md border px-3 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+              isDeckVisible
+                ? 'border-[color:var(--border)] bg-[color:var(--surface-muted)] text-[color:var(--text-primary)]'
+                : 'border-transparent text-[color:var(--text-secondary)]'
+            }`}
+          >
+            <span>{builder.deckHeading}</span>
+            <span className="text-[11px] font-normal text-[color:var(--text-secondary)]">
+              {builder.totalCardsLabel}: {totalCards}
+            </span>
+          </button>
+        </div>
+      </nav>
 
       <ZoomOverlay
         card={zoomCard}
