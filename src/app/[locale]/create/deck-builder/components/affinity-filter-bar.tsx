@@ -9,7 +9,7 @@ export type AffinityFilterBarProps = {
 
 export function AffinityFilterBar({ activeAffinities, onToggle }: AffinityFilterBarProps) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {AFFINITY_FILTERS.map((filter) => {
         const isEnabled = activeAffinities[filter.value] ?? true;
         const iconSrc = isEnabled ? filter.filledIcon : filter.disabledIcon;

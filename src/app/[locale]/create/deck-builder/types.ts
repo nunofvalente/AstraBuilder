@@ -2,6 +2,8 @@ import type { Dictionary } from '@/i18n/get-dictionary';
 
 export type DeckBuilderProps = {
   dictionary: Dictionary;
+  initialCards: Card[];
+  initialError: string | null;
 };
 
 export type CardRow = {
@@ -31,6 +33,12 @@ export type Card = {
   cost: number;
   attack: number;
   health: number;
+  subtype: string;
+  rarity: string;
+  artist: string;
+  influence: number | null;
+  rulesText: string;
+  description: string;
   imageSrc: string;
   searchContent: string;
   detailLabel: string;
@@ -52,4 +60,3 @@ export type AffinityFilter = {
   filledIcon: string;
   disabledIcon: string;
 };
-

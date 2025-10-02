@@ -34,12 +34,10 @@ export default async function LocaleLayout({
       <LangAttribute locale={locale} />
       <div className="flex h-screen flex-col overflow-hidden bg-[color:var(--background)] transition-colors">
         <TopBar locale={locale} />
-        <main className="flex flex-1 min-h-0 flex-col overflow-hidden">{children}</main>
+        <main className="flex flex-1 min-h-0 flex-col overflow-y-auto">{children}</main>
         <Footer />
       </div>
     </>
   );
 }
-
-
 

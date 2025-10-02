@@ -4,6 +4,9 @@ import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
 
 import { DeckBuilder } from './deck-builder-client';
+import { getStaticCards } from './deck-builder/data';
+
+export const dynamic = 'force-dynamic';
 
 type LocaleParams = {
   locale: string;
@@ -21,10 +24,11 @@ export default async function CreateDeckPage({ params }: CreateDeckPageProps) {
   }
 
   const dictionary = await getDictionary(locale);
+  const { cards, error } = await getStaticCards();
 
   return (
     <div className="flex h-full flex-1 min-h-0 flex-col overflow-hidden">
-      <DeckBuilder dictionary={dictionary} />
+      <DeckBuilder dictionary={dictionary} initialCards={cards} initialError={error} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import Image from 'next/image';
 
 import { CARD_IMAGE_SIZES } from '../constants';
 import type { Card } from '../types';
+import type { ZoomAnchor } from './zoom-overlay';
 
 export type CardLibraryProps = {
   cards: Card[];
@@ -13,7 +14,7 @@ export type CardLibraryProps = {
   addButtonLabel: string;
   zoomButtonLabel: string;
   onAdd: (cardId: string) => void;
-  onZoom: (card: Card) => void;
+  onZoom: (card: Card | null, variant?: 'default' | 'compact', anchor?: ZoomAnchor | null) => void;
 };
 
 export function CardLibrary({
@@ -30,7 +31,7 @@ export function CardLibrary({
 }: CardLibraryProps) {
   if (isLoading) {
     return (
-      <ul className="grid grid-cols-2 gap-4 md:grid-cols-3">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
         {Array.from({ length: skeletonCount }).map((_, index) => (
           <li key={index}>
             <div className="aspect-[5/7] w-full animate-pulse rounded-none bg-[color:var(--surface-muted)]" />
@@ -49,19 +50,29 @@ export function CardLibrary({
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-4 md:grid-cols-3">
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
       {cards.map((card) => {
         const copies = deck[card.id] ?? 0;
         const isSelected = copies > 0;
+        const isMaxed = copies >= 3;
 
         return (
           <li key={card.id}>
             <div className="group relative h-full">
               <button
                 type="button"
-                onClick={() => onAdd(card.id)}
+                onClick={() => {
+                  if (isMaxed) {
+                    return;
+                  }
+                  onAdd(card.id);
+                }}
                 aria-label={`${addButtonLabel} ${card.name}`}
-                className="relative block h-full w-full focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                aria-disabled={isMaxed}
+                disabled={isMaxed}
+                className={`relative block h-full w-full focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                  isMaxed ? 'cursor-not-allowed opacity-90' : ''
+                }`}
               >
                 <span className="sr-only">{card.detailLabel}</span>
                 <div
@@ -72,13 +83,13 @@ export function CardLibrary({
                   <Image
                     src={card.imageSrc}
                     alt={card.name}
-                    width={240}
-                    height={336}
+                    width={220}
+                    height={308}
                     className="h-auto w-full select-none"
                     sizes={CARD_IMAGE_SIZES}
                   />
                   {copies > 0 ? (
-                    <span className="absolute right-2 bottom-2 rounded-full bg-black/70 px-2 py-1 text-xs font-semibold text-white">
+                    <span className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-[color:var(--accent)] px-2 py-0.5 text-xs font-semibold text-[color:var(--text-on-accent)] shadow-md">
                       x{copies}
                     </span>
                   ) : null}
@@ -92,7 +103,7 @@ export function CardLibrary({
                   onZoom(card);
                 }}
                 aria-label={`${zoomButtonLabel} ${card.name}`}
-                className="pointer-events-auto absolute right-2 top-2 z-10 rounded-full bg-black/70 p-2 text-white opacity-0 transition hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100"
+                className="pointer-events-auto absolute right-2 top-2 z-10 rounded-full border border-white/80 bg-black/70 p-2 text-white opacity-0 transition hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

@@ -15,9 +15,25 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const metadataTitle = 'AstraBuilder';
+const metadataDescription = 'Deckbuilding website for Echoes of Astra';
+const metadataIcon = '/favicon.png';
+
 export const metadata: Metadata = {
-  title: 'AstraBuilder',
-  description: 'Card management for AstraBuilder',
+  title: metadataTitle,
+  description: metadataDescription,
+  openGraph: {
+    title: metadataTitle,
+    description: metadataDescription,
+  },
+  icons: {
+    icon: metadataIcon,
+  },
+  twitter: {
+    card: 'summary',
+    title: metadataTitle,
+    description: metadataDescription,
+  },
 };
 
 export default function RootLayout({

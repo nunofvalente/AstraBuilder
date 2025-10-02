@@ -32,12 +32,40 @@ type BuilderDictionary = {
     comingSoon: string;
     costCurveHeading: string;
     costCurveEmpty: string;
+    showCostCurve: string;
+    hideCostCurve: string;
+    menuImport: string;
+    menuExport: string;
+    menuShare: string;
+    menuSave: string;
+    importHeading: string;
+    importInstructions: string;
+    importPlaceholder: string;
+    importUploadLabel: string;
+    importButton: string;
+    importCancel: string;
+    importErrorInvalid: string;
+    importErrorUnknown: string;
+    importErrorEmpty: string;
     deckHeading: string;
     emptyDeck: string;
     totalCardsLabel: string;
     addButton: string;
     removeButton: string;
     noResults: string;
+    menuButton: string;
+    exportOptionTTS: string;
+    exportCopy: string;
+    exportCopySuccess: string;
+    exportCopyError: string;
+    shareButton: string;
+    shareGenerating: string;
+    shareDownload: string;
+    shareCopy: string;
+    shareCopySuccess: string;
+    shareCopyError: string;
+    shareEmpty: string;
+    shareError: string;
   };
 };
 
@@ -103,4 +131,3 @@ export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);
 }
-
