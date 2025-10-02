@@ -4,10 +4,54 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Card, CostBucket, DeckEntry } from '../types';
 import { DeckCardChip } from './deck-card-chip';
+import type { ZoomAnchor } from './zoom-overlay';
 
 const CARD_TYPE_ORDER = ['Unit', 'Tactic', 'Territory'];
+const PRIORITY_MATCHERS = CARD_TYPE_ORDER.map((type) => ({ type, matcher: type.toLowerCase() }));
 const FALLBACK_TYPE_LABEL = 'Other';
 
+type CostCurveProps = {
+  className?: string;
+  costBuckets: CostBucket[];
+  maxBucketCount: number;
+  totalCards: number;
+  heading: string;
+  emptyLabel: string;
+};
+
+function CostCurve({ className = '', costBuckets, maxBucketCount, totalCards, heading, emptyLabel }: CostCurveProps) {
+  const hasCards = maxBucketCount > 0;
+  const visibleBuckets = costBuckets.filter((bucket) => bucket.count > 0);
+  const bucketsToRender = visibleBuckets.length > 0 ? visibleBuckets : costBuckets;
+
+  return (
+    <div className={className}>
+      <h3 className="text-sm font-semibold text-[color:var(--text-primary)] min-[1920px]:text-base">{heading}</h3>
+      {totalCards === 0 ? (
+        <p className="mt-3 text-sm text-[color:var(--text-secondary)]">{emptyLabel}</p>
+      ) : (
+        <div className="mt-4 flex items-end gap-3">
+          {bucketsToRender.map((bucket) => {
+            const height = hasCards ? Math.max((bucket.count / maxBucketCount) * 120, 4) : 0;
+
+            return (
+              <div key={bucket.cost} className="flex flex-1 flex-col items-center gap-2">
+                <div
+                  className="flex w-full items-end justify-center rounded bg-[color:var(--accent)]/80"
+                  style={{ height: `${height}px` }}
+                  aria-label={`${bucket.count} cards with cost ${bucket.cost}`}
+                >
+                  <span className="pb-1 text-xs font-semibold text-[color:var(--text-on-accent)]">{bucket.count}</span>
+                </div>
+                <span className="text-xs text-[color:var(--text-secondary)]">{bucket.cost}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 export type DeckPanelProps = {
   deckEntries: DeckEntry[];
   totalCards: number;
@@ -31,7 +75,7 @@ export type DeckPanelProps = {
   };
   onAdd: (cardId: string) => void;
   onRemove: (cardId: string) => void;
-  onZoom: (card: Card | null, variant?: 'default' | 'compact', anchorRect?: DOMRect | null) => void;
+  onZoom: (card: Card | null, variant?: 'default' | 'compact', anchor?: ZoomAnchor | null) => void;
   onMenuSelect: (action: 'import' | 'export' | 'share' | 'save') => void;
   isCostCurveVisible: boolean;
   onToggleCostCurve: () => void;
@@ -75,6 +119,10 @@ export function DeckPanel({
     }
 
     const getPriority = (label: string) => {
+      const normalized = PRIORITY_MATCHERS.find(({ matcher }) => label.toLowerCase().includes(matcher));
+      if (normalized) {
+        return CARD_TYPE_ORDER.indexOf(normalized.type);
+      }
       const index = CARD_TYPE_ORDER.findIndex((type) => type.toLowerCase() === label.toLowerCase());
       return index === -1 ? CARD_TYPE_ORDER.length : index;
     };
@@ -95,6 +143,50 @@ export function DeckPanel({
       });
   }, [deckEntries]);
 
+  const deckListContent =
+    deckEntries.length === 0 ? (
+      <p className="px-4 py-6 text-sm text-[color:var(--text-secondary)] min-[1920px]:px-0 min-[1920px]:py-0">
+        {labels.emptyDeck}
+      </p>
+    ) : (
+      <div className="flex flex-col gap-6">
+        {sections.map((section) => (
+          <section key={section.type} className="flex flex-col gap-3">
+            <header className="flex items-center justify-between px-2 pb-2 border-b border-[color:var(--border)]">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] min-[1920px]:text-sm">
+                {section.type}
+              </h3>
+              <span className="text-xs text-[color:var(--text-secondary)]">x{section.total}</span>
+            </header>
+            <ul className="flex flex-col gap-2">
+              {section.entries.map(({ card, count }) => (
+                <DeckCardChip
+                  key={card.id}
+                  card={card}
+                  count={count}
+                  labels={{ add: labels.addButton, remove: labels.removeButton }}
+                  onIncrement={onAdd}
+                  onDecrement={onRemove}
+                  onZoom={onZoom}
+                />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    );
+
+  const deckListSmall = (
+    <div className="deck-scroll flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
+      {deckListContent}
+    </div>
+  );
+
+  const deckListLarge = (
+    <div className="deck-scroll flex-1 min-h-0 overflow-y-auto min-[1920px]:order-1 min-[1920px]:p-0">
+      {deckListContent}
+    </div>
+  );
   useEffect(() => {
     if (!isMenuOpen) {
       return;
@@ -272,7 +364,7 @@ export function DeckPanel({
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-[1920px]:hidden">
               <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                 {labels.costCurveHeading}
               </span>
@@ -298,66 +390,33 @@ export function DeckPanel({
             </span>
           </div>
         </div>
-        {isCostCurveVisible ? (
-          <div className="border-b border-[color:var(--border)] px-4 py-4">
-            <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">{labels.costCurveHeading}</h3>
-            {totalCards === 0 ? (
-              <p className="mt-3 text-sm text-[color:var(--text-secondary)]">{labels.costCurveEmpty}</p>
-            ) : (
-              <div className="mt-4 flex items-end gap-3">
-                {costBuckets.map((bucket) => {
-                  const hasCards = maxBucketCount > 0;
-                  const height = hasCards ? Math.max((bucket.count / maxBucketCount) * 120, 4) : 0;
-
-                  return (
-                    <div key={bucket.cost} className="flex flex-1 flex-col items-center gap-2">
-                      <div
-                        className="flex w-full items-end justify-center rounded bg-[color:var(--accent)]/80"
-                        style={{ height: `${height}px` }}
-                        aria-label={`${bucket.count} cards with cost ${bucket.cost}`}
-                      >
-                        <span className="pb-1 text-xs font-semibold text-[color:var(--text-on-accent)]">{bucket.count}</span>
-                      </div>
-                      <span className="text-xs text-[color:var(--text-secondary)]">{bucket.cost}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : null}
-        {deckEntries.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-[color:var(--text-secondary)]">{labels.emptyDeck}</p>
-        ) : (
-          <div className="deck-scroll flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
-            <div className="flex flex-col gap-6">
-              {sections.map((section) => (
-                <section key={section.type} className="flex flex-col gap-3">
-                  <header className="flex items-center justify-between px-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                      {section.type}
-                    </h3>
-                    <span className="text-xs text-[color:var(--text-secondary)]">x{section.total}</span>
-                  </header>
-                  <ul className="flex flex-col gap-2">
-                    {section.entries.map(({ card, count }) => (
-                      <DeckCardChip
-                        key={card.id}
-                        card={card}
-                        count={count}
-                        labels={{ add: labels.addButton, remove: labels.removeButton }}
-                        onIncrement={onAdd}
-                        onDecrement={onRemove}
-                        onZoom={onZoom}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </div>
-        )}
+        <CostCurve
+          className={`border-b border-[color:var(--border)] px-4 py-4 min-[1920px]:hidden ${isCostCurveVisible ? '' : 'hidden'}`}
+          costBuckets={costBuckets}
+          maxBucketCount={maxBucketCount}
+          totalCards={totalCards}
+          heading={labels.costCurveHeading}
+          emptyLabel={labels.costCurveEmpty}
+        />
+        <div className="hidden min-[1920px]:flex min-[1920px]:min-h-0 min-[1920px]:flex-1 min-[1920px]:items-start min-[1920px]:gap-6 min-[1920px]:px-6 min-[1920px]:pb-6 min-[1920px]:pt-4">
+          {deckListLarge}
+          <CostCurve
+            className="w-[320px] flex-shrink-0 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 p-4 shadow-sm min-[1920px]:order-2"
+            costBuckets={costBuckets}
+            maxBucketCount={maxBucketCount}
+            totalCards={totalCards}
+            heading={labels.costCurveHeading}
+            emptyLabel={labels.costCurveEmpty}
+          />
+        </div>
+        <div className="flex-1 min-h-0 min-[1920px]:hidden">
+          {deckListSmall}
+        </div>
       </section>
     </aside>
   );
 }
+
+
+
+

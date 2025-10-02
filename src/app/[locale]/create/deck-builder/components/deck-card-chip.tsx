@@ -1,10 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, type FocusEvent, type MouseEvent } from 'react';
+import { useCallback, type FocusEvent, type MouseEvent as ReactMouseEvent } from 'react';
 
 import { getAffinityColorScheme } from '../constants';
 import type { Card } from '../types';
+import type { ZoomAnchor } from './zoom-overlay';
 
 const COST_ICON_PATHS: Record<number, string> = {
   0: '/images/icons/cost/frame_number_0.png',
@@ -28,7 +29,7 @@ const AFFINITY_ICON_PATHS: Record<string, string> = {
   terra: '/images/icons/affinity/icon_terra.png',
 };
 
-type ZoomEvent = MouseEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>;
+type ZoomEvent = ReactMouseEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>;
 
 export type DeckCardChipProps = {
   card: Card;
@@ -39,7 +40,7 @@ export type DeckCardChipProps = {
   };
   onIncrement: (cardId: string) => void;
   onDecrement: (cardId: string) => void;
-  onZoom: (card: Card | null, variant?: 'default' | 'compact', anchorRect?: DOMRect | null) => void;
+  onZoom: (card: Card | null, variant?: 'default' | 'compact', anchor?: ZoomAnchor | null) => void;
 };
 
 function getCostIconPath(cost: number): string | null {
@@ -63,7 +64,38 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
 
   const handlePreview = useCallback(
     (event: ZoomEvent) => {
-      onZoom(card, 'compact', event.currentTarget.getBoundingClientRect());
+      const rect = event.currentTarget.getBoundingClientRect();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : rect.right;
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : rect.bottom;
+
+      let pointerX = rect.left + rect.width / 2;
+      let pointerY = rect.top + rect.height / 2;
+
+      if ('clientX' in event && typeof event.clientX === 'number' && typeof event.clientY === 'number') {
+        pointerX = event.clientX;
+        pointerY = event.clientY;
+      } else if (
+        event.nativeEvent &&
+        typeof (event.nativeEvent as MouseEvent).clientX === 'number' &&
+        typeof (event.nativeEvent as MouseEvent).clientY === 'number'
+      ) {
+        const native = event.nativeEvent as globalThis.MouseEvent;
+        pointerX = native.clientX;
+        pointerY = native.clientY;
+      }
+
+      const anchor: ZoomAnchor = {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+        viewportWidth,
+        viewportHeight,
+        pointerX,
+        pointerY,
+      };
+
+      onZoom(card, 'compact', anchor);
     },
     [card, onZoom]
   );
@@ -91,9 +123,9 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
       >
         <span className="flex items-center gap-2">
           {costIcon ? (
-            <Image src={costIcon} alt={`Cost ${card.cost}`} width={28} height={28} className="h-7 w-7" />
+            <Image src={costIcon} alt={`Cost ${card.cost}`} width={32} height={32} className="h-8 w-8" />
           ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/30 text-xs font-semibold text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-xs font-semibold text-white">
               {card.cost}
             </span>
           )}
@@ -129,4 +161,6 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
     </li>
   );
 }
+
+
 

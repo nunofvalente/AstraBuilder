@@ -9,6 +9,8 @@ export type ZoomAnchor = {
   height: number;
   viewportWidth: number;
   viewportHeight: number;
+  pointerX: number;
+  pointerY: number;
 };
 
 export type ZoomOverlayProps = {
@@ -56,23 +58,22 @@ export function ZoomOverlay({ card, onClose, variant = 'default', anchor = null 
       );
 
       if (containerWidth > 0 && estimatedHeight > 0) {
-        const availableRight = viewportWidth - (anchor.left + anchor.width);
-        const availableLeft = anchor.left;
+        const pointerX = anchor.pointerX ?? anchor.left + anchor.width / 2;
+        const pointerY = anchor.pointerY ?? anchor.top + anchor.height / 2;
+        const prefersRight = pointerX <= viewportWidth / 2;
 
-        let left = anchor.left + anchor.width + GAP;
-        if (availableRight >= containerWidth + GAP) {
-          left = anchor.left + anchor.width + GAP;
-        } else if (availableLeft >= containerWidth + GAP) {
-          left = anchor.left - containerWidth - GAP;
-        } else {
-          left = clamp(
-            anchor.left + anchor.width / 2 - containerWidth / 2,
-            EDGE_MARGIN,
-            viewportWidth - EDGE_MARGIN - containerWidth
-          );
+        let left = prefersRight ? pointerX + GAP : pointerX - containerWidth - GAP;
+        if (left < EDGE_MARGIN) {
+          left = EDGE_MARGIN;
+        } else if (left + containerWidth > viewportWidth - EDGE_MARGIN) {
+          left = viewportWidth - EDGE_MARGIN - containerWidth;
         }
 
-        const top = clamp(anchor.top, EDGE_MARGIN, viewportHeight - EDGE_MARGIN - estimatedHeight);
+        const top = clamp(
+          pointerY - estimatedHeight / 2,
+          EDGE_MARGIN,
+          viewportHeight - EDGE_MARGIN - estimatedHeight
+        );
 
         positionStyle = {
           top: `${Math.round(top)}px`,
