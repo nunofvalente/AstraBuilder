@@ -59,7 +59,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isCostCurveVisible, setIsCostCurveVisible] = useState(true);
+  const [isCostCurveVisible, setIsCostCurveVisible] = useState(false);
   const [activeMobilePane, setActiveMobilePane] = useState<'catalogue' | 'deck'>('catalogue');
 
   useEffect(() => {
