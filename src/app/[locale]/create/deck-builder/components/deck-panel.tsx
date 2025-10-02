@@ -1,10 +1,12 @@
 'use client';
 
-import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Card, CostBucket, DeckEntry } from '../types';
-import { getAffinityColorScheme } from '../constants';
+import { DeckCardChip } from './deck-card-chip';
+
+const CARD_TYPE_ORDER = ['Unit', 'Tactic', 'Territory'];
+const FALLBACK_TYPE_LABEL = 'Other';
 
 export type DeckPanelProps = {
   deckEntries: DeckEntry[];
@@ -16,6 +18,7 @@ export type DeckPanelProps = {
     totalCardsLabel: string;
     emptyDeck: string;
     removeButton: string;
+    addButton: string;
     costCurveHeading: string;
     costCurveEmpty: string;
     showCostCurve: string;
@@ -26,6 +29,7 @@ export type DeckPanelProps = {
     menuShare: string;
     menuSave: string;
   };
+  onAdd: (cardId: string) => void;
   onRemove: (cardId: string) => void;
   onZoom: (card: Card | null, variant?: 'default' | 'compact', anchorRect?: DOMRect | null) => void;
   onMenuSelect: (action: 'import' | 'export' | 'share' | 'save') => void;
@@ -39,6 +43,7 @@ export function DeckPanel({
   costBuckets,
   maxBucketCount,
   labels,
+  onAdd,
   onRemove,
   onZoom,
   onMenuSelect,
@@ -49,6 +54,46 @@ export function DeckPanel({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const sections = useMemo(() => {
+    if (deckEntries.length === 0) {
+      return [];
+    }
+
+    const groups = new Map<string, { label: string; entries: DeckEntry[] }>();
+
+    for (const entry of deckEntries) {
+      const rawType = entry.card.type?.trim();
+      const label = rawType && rawType.length > 0 ? rawType : FALLBACK_TYPE_LABEL;
+      const key = label.toLowerCase();
+      const existing = groups.get(key);
+      if (existing) {
+        existing.entries.push(entry);
+      } else {
+        groups.set(key, { label, entries: [entry] });
+      }
+    }
+
+    const getPriority = (label: string) => {
+      const index = CARD_TYPE_ORDER.findIndex((type) => type.toLowerCase() === label.toLowerCase());
+      return index === -1 ? CARD_TYPE_ORDER.length : index;
+    };
+
+    return Array.from(groups.values())
+      .map(({ label, entries }) => ({
+        type: label,
+        entries,
+        total: entries.reduce((sum, item) => sum + item.count, 0),
+      }))
+      .sort((a, b) => {
+        const priorityDiff = getPriority(a.type) - getPriority(b.type);
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
+
+        return a.type.localeCompare(b.type);
+      });
+  }, [deckEntries]);
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -285,79 +330,31 @@ export function DeckPanel({
           <p className="px-4 py-6 text-sm text-[color:var(--text-secondary)]">{labels.emptyDeck}</p>
         ) : (
           <div className="deck-scroll flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
-            <ul className="flex flex-col gap-3">
-              {deckEntries.map(({ card, count }) => {
-                const scheme = getAffinityColorScheme(card.affinity);
-                return (
-                  <li
-                    key={card.id}
-                    className="group flex items-center gap-3 rounded-md border p-2 transition-shadow hover:shadow-md"
-                    style={{
-                      background: scheme.gradient,
-                      borderColor: scheme.borderColor,
-                      color: scheme.textColor,
-                    }}
-                  >
-                  <div className="relative h-28 w-20 flex-shrink-0 overflow-hidden rounded-none lg:h-24 lg:w-16">
-                    <button
-                      type="button"
-                      onClick={() => onZoom(card)}
-                      onMouseEnter={(event) =>
-                        onZoom(card, 'compact', event.currentTarget.getBoundingClientRect())
-                      }
-                      onMouseLeave={() => onZoom(null)}
-                      onFocus={(event) =>
-                        onZoom(card, 'compact', event.currentTarget.getBoundingClientRect())
-                      }
-                      onBlur={() => onZoom(null)}
-                      aria-label={`Zoom ${card.name}`}
-                      className="group/image relative block h-full w-full overflow-hidden rounded-none focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-                    >
-                      <Image
-                        src={card.imageSrc}
-                        alt={card.name}
-                        width={200}
-                        height={280}
-                        className="h-full w-full select-none object-cover transition-transform duration-150 group-hover/image:scale-110"
-                        sizes="200px"
+            <div className="flex flex-col gap-6">
+              {sections.map((section) => (
+                <section key={section.type} className="flex flex-col gap-3">
+                  <header className="flex items-center justify-between px-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      {section.type}
+                    </h3>
+                    <span className="text-xs text-[color:var(--text-secondary)]">x{section.total}</span>
+                  </header>
+                  <ul className="flex flex-col gap-2">
+                    {section.entries.map(({ card, count }) => (
+                      <DeckCardChip
+                        key={card.id}
+                        card={card}
+                        count={count}
+                        labels={{ add: labels.addButton, remove: labels.removeButton }}
+                        onIncrement={onAdd}
+                        onDecrement={onRemove}
+                        onZoom={onZoom}
                       />
-                    </button>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold" style={{ color: scheme.textColor }}>
-                      {card.name}
-                    </p>
-                    <p className="truncate text-xs" style={{ color: scheme.mutedTextColor }}>
-                      {labels.totalCardsLabel}: {count} | {card.type} | Cost {card.cost}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span
-                      className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold"
-                      style={{
-                        backgroundColor: scheme.chipBackground,
-                        color: scheme.chipTextColor,
-                      }}
-                    >
-                      x{count}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onRemove(card.id)}
-                      className="rounded-md border px-2 py-1 text-xs font-medium transition"
-                      style={{
-                        backgroundColor: scheme.chipBackground,
-                        borderColor: scheme.chipBackground,
-                        color: scheme.chipTextColor,
-                      }}
-                    >
-                      {labels.removeButton}
-                    </button>
-                  </div>
-                </li>
-                );
-              })}
-            </ul>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
           </div>
         )}
       </section>

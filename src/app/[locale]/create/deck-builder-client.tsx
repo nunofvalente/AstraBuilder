@@ -443,6 +443,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
             totalCardsLabel: builder.totalCardsLabel,
             emptyDeck: builder.emptyDeck,
             removeButton: builder.removeButton,
+            addButton: builder.addButton,
             costCurveHeading: builder.costCurveHeading,
             costCurveEmpty: builder.costCurveEmpty,
             showCostCurve: builder.showCostCurve,
@@ -453,6 +454,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
             menuShare: builder.menuShare,
             menuSave: builder.menuSave,
           }}
+          onAdd={handleAddCard}
           onRemove={handleRemoveCard}
           onZoom={handleZoom}
           onMenuSelect={handleMenuSelect}

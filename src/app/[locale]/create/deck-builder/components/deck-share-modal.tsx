@@ -85,7 +85,7 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
       }
 
       try {
-        const htmlToImageModule = await import('html-to-image').catch(async () => import('html-to-image/dist/html-to-image.js'));
+        const htmlToImageModule = await import('html-to-image');
         const toPng =
           (htmlToImageModule as typeof import('html-to-image')).toPng ??
           ((htmlToImageModule as { default?: typeof import('html-to-image') }).default?.toPng ?? null);
