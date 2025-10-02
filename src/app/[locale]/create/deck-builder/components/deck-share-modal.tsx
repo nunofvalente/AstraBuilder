@@ -34,10 +34,38 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
   const hasDeck = deckEntries.length > 0;
 
   const shareSections = useMemo(() => {
+    if (deckEntries.length === 0) {
+      return [];
+    }
+
     const order = ['Unit', 'Tactic', 'Territory'];
-    return order.map((type) => {
-      const entries = deckEntries.filter(({ card }) => card.type.toLowerCase() === type.toLowerCase());
-      return { type, entries };
+    const groups = new Map<string, { type: string; entries: DeckEntry[]; total: number }>();
+
+    for (const entry of deckEntries) {
+      const rawType = entry.card.type?.trim();
+      const label = rawType && rawType.length > 0 ? rawType : 'Other';
+      const key = label.toLowerCase();
+      const existing = groups.get(key);
+      if (existing) {
+        existing.entries.push(entry);
+        existing.total += entry.count;
+      } else {
+        groups.set(key, { type: label, entries: [entry], total: entry.count });
+      }
+    }
+
+    const getPriority = (label: string) => {
+      const index = order.findIndex((type) => type.toLowerCase() === label.toLowerCase());
+      return index === -1 ? order.length : index;
+    };
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const priorityDiff = getPriority(a.type) - getPriority(b.type);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return a.type.localeCompare(b.type);
     });
   }, [deckEntries]);
 
@@ -238,55 +266,48 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
             </span>
           </header>
 
-          {['Unit', 'Tactic', 'Territory'].map((category) => {
-            const section = shareSections.find((item) => item.type === category);
-            if (!section || section.entries.length === 0) {
-              return null;
-            }
-
-            return (
-              <section key={`share-${category}`} className="mt-4 first:mt-0">
-                <header className="flex items-center justify-between border-b border-neutral-200 pb-2">
-                  <h3 className="text-xl font-semibold text-[color:var(--accent)]">{category}</h3>
-                  <span className="text-xs text-neutral-500">{section.entries.length} cards</span>
-                </header>
-                <ul className="mt-3 grid grid-cols-2 gap-3">
-                  {section.entries.map(({ card, count }) => {
-                    const scheme = getAffinityColorScheme(card.affinity);
-                    return (
-                      <li
-                        key={`share-${category}-${card.id}`}
-                        className="flex items-center justify-between rounded-lg border px-4 py-3"
+          {shareSections.map((section) => (
+            <section key={`share-${section.type}`} className="mt-4 first:mt-0">
+              <header className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                <h3 className="text-xl font-semibold text-[color:var(--accent)]">{section.type}</h3>
+                <span className="text-xs text-neutral-500">{section.total} cards</span>
+              </header>
+              <ul className="mt-3 grid grid-cols-2 gap-3">
+                {section.entries.map(({ card, count }) => {
+                  const scheme = getAffinityColorScheme(card.affinity);
+                  return (
+                    <li
+                      key={`share-${section.type}-${card.id}`}
+                      className="flex items-center justify-between rounded-lg border px-4 py-3"
+                      style={{
+                        background: scheme.gradient,
+                        borderColor: scheme.borderColor,
+                        color: scheme.textColor,
+                      }}
+                    >
+                      <div className="min-w-0 pr-3">
+                        <p className="truncate text-sm font-semibold" style={{ color: scheme.textColor }}>
+                          {card.name}
+                        </p>
+                        <p className="truncate text-xs" style={{ color: scheme.mutedTextColor }}>
+                          {card.subtype ? `${card.subtype}` : card.type}
+                        </p>
+                      </div>
+                      <span
+                        className="rounded-full px-3 py-1 text-xs font-semibold"
                         style={{
-                          background: scheme.gradient,
-                          borderColor: scheme.borderColor,
-                          color: scheme.textColor,
+                          backgroundColor: scheme.chipBackground,
+                          color: scheme.chipTextColor,
                         }}
                       >
-                        <div className="min-w-0 pr-3">
-                          <p className="truncate text-sm font-semibold" style={{ color: scheme.textColor }}>
-                            {card.name}
-                          </p>
-                          <p className="truncate text-xs" style={{ color: scheme.mutedTextColor }}>
-                            {card.subtype ? `${card.subtype}` : card.type}
-                          </p>
-                        </div>
-                        <span
-                          className="rounded-full px-3 py-1 text-xs font-semibold"
-                          style={{
-                            backgroundColor: scheme.chipBackground,
-                            color: scheme.chipTextColor,
-                          }}
-                        >
-                          x{count}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
+                        x{count}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
         </div>
       </div>
     </>

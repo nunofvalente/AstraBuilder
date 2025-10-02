@@ -31,7 +31,7 @@ export function CardLibrary({
 }: CardLibraryProps) {
   if (isLoading) {
     return (
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
         {Array.from({ length: skeletonCount }).map((_, index) => (
           <li key={index}>
             <div className="aspect-[5/7] w-full animate-pulse rounded-none bg-[color:var(--surface-muted)]" />
@@ -50,7 +50,7 @@ export function CardLibrary({
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
       {cards.map((card) => {
         const copies = deck[card.id] ?? 0;
         const isSelected = copies > 0;

@@ -24,7 +24,7 @@ function CostCurve({ className = '', costBuckets, maxBucketCount, totalCards, he
   const visibleBuckets = costBuckets.filter((bucket) => bucket.count > 0);
   const bucketsToRender = visibleBuckets.length > 0 ? visibleBuckets : costBuckets;
 
-  const rootClassName = ['flex min-h-0 min-w-0 flex-1 flex-col lg:basis-1/2 xl:basis-1/3', className]\r\n    .filter(Boolean)\r\n    .join(' ');\r\n\r\n  return (
+  return (
     <div className={className}>
       <h3 className="text-sm font-semibold text-[color:var(--text-primary)] min-[1920px]:text-base">{heading}</h3>
       {totalCards === 0 ? (
@@ -97,6 +97,12 @@ export function DeckPanel({
   className = '',
 }: DeckPanelProps) {
   const costCurveToggleLabel = isCostCurveVisible ? labels.hideCostCurve : labels.showCostCurve;
+  const rootClassName = [
+    'flex min-h-0 min-w-0 basis-1/2 flex-1 flex-col xl:basis-2/5 min-[1920px]:basis-1/3',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
