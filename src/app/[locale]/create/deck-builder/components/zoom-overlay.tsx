@@ -85,7 +85,7 @@ export function ZoomOverlay({ card, onClose, variant = 'default', anchor = null 
     }
 
     return (
-      <div className="pointer-events-none fixed inset-0 z-40">
+      <div className="pointer-events-none fixed inset-0 z-[70]">
         <div
           className="absolute overflow-hidden rounded-none bg-[color:var(--surface)]/95 p-3 shadow-2xl"
           style={{

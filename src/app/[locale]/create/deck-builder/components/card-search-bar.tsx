@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 
 import type { SearchQuery, SearchSuggestion } from '../search';
 
@@ -31,6 +31,86 @@ export function CardSearchBar({
   onRemoveFilter,
   children,
 }: CardSearchBarProps) {
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number>(-1);
+  const suggestionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const suggestionListId = 'card-search-suggestions';
+  const hasSuggestions = suggestions.length > 0;
+  const activeSuggestionId =
+    activeSuggestionIndex >= 0 && activeSuggestionIndex < suggestions.length
+      ? `${suggestionListId}-${suggestions[activeSuggestionIndex].key}`
+      : undefined;
+
+  suggestionRefs.current = Array(suggestions.length).fill(null);
+
+  useEffect(() => {
+    setActiveSuggestionIndex(-1);
+  }, [suggestions]);
+
+  useEffect(() => {
+    if (activeSuggestionIndex < 0 || activeSuggestionIndex >= suggestionRefs.current.length) {
+      return;
+    }
+
+    const node = suggestionRefs.current[activeSuggestionIndex];
+    if (node) {
+      node.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeSuggestionIndex]);
+
+  function handleInputChange(value: string) {
+    setActiveSuggestionIndex(-1);
+    onSearchTermChange(value);
+  }
+
+  function handleSuggestionPick(value: string) {
+    setActiveSuggestionIndex(-1);
+    onSuggestionSelect(value);
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown' && hasSuggestions) {
+      event.preventDefault();
+      setActiveSuggestionIndex((previous) => {
+        const next = previous + 1;
+        if (next >= suggestions.length) {
+          return 0;
+        }
+        return next;
+      });
+      return;
+    }
+
+    if (event.key === 'ArrowUp' && hasSuggestions) {
+      event.preventDefault();
+      setActiveSuggestionIndex((previous) => {
+        if (previous <= 0) {
+          return suggestions.length - 1;
+        }
+        return previous - 1;
+      });
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      if (activeSuggestionIndex !== -1) {
+        event.preventDefault();
+        setActiveSuggestionIndex(-1);
+      }
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      if (activeSuggestionIndex >= 0 && activeSuggestionIndex < suggestions.length) {
+        event.preventDefault();
+        handleSuggestionPick(suggestions[activeSuggestionIndex].value);
+        return;
+      }
+
+      event.preventDefault();
+      onSubmit();
+    }
+  }
+
   return (
     <div className="border-b border-[color:var(--border)] px-4 py-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -39,33 +119,54 @@ export function CardSearchBar({
             id="card-search"
             type="search"
             value={searchTerm}
-            onChange={(event) => onSearchTermChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onSubmit();
-              }
-            }}
+            onChange={(event) => handleInputChange(event.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={placeholder}
             aria-label={ariaLabel}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={hasSuggestions}
+            aria-controls={hasSuggestions ? suggestionListId : undefined}
+            aria-activedescendant={activeSuggestionId}
             className="w-full border border-[color:var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
           />
-          {suggestions.length > 0 ? (
-            <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-lg">
-              {suggestions.map((suggestion) => (
-                <li key={suggestion.key}>
-                  <button
-                    type="button"
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      onSuggestionSelect(suggestion.value);
-                    }}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text-primary)]"
-                  >
-                    <span>{suggestion.display}</span>
-                  </button>
-                </li>
-              ))}
+          {hasSuggestions ? (
+            <ul
+              id={suggestionListId}
+              role="listbox"
+              aria-label="Search suggestions"
+              className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-lg"
+            >
+              {suggestions.map((suggestion, index) => {
+                const suggestionId = `${suggestionListId}-${suggestion.key}`;
+                const isActive = index === activeSuggestionIndex;
+
+                return (
+                  <li key={suggestion.key}>
+                    <button
+                      id={suggestionId}
+                      ref={(element) => {
+                        suggestionRefs.current[index] = element;
+                      }}
+                      type="button"
+                      role="option"
+                      aria-selected={isActive}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        handleSuggestionPick(suggestion.value);
+                      }}
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition ${
+                        isActive
+                          ? 'bg-[color:var(--surface-muted)] text-[color:var(--text-primary)]'
+                          : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text-primary)]'
+                      }`}
+                    >
+                      <span>{suggestion.display}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
         </div>

@@ -177,13 +177,13 @@ export function DeckPanel({
     );
 
   const deckListSmall = (
-    <div className="deck-scroll flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
+    <div className="deck-scroll h-full min-h-0 overflow-y-auto px-4 pb-4 pt-4">
       {deckListContent}
     </div>
   );
 
   const deckListLarge = (
-    <div className="deck-scroll flex-1 min-h-0 overflow-y-auto min-[1920px]:order-1 min-[1920px]:p-0">
+    <div className="deck-scroll flex-1 h-full min-h-0 overflow-y-auto min-[1920px]:order-1 min-[1920px]:p-0 min-[1920px]:pr-4">
       {deckListContent}
     </div>
   );
@@ -398,7 +398,7 @@ export function DeckPanel({
           heading={labels.costCurveHeading}
           emptyLabel={labels.costCurveEmpty}
         />
-        <div className="hidden min-[1920px]:flex min-[1920px]:min-h-0 min-[1920px]:flex-1 min-[1920px]:items-start min-[1920px]:gap-6 min-[1920px]:px-6 min-[1920px]:pb-6 min-[1920px]:pt-4">
+        <div className="hidden min-[1920px]:flex min-[1920px]:min-h-0 min-[1920px]:flex-1 min-[1920px]:items-start min-[1920px]:gap-6 min-[1920px]:px-6 min-[1920px]:pb-6 min-[1920px]:pt-4 min-[1920px]:overflow-hidden">
           {deckListLarge}
           <CostCurve
             className="w-[320px] flex-shrink-0 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 p-4 shadow-sm min-[1920px]:order-2"
