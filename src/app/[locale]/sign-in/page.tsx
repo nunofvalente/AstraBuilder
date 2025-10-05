@@ -1,4 +1,5 @@
-﻿import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import { notFound } from "next/navigation";
 
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -29,7 +30,9 @@ export default async function SignInPage({ params }: SignInPageProps) {
           <h1 className="text-2xl font-semibold">{signInCopy.title}</h1>
           <p className="text-sm text-[color:var(--text-secondary)]">{signInCopy.description}</p>
         </div>
-        <SignInForm locale={locale as Locale} dictionary={signInCopy} />
+        <Suspense fallback={<div className="text-sm text-[color:var(--text-secondary)]">Loading�</div>}>
+          <SignInForm locale={locale as Locale} dictionary={signInCopy} />
+        </Suspense>
       </div>
     </div>
   );
