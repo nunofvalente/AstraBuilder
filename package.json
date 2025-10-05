@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "generate:cards": "node scripts/generate-card-data.mjs"
+    "generate:cards": "node scripts/generate-card-data.mjs",
+    "storage:set-cache": "node scripts/set-storage-cache-control.mjs --bucket cards --seconds 31536000"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",

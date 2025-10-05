@@ -1,5 +1,5 @@
 import Image from 'next/image';
-
+import { getTransformedImageUrl } from '../image-url';
 import type { Card } from '../types';
 
 export type ZoomAnchor = {
@@ -36,6 +36,12 @@ export function ZoomOverlay({ card, onClose, variant = 'default', anchor = null 
   }
 
   if (variant === 'compact') {
+    const transformedSrc = getTransformedImageUrl(card.imageSrc, {
+      width: 400,
+      height: 560,
+      quality: 80,
+    });
+
     const canAnchor =
       anchor != null &&
       anchor.viewportWidth > EDGE_MARGIN * 2 &&
@@ -95,17 +101,24 @@ export function ZoomOverlay({ card, onClose, variant = 'default', anchor = null 
           }}
         >
           <Image
-            src={card.imageSrc}
+            src={transformedSrc}
             alt={card.name}
             width={400}
             height={560}
             className="h-auto max-h-[80vh] w-full select-none rounded-none"
             sizes="(max-width: 768px) 80vw, 416px"
+            loading="lazy"
           />
         </div>
       </div>
     );
   }
+
+  const transformedSrc = getTransformedImageUrl(card.imageSrc, {
+    width: 400,
+    height: 560,
+    quality: 85,
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 sm:p-6" role="dialog" aria-modal="true">
@@ -122,12 +135,13 @@ export function ZoomOverlay({ card, onClose, variant = 'default', anchor = null 
         </button>
         <div className="overflow-hidden rounded-none bg-[color:var(--surface)] p-4 shadow-2xl">
           <Image
-            src={card.imageSrc}
+            src={transformedSrc}
             alt={card.name}
             width={400}
             height={560}
             className="h-auto w-full select-none rounded-none"
             sizes="(min-width: 640px) 400px, 92vw"
+            loading="lazy"
           />
         </div>
       </div>
