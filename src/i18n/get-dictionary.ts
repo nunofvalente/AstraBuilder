@@ -238,8 +238,9 @@ export type SignInDictionary = AuthDictionary["auth"]["signIn"];
 export type ForgotPasswordDictionary = AuthDictionary["auth"]["forgotPassword"];
 export type ResetPasswordDictionary = AuthDictionary["auth"]["resetPassword"];
 export type PasswordStrengthDictionary = AuthDictionary["auth"]["passwordStrength"];
-export type ProfileDictionary = ProfileDictionaryShape;
+export type ProfileDictionary = ProfileDictionaryShape["profile"];
 
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);
 }
+
