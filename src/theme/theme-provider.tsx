@@ -6,6 +6,8 @@ import { DESIGN_TOKEN_KEYS, DESIGN_TOKENS, type DesignTokenName } from "./design
 
 type Theme = "light" | "dark";
 
+const DEFAULT_THEME: Theme = "dark";
+
 type ThemeContextValue = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
@@ -18,7 +20,7 @@ const STORAGE_KEY = "astrabuilder-theme";
 
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") {
-    return "light";
+    return DEFAULT_THEME;
   }
 
   try {
@@ -30,7 +32,7 @@ function getInitialTheme(): Theme {
     console.warn("Unable to access theme in localStorage", error);
   }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return DEFAULT_THEME;
 }
 
 const TOKEN_VARIABLES = DESIGN_TOKEN_KEYS.reduce<Record<DesignTokenName, string>>((accumulator, token) => {
