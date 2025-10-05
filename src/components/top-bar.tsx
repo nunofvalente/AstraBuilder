@@ -52,10 +52,10 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [authEvent, setAuthEvent] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
-  const [sessionType, setSessionType] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
@@ -75,7 +75,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
         }
 
         setUser(session?.user ?? null);
-        setSessionType(session?.type ?? null);
+        setAuthEvent(null);
         setIsAuthReady(true);
       })
       .catch((error) => {
@@ -87,13 +87,13 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
         setIsAuthReady(true);
       });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) {
         return;
       }
 
       setUser(session?.user ?? null);
-      setSessionType(session?.type ?? null);
+      setAuthEvent(event ?? null);
       setIsAuthReady(true);
     });
 
@@ -108,11 +108,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
       return;
     }
 
-    if (sessionType === null) {
-      return;
-    }
-
-    if (sessionType === 'recovery') {
+    if (authEvent === 'PASSWORD_RECOVERY') {
       const hasRecoveryFlag = window.localStorage.getItem(RESET_FLAG_STORAGE_KEY) === '1';
       const requiredPath = `/${locale}/reset-password`;
       if (!hasRecoveryFlag) {
@@ -128,7 +124,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     } else {
       window.localStorage.removeItem(RESET_FLAG_STORAGE_KEY);
     }
-  }, [sessionType, locale, pathname, router, isAuthReady]);
+  }, [authEvent, locale, pathname, router, isAuthReady]);
 
   useEffect(() => {
     if (!isSettingsMenuOpen && !isLanguageMenuOpen && !isUserMenuOpen) {
@@ -501,3 +497,6 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     </header>
   );
 }
+
+
+
