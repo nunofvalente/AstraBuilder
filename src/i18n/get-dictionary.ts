@@ -111,10 +111,117 @@ type AuthDictionary = {
         signInLink: string;
       };
     };
+    signIn: {
+      title: string;
+      description: string;
+      dividerLabel: string;
+      form: {
+        emailLabel: string;
+        passwordLabel: string;
+        submit: string;
+      };
+      google: {
+        button: string;
+      };
+      messages: {
+        invalidCredentials: string;
+        genericError: string;
+        passwordResetSuccess: string;
+        passwordResetExpired: string;
+        accountDeleted: string;
+      };
+      footer: {
+        noAccount: string;
+        signUpLink: string;
+      };
+      forgotPasswordLink: string;
+    };
+    forgotPassword: {
+      title: string;
+      description: string;
+      form: {
+        emailLabel: string;
+        submit: string;
+      };
+      messages: {
+        success: string;
+        genericError: string;
+      };
+      footer: {
+        backToSignIn: string;
+      };
+    };
+    resetPassword: {
+      title: string;
+      description: string;
+      form: {
+        passwordLabel: string;
+        confirmPasswordLabel: string;
+        submit: string;
+      };
+      messages: {
+        mismatch: string;
+        genericError: string;
+        success: string;
+      };
+      footer: {
+        backToHome: string;
+      };
+    };
+    passwordStrength: {
+      label: string;
+      values: {
+        tooWeak: string;
+        weak: string;
+        medium: string;
+        strong: string;
+        veryStrong: string;
+      };
+    };
   };
 };
 
-type DictionaryModule = { default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary };
+type ProfileDictionaryShape = {
+  profile: {
+    heading: string;
+    description: string;
+    fields: {
+      username: string;
+      usernameHint: string;
+      bio: string;
+      bioHint: string;
+      xLink: string;
+      xPlaceholder: string;
+      youtubeLink: string;
+      youtubePlaceholder: string;
+    };
+    actions: {
+      save: string;
+      saving: string;
+    };
+    deleteAccount: {
+      title: string;
+      description: string;
+      trigger: string;
+      confirmationLabel: string;
+      confirmationDescription: string;
+      confirmationPlaceholder: string;
+      confirmationKeyword: string;
+      confirmButton: string;
+      cancelButton: string;
+      success: string;
+      error: string;
+      keywordMismatch: string;
+    };
+    messages: {
+      loading: string;
+      success: string;
+      error: string;
+      usernameRequired: string;
+    };
+  };
+};
+type DictionaryModule = { default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
 
@@ -125,8 +232,13 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary;
+export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape;
 export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
+export type SignInDictionary = AuthDictionary["auth"]["signIn"];
+export type ForgotPasswordDictionary = AuthDictionary["auth"]["forgotPassword"];
+export type ResetPasswordDictionary = AuthDictionary["auth"]["resetPassword"];
+export type PasswordStrengthDictionary = AuthDictionary["auth"]["passwordStrength"];
+export type ProfileDictionary = ProfileDictionaryShape;
 
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);

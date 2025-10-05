@@ -28,32 +28,32 @@
     "totalCardsLabel": "Jumlah kad",
     "filtersDescription": "Pilihan penapisan akan tiba tidak lama lagi.",
     "noResults": "Tiada kad sepadan dengan carian anda.",
-  "cardsHeading": "Perpustakaan kad",
-  "costCurveHeading": "Keluk kos",
-  "showCostCurve": "Tunjukkan keluk kos",
-  "hideCostCurve": "Sembunyikan keluk kos",
-  "menuImport": "Import",
-  "menuExport": "Eksport",
-  "menuShare": "Kongsi imej",
-  "menuSave": "Simpan dek",
-  "importHeading": "Import dek",
-  "importInstructions": "Tampal JSON eksport di bawah atau muat naik fail untuk mengimport dek.",
-  "importPlaceholder": "[\n  {\n    \"name\": \"Nama Kad\",\n    \"count\": 2\n  }\n]",
-  "importUploadLabel": "Muat naik fail JSON",
-  "importButton": "Import dek",
-  "importCancel": "Batal",
-  "importErrorInvalid": "JSON yang diberi tidak dapat diproses. Sila semak format dan cuba lagi.",
-  "importErrorUnknown": "Kad ini tidak ditemui dalam katalog:",
-  "importErrorEmpty": "Tiada kad sah ditemui dalam data import.",
-  "addButton": "Tambah",
-  "searchPlaceholder": "Cari mengikut nama atau kata kunci",
-  "filtersHeading": "Penapis",
-  "menuButton": "Menu",
-  "exportOptionTTS": "Eksport ke TTS",
-  "exportCopy": "Salin JSON",
-  "exportCopySuccess": "JSON disalin ke papan klip.",
-  "exportCopyError": "Tidak dapat menyalin secara automatik. Sila salin secara manual.",
-  "shareButton": "Kongsi imej",
+    "cardsHeading": "Perpustakaan kad",
+    "costCurveHeading": "Keluk kos",
+    "showCostCurve": "Tunjukkan keluk kos",
+    "hideCostCurve": "Sembunyikan keluk kos",
+    "menuImport": "Import",
+    "menuExport": "Eksport",
+    "menuShare": "Kongsi imej",
+    "menuSave": "Simpan dek",
+    "importHeading": "Import dek",
+    "importInstructions": "Tampal JSON eksport di bawah atau muat naik fail untuk mengimport dek.",
+    "importPlaceholder": "[\n  {\n    \"name\": \"Nama Kad\",\n    \"count\": 2\n  }\n]",
+    "importUploadLabel": "Muat naik fail JSON",
+    "importButton": "Import dek",
+    "importCancel": "Batal",
+    "importErrorInvalid": "JSON yang diberi tidak dapat diproses. Sila semak format dan cuba lagi.",
+    "importErrorUnknown": "Kad ini tidak ditemui dalam katalog:",
+    "importErrorEmpty": "Tiada kad sah ditemui dalam data import.",
+    "addButton": "Tambah",
+    "searchPlaceholder": "Cari mengikut nama atau kata kunci",
+    "filtersHeading": "Penapis",
+    "menuButton": "Menu",
+    "exportOptionTTS": "Eksport ke TTS",
+    "exportCopy": "Salin JSON",
+    "exportCopySuccess": "JSON disalin ke papan klip.",
+    "exportCopyError": "Tidak dapat menyalin secara automatik. Sila salin secara manual.",
+    "shareButton": "Kongsi imej",
     "shareGenerating": "Menjana imej...",
     "shareDownload": "Muat turun imej",
     "shareCopy": "Salin imej",
@@ -99,6 +99,111 @@
         "haveAccount": "Sudah ada akaun?",
         "signInLink": "Log masuk"
       }
+    },
+    "signIn": {
+      "title": "Selamat kembali",
+      "description": "Log masuk untuk terus membina dan berkongsi dek anda.",
+      "dividerLabel": "Atau teruskan dengan",
+      "form": {
+        "emailLabel": "E-mel",
+        "passwordLabel": "Kata laluan",
+        "submit": "Log masuk"
+      },
+      "google": {
+        "button": "Teruskan dengan Google"
+      },
+      "messages": {
+        "invalidCredentials": "E-mel atau kata laluan tidak sah.",
+        "genericError": "Kami tidak dapat log masuk anda. Sila cuba lagi.",
+        "passwordResetSuccess": "Kata laluan dikemas kini. Sila log masuk dengan kata laluan baharu anda.",
+        "passwordResetExpired": "Pautan tetapan semula ini telah tamat tempoh. Sila minta pautan baharu.",
+        "accountDeleted": "Akaun anda telah dipadam. Kami sedih untuk melihat anda pergi."
+      },
+      "footer": {
+        "noAccount": "Belum ada akaun?",
+        "signUpLink": "Daftar sekarang"
+      },
+      "forgotPasswordLink": "Lupa kata laluan?"
+    },
+    "forgotPassword": {
+      "title": "Tetapkan semula kata laluan",
+      "description": "Masukkan e-mel akaun anda dan kami akan menghantar pautan tetapan semula.",
+      "form": {
+        "emailLabel": "E-mel",
+        "submit": "Hantar pautan tetapan semula"
+      },
+      "messages": {
+        "success": "Semak peti masuk anda untuk pautan tetapan semula kata laluan.",
+        "genericError": "Kami tidak dapat menghantar e-mel tetapan semula. Sila cuba lagi."
+      },
+      "footer": {
+        "backToSignIn": "Kembali ke log masuk"
+      }
+    },
+    "resetPassword": {
+      "title": "Buat kata laluan baharu",
+      "description": "Masukkan kata laluan baharu untuk akaun anda.",
+      "form": {
+        "passwordLabel": "Kata laluan baharu",
+        "confirmPasswordLabel": "Sahkan kata laluan baharu",
+        "submit": "Kemaskini kata laluan"
+      },
+      "messages": {
+        "mismatch": "Kata laluan tidak sepadan.",
+        "genericError": "Kami tidak dapat mengemas kini kata laluan. Sila cuba lagi.",
+        "success": "Kata laluan dikemas kini. Anda boleh meneruskan."
+      },
+      "footer": {
+        "backToHome": "Kembali ke laman utama"
+      }
+    },
+    "passwordStrength": {
+      "label": "Kekuatan kata laluan",
+      "values": {
+        "tooWeak": "Terlalu lemah",
+        "weak": "Lemah",
+        "medium": "Sederhana",
+        "strong": "Kuat",
+        "veryStrong": "Sangat kuat"
+      }
+    }
+  },
+  "profile": {
+    "heading": "Profil",
+    "description": "Kemas kini cara pemain lain melihat anda di AstraBuilder.",
+    "fields": {
+      "username": "Nama paparan",
+      "usernameHint": "Dipaparkan bersama dek yang anda kongsi.",
+      "bio": "Bio",
+      "bioHint": "Pilihan. Sehingga 280 aksara.",
+      "xLink": "Pautan X (Twitter)",
+      "xPlaceholder": "https://x.com/pengendalianda",
+      "youtubeLink": "Pautan YouTube",
+      "youtubePlaceholder": "https://youtube.com/@salurananda"
+    },
+    "actions": {
+      "save": "Simpan perubahan",
+      "saving": "Menyimpan..."
+    },
+    "messages": {
+      "loading": "Memuatkan profil...",
+      "success": "Profil berjaya dikemas kini.",
+      "error": "Profil anda tidak dapat dikemas kini. Sila cuba lagi.",
+      "usernameRequired": "Nama paparan diperlukan."
+    },
+    "deleteAccount": {
+      "title": "Padam akaun",
+      "description": "Padam akaun AstraBuilder anda dan semua data yang berkaitan secara kekal. Tindakan ini tidak boleh dibatalkan.",
+      "trigger": "Padam akaun",
+      "confirmationLabel": "Pengesahan",
+      "confirmationDescription": "Taip \"delete\" untuk mengesahkan. Tindakan ini tidak boleh dibatalkan.",
+      "confirmationPlaceholder": "delete",
+      "confirmationKeyword": "delete",
+      "confirmButton": "Sahkan pemadaman",
+      "cancelButton": "Batal",
+      "success": "Akaun anda telah dipadam.",
+      "error": "Kami tidak dapat memadam akaun anda. Sila cuba lagi.",
+      "keywordMismatch": "Sila taip delete untuk mengesahkan."
     }
   }
 }

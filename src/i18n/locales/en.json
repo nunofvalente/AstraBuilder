@@ -99,6 +99,111 @@
         "haveAccount": "Already have an account?",
         "signInLink": "Sign in"
       }
+    },
+    "signIn": {
+      "title": "Welcome back",
+      "description": "Sign in to continue building and sharing your decks.",
+      "dividerLabel": "Or continue with",
+      "form": {
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "submit": "Sign in"
+      },
+      "google": {
+        "button": "Continue with Google"
+      },
+      "messages": {
+        "invalidCredentials": "The email or password is incorrect.",
+        "genericError": "We could not sign you in. Please try again.",
+        "passwordResetSuccess": "Password updated. Please sign in with your new password.",
+        "passwordResetExpired": "This reset link has expired. Please request a new one.",
+        "accountDeleted": "Your account has been deleted. We're sorry to see you go."
+      },
+      "footer": {
+        "noAccount": "Don't have an account yet?",
+        "signUpLink": "Create one"
+      },
+      "forgotPasswordLink": "Forgot password?"
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "description": "Enter your account email and we will send you a reset link.",
+      "form": {
+        "emailLabel": "Email",
+        "submit": "Send reset link"
+      },
+      "messages": {
+        "success": "Check your inbox for a password reset link.",
+        "genericError": "We could not send the reset email. Please try again."
+      },
+      "footer": {
+        "backToSignIn": "Back to sign in"
+      }
+    },
+    "resetPassword": {
+      "title": "Create a new password",
+      "description": "Enter a new password for your account.",
+      "form": {
+        "passwordLabel": "New password",
+        "confirmPasswordLabel": "Confirm new password",
+        "submit": "Update password"
+      },
+      "messages": {
+        "mismatch": "Passwords do not match.",
+        "genericError": "We could not update your password. Please try again.",
+        "success": "Password updated. You can continue."
+      },
+      "footer": {
+        "backToHome": "Back to home"
+      }
+    },
+    "passwordStrength": {
+      "label": "Password strength",
+      "values": {
+        "tooWeak": "Too weak",
+        "weak": "Weak",
+        "medium": "Fair",
+        "strong": "Strong",
+        "veryStrong": "Very strong"
+      }
+    }
+  },
+  "profile": {
+    "heading": "Profile",
+    "description": "Update how other players see you across AstraBuilder.",
+    "fields": {
+      "username": "Display name",
+      "usernameHint": "Shown next to decks you share.",
+      "bio": "Bio",
+      "bioHint": "Optional. Up to 280 characters.",
+      "xLink": "X (Twitter) link",
+      "xPlaceholder": "https://x.com/yourhandle",
+      "youtubeLink": "YouTube link",
+      "youtubePlaceholder": "https://youtube.com/@yourchannel"
+    },
+    "actions": {
+      "save": "Save changes",
+      "saving": "Saving..."
+    },
+    "messages": {
+      "loading": "Loading profile...",
+      "success": "Profile updated successfully.",
+      "error": "We couldn't update your profile. Please try again.",
+      "usernameRequired": "Display name is required."
+    },
+    "deleteAccount": {
+      "title": "Delete account",
+      "description": "Permanently remove your AstraBuilder account and profile. This action cannot be undone.",
+      "trigger": "Delete Account",
+      "confirmationLabel": "Confirm deletion",
+      "confirmationDescription": "Type \"delete\" to confirm. This cannot be undone.",
+      "confirmationPlaceholder": "delete",
+      "confirmationKeyword": "delete",
+      "confirmButton": "Confirm deletion",
+      "cancelButton": "Cancel",
+      "success": "Your account has been deleted.",
+      "error": "We couldn't delete your account. Please try again.",
+      "keywordMismatch": "Enter delete to confirm."
     }
   }
 }

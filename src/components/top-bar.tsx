@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { PrimaryButton } from '@/components/primary-button';
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
+import { ensureProfileForUser, type Profile } from '@/lib/supabase/profiles';
 import { useTheme } from '@/theme/theme-provider';
 import Link from 'next/link';
 
@@ -22,17 +23,46 @@ const LANGUAGE_LABELS: Record<Locale, string> = {
   ms: 'Malay',
 };
 
+const SIGN_IN_LABELS: Record<Locale, string> = {
+  de: 'Anmelden',
+  en: 'Sign in',
+  fr: 'Se connecter',
+  ms: 'Log masuk',
+};
+
+const ACCOUNT_FALLBACK_LABELS: Record<Locale, string> = {
+  de: 'Konto',
+  en: 'Account',
+  fr: 'Compte',
+  ms: 'Akaun',
+};
+
+const PROFILE_MENU_LABELS: Record<Locale, string> = {
+  de: 'Profil',
+  en: 'Profile',
+  fr: 'Profil',
+  ms: 'Profil',
+};
+
+const RESET_FLAG_STORAGE_KEY = 'astrabuilder-auth-reset';
+
 export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [sessionType, setSessionType] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const userId = user?.id ?? null;
 
   useEffect(() => {
     let isMounted = true;
@@ -45,6 +75,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
         }
 
         setUser(session?.user ?? null);
+        setSessionType(session?.type ?? null);
         setIsAuthReady(true);
       })
       .catch((error) => {
@@ -56,16 +87,15 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
         setIsAuthReady(true);
       });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!isMounted) {
-          return;
-        }
-
-        setUser(session?.user ?? null);
-        setIsAuthReady(true);
+    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
+      if (!isMounted) {
+        return;
       }
-    );
+
+      setUser(session?.user ?? null);
+      setSessionType(session?.type ?? null);
+      setIsAuthReady(true);
+    });
 
     return () => {
       isMounted = false;
@@ -74,18 +104,45 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   }, []);
 
   useEffect(() => {
-    if (!isMenuOpen && !isLanguageMenuOpen) {
+    if (typeof window === 'undefined' || !isAuthReady) {
+      return;
+    }
+
+    if (sessionType === null) {
+      return;
+    }
+
+    if (sessionType === 'recovery') {
+      const hasRecoveryFlag = window.localStorage.getItem(RESET_FLAG_STORAGE_KEY) === '1';
+      const requiredPath = `/${locale}/reset-password`;
+      if (!hasRecoveryFlag) {
+        window.localStorage.removeItem(RESET_FLAG_STORAGE_KEY);
+        void supabase.auth.signOut();
+        router.replace(`/${locale}/sign-in?reset=expired`);
+        return;
+      }
+
+      if (pathname !== requiredPath) {
+        router.replace(requiredPath);
+      }
+    } else {
+      window.localStorage.removeItem(RESET_FLAG_STORAGE_KEY);
+    }
+  }, [sessionType, locale, pathname, router, isAuthReady]);
+
+  useEffect(() => {
+    if (!isSettingsMenuOpen && !isLanguageMenuOpen && !isUserMenuOpen) {
       return;
     }
 
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
       if (
-        isMenuOpen &&
+        isSettingsMenuOpen &&
         settingsMenuRef.current &&
         !settingsMenuRef.current.contains(target)
       ) {
-        setIsMenuOpen(false);
+        setIsSettingsMenuOpen(false);
       }
       if (
         isLanguageMenuOpen &&
@@ -94,15 +151,25 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
       ) {
         setIsLanguageMenuOpen(false);
       }
+      if (
+        isUserMenuOpen &&
+        userMenuRef.current &&
+        !userMenuRef.current.contains(target)
+      ) {
+        setIsUserMenuOpen(false);
+      }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        if (isMenuOpen) {
-          setIsMenuOpen(false);
+        if (isSettingsMenuOpen) {
+          setIsSettingsMenuOpen(false);
         }
         if (isLanguageMenuOpen) {
           setIsLanguageMenuOpen(false);
+        }
+        if (isUserMenuOpen) {
+          setIsUserMenuOpen(false);
         }
       }
     }
@@ -114,15 +181,64 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isLanguageMenuOpen, isMenuOpen]);
+  }, [isLanguageMenuOpen, isSettingsMenuOpen, isUserMenuOpen]);
 
-  function toggleMenu() {
+  useEffect(() => {
+    if (!user || !userId) {
+      setProfile(null);
+      setIsProfileLoading(false);
+      return;
+    }
+
+    let isActive = true;
+    setIsProfileLoading(true);
+
+    ensureProfileForUser(user)
+      .then((nextProfile) => {
+        if (!isActive) {
+          return;
+        }
+        setProfile(nextProfile);
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+        console.error('Failed to load profile', error);
+        setProfile(null);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsProfileLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [user, userId]);
+
+  function toggleSettingsMenu() {
     setIsLanguageMenuOpen(false);
-    setIsMenuOpen((previous) => !previous);
+    setIsUserMenuOpen(false);
+    setIsSettingsMenuOpen((previous) => !previous);
+  }
+
+  function toggleUserMenu() {
+    setIsLanguageMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen((previous) => !previous);
+  }
+
+  function toggleLanguageMenu() {
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsLanguageMenuOpen((previous) => !previous);
   }
 
   function handleSettingsClick() {
-    setIsMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
 
     if (onSettings) {
       onSettings();
@@ -131,6 +247,11 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
 
   function handleThemeToggle() {
     toggleTheme();
+  }
+
+  function handleProfileNavigate() {
+    setIsUserMenuOpen(false);
+    router.push(`/${locale}/profile`);
   }
 
   async function handleSignOut() {
@@ -149,13 +270,15 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
       console.error('Failed to sign out', error);
     } finally {
       setIsSigningOut(false);
-      setIsMenuOpen(false);
+      setIsUserMenuOpen(false);
+      setIsSettingsMenuOpen(false);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(RESET_FLAG_STORAGE_KEY);
+      }
+      const homepagePath = `/${locale}`;
+      router.replace(homepagePath);
+      router.refresh();
     }
-  }
-
-  function toggleLanguageMenu() {
-    setIsMenuOpen(false);
-    setIsLanguageMenuOpen((previous) => !previous);
   }
 
   function buildLocaleHref(targetLocale: Locale) {
@@ -178,6 +301,8 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
 
   function handleLanguageSelect(targetLocale: Locale) {
     setIsLanguageMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsUserMenuOpen(false);
 
     if (targetLocale === locale) {
       return;
@@ -201,9 +326,18 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     transform: isDark ? 'translateX(16px)' : 'translateX(2px)',
   };
   const languageLabel = LANGUAGE_LABELS[locale];
+  const signInLabel = SIGN_IN_LABELS[locale];
+  const accountFallbackLabel = ACCOUNT_FALLBACK_LABELS[locale];
+  const profileMenuLabel = PROFILE_MENU_LABELS[locale];
 
   const shouldShowSignInButton = isAuthReady && !user;
+  const shouldShowProfileButton = isAuthReady && !!user;
+  const profileFallbackLabel = user?.email ?? accountFallbackLabel;
+  const profileName = profile?.username && profile.username.trim().length > 0 ? profile.username.trim() : profileFallbackLabel;
+  const profileDisplayLabel = isProfileLoading ? '...' : profileName;
+  const profileButtonTitle = profileName;
   const signOutLabel = isSigningOut ? 'Signing out...' : 'Sign out';
+
   return (
     <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -212,7 +346,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
             <Image
               src="/images/astrabuilder_logo.png"
               alt="AstraBuilder Logo"
-              width={120} // adjust to fit your design
+              width={120}
               height={32}
               priority
             />
@@ -264,21 +398,62 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
               </div>
             ) : null}
           </div>
-          {/* {shouldShowSignInButton ? (
+          {shouldShowSignInButton ? (
             <PrimaryButton
               className="px-4"
               type="button"
               href={`/${locale}/sign-in`}
             >
-              Sign in
+              {signInLabel}
             </PrimaryButton>
-          ) : null} */}
+          ) : null}
+          {shouldShowProfileButton ? (
+            <div className="relative" ref={userMenuRef}>
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={isUserMenuOpen}
+                aria-busy={isProfileLoading}
+                aria-label={profileMenuLabel}
+                title={profileButtonTitle}
+                onClick={toggleUserMenu}
+                className={`max-w-[200px] truncate rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${isUserMenuOpen ? 'bg-[var(--surface-muted)]' : ''}`}
+              >
+                {profileDisplayLabel}
+              </button>
+              {isUserMenuOpen ? (
+                <div
+                  className="absolute right-0 mt-2 w-48 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] shadow-lg"
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    onClick={handleProfileNavigate}
+                    className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
+                    role="menuitem"
+                  >
+                    {profileMenuLabel}
+                  </button>
+                  <div className="border-t border-[color:var(--border)]" />
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                    className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass} disabled:opacity-70`}
+                    role="menuitem"
+                  >
+                    {signOutLabel}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="relative" ref={settingsMenuRef}>
             <button
               type="button"
               aria-haspopup="menu"
-              aria-expanded={isMenuOpen}
-              onClick={toggleMenu}
+              aria-expanded={isSettingsMenuOpen}
+              onClick={toggleSettingsMenu}
               className="flex h-10 w-10 items-center justify-center rounded-md border border-[color:var(--border)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
             >
               <span className="sr-only">Toggle settings menu</span>
@@ -288,7 +463,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                 <span className={`block h-0.5 w-5 ${barColorClass}`}></span>
               </span>
             </button>
-            {isMenuOpen ? (
+            {isSettingsMenuOpen ? (
               <div
                 className="absolute right-0 mt-2 w-48 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] shadow-lg"
                 role="menu"
@@ -318,20 +493,6 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                     />
                   </span>
                 </button>
-                {user ? (
-                  <>
-                    <div className="border-t border-[color:var(--border)]" />
-                    <button
-                      type="button"
-                      onClick={handleSignOut}
-                      disabled={isSigningOut}
-                      className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass} disabled:opacity-70`}
-                      role="menuitem"
-                    >
-                      {signOutLabel}
-                    </button>
-                  </>
-                ) : null}
               </div>
             ) : null}
           </div>
