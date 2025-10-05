@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -19,7 +19,7 @@ export function Footer() {
 
   return (
     <>
-      <footer className={`${footerBackgroundClass} ${footerTextClass}`}>
+      <footer className={`hidden lg:block ${footerBackgroundClass} ${footerTextClass}`}>
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6">
           <button
             type="button"
