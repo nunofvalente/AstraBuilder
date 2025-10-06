@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useCallback, type FocusEvent, type MouseEvent as ReactMouseEvent } from 'react';
 
+import { getAffinityIconPath } from '@/lib/cards/affinity';
 import { getAffinityColorScheme } from '../constants';
 import type { Card } from '../types';
 import type { ZoomAnchor } from './zoom-overlay';
@@ -18,15 +19,6 @@ const COST_ICON_PATHS: Record<number, string> = {
   7: '/images/icons/cost/frame_number_7.png',
   8: '/images/icons/cost/frame_number_8.png',
   9: '/images/icons/cost/frame_number_9.png',
-};
-
-const AFFINITY_ICON_PATHS: Record<string, string> = {
-  caelum: '/images/icons/affinity/icon_caelum.png',
-  lux: '/images/icons/affinity/icon_lux.png',
-  neutral: '/images/icons/affinity/icon_neutral.png',
-  nox: '/images/icons/affinity/icon_nox.png',
-  solara: '/images/icons/affinity/icon_solara.png',
-  terra: '/images/icons/affinity/icon_terra.png',
 };
 
 type ZoomEvent = ReactMouseEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>;
@@ -51,11 +43,6 @@ function getCostIconPath(cost: number): string | null {
 
   const rounded = Math.round(cost);
   return COST_ICON_PATHS[rounded] ?? null;
-}
-
-function getAffinityIconPath(affinity: string): string | null {
-  const key = affinity.trim().toLowerCase();
-  return AFFINITY_ICON_PATHS[key] ?? null;
 }
 
 export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, onZoom, readOnly = false }: DeckCardChipProps) {
@@ -184,5 +171,4 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
     </li>
   );
 }
-
 

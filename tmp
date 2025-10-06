@@ -1,0 +1,16 @@
+            {deckEntries.length > 0 ? (
+                <span className="flex items-center gap-1">
+                  {deckEntries
+                    .map((entry) => normalizeAffinity(entry.card.affinity))
+                    .filter((affinity, index, array) => affinity && array.indexOf(affinity) === index && affinity !== 'Neutral')
+                    .map((affinity) => {
+                      const iconSrc = getAffinityIconPath(affinity);
+                      if (!iconSrc) {
+                        return null;
+                      }
+                      return (
+                        <span key={affinity} className="sr-only">{affinity}</span>
+                      );
+                    })}
+                </span>
+              ) : null}

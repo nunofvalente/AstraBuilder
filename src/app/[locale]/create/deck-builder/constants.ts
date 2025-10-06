@@ -1,13 +1,5 @@
 import type { AffinityFilter } from './types';
-
-export const AFFINITY_NAME_MAP: Record<string, string> = {
-  caelum: 'Caelum',
-  lux: 'Lux',
-  neutral: 'Neutral',
-  nox: 'Nox',
-  solara: 'Solara',
-  terra: 'Terra',
-};
+export { AFFINITY_NAME_MAP } from '@/lib/cards/affinity';
 
 export const AFFINITY_FILTERS: ReadonlyArray<AffinityFilter> = [
   {

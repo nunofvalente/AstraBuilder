@@ -106,7 +106,7 @@
     "notesHeading": "Deskripsi",
     "privateNotice": "Dek ini buat masa ini adalah peribadi.",
     "publicNotice": "Dek ini adalah awam dan mungkin muncul dalam senarai komuniti.",
-    "backButton": "Kembali ke Dek Saya"
+    "backButton": "Kembali ke dek"
   },
   "deckFeed": {
     "heading": "Dek komuniti",
@@ -117,6 +117,18 @@
     "cardsLabel": "Kad",
     "favoritesLabel": "Kegemaran",
     "viewsLabel": "Paparan"
+  },
+  "publicProfile": {
+    "heading": "Profil komuniti",
+    "subtitle": "Terokai dek awam dan pautan sosial pencipta ini.",
+    "socialsHeading": "Pautan sosial",
+    "socialsEmpty": "Tiada pautan sosial dikongsi.",
+    "decksHeading": "Dek awam",
+    "noDecks": "Tiada dek awam tersedia.",
+    "backButton": "Kembali ke dek komuniti",
+    "xLabel": "X",
+    "youtubeLabel": "YouTube",
+    "unknownUser": "Pemain tanpa nama"
   },
   "cards": {
     "title": "Semua Kad",

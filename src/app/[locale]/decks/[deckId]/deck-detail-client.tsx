@@ -10,6 +10,10 @@ import { DeckCardChip } from '@/app/[locale]/create/deck-builder/components/deck
 import { ZoomOverlay } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import type { ZoomAnchor } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import { supabase } from '@/lib/supabase/supabaseClient';
+import Image from 'next/image';
+
+import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
+import { TertiaryButton } from '@/components/tertiary-button';
 
 const CARD_TYPE_ORDER = ['Unit', 'Tactic', 'Territory'];
 const FALLBACK_SECTION_LABEL = 'Other';
@@ -207,6 +211,20 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       });
   }, [deckEntries]);
 
+  const bannerAffinities = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const entry of deckEntries) {
+      const normalized = normalizeAffinity(entry.card.affinity);
+      if (!normalized || normalized === 'Neutral' || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      result.push(normalized);
+    }
+    return result;
+  }, [deckEntries]);
+
   const formattedCreatedAt = useMemo(() => {
     if (!deckMeta?.createdAt) {
       return null;
@@ -228,11 +246,13 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     setZoomAnchor(anchor);
   }
 
+  const backHref = `/${locale}/decks`;
+
   if (status === 'loading' || status === 'idle') {
     return (
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-10 text-[color:var(--text-secondary)]">
         <Link
-          href={`/${locale}/my-decks`}
+          href={backHref}
           className="inline-flex w-fit items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
         >
           ← {labels.deckDetails.backButton}
@@ -248,7 +268,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     return (
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-10 text-[color:var(--text-secondary)]">
         <Link
-          href={`/${locale}/my-decks`}
+          href={backHref}
           className="inline-flex w-fit items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
         >
           ← {labels.deckDetails.backButton}
@@ -289,7 +309,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 text-[color:var(--text-primary)]">
       <div className="flex items-center justify-between">
         <Link
-          href={`/${locale}/my-decks`}
+          href={backHref}
           className="inline-flex items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
         >
           ← {labels.deckDetails.backButton}
@@ -302,33 +322,78 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
         </Link>
       </div>
 
-      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm">
+      <div
+        className="space-y-3 rounded-2xl border border-[color:var(--border)] p-6 shadow-sm"
+        style={{
+          backgroundImage: `linear-gradient(rgba(12, 15, 21, 0.35), rgba(12, 15, 21, 0.35)), ${buildAffinityGradient(bannerAffinities)}`,
+        }}
+      >
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold text-[color:var(--text-primary)]">{title}</h1>
-            <p className="text-sm text-[color:var(--text-secondary)]">{labels.deckDetails.description}</p>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-semibold text-[color:var(--text-primary)]">{title}</h1>
+              {bannerAffinities.length > 0 ? (
+                <span className="flex items-center gap-1">
+                  {bannerAffinities.map((affinity) => {
+                    const iconSrc = getAffinityIconPath(affinity);
+                    if (!iconSrc) {
+                      return null;
+                    }
+                    return (
+                      <Image
+                        key={affinity}
+                        src={iconSrc}
+                        alt={`${affinity} affinity`}
+                        width={20}
+                        height={20}
+                        className="h-5 w-5"
+                      />
+                    );
+                  })}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+              <span className="inline-flex items-center gap-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-4 w-4"
+                >
+                  <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                {deckMeta?.viewsTotal ?? 0}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="h-4 w-4 text-[color:var(--accent)]"
+                >
+                  <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                {deckMeta?.favoritesTotal ?? 0}
+              </span>
+              <span className="font-semibold text-[color:var(--text-primary)]">
+                {labels.myDecks.cardsLabel}: <span className="font-normal text-[color:var(--text-secondary)]">{totalCards}</span>
+              </span>
+              {formattedCreatedAt ? (
+                <span className="font-semibold text-[color:var(--text-primary)]">{formattedCreatedAt}</span>
+              ) : null}
+            </div>
             {description ? (
-              <div className="mt-4 space-y-2">
+              <div className="space-y-2">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                   {labels.deckDetails.notesHeading}
                 </h2>
                 <p className="text-sm leading-6 text-[color:var(--text-primary)] whitespace-pre-line">{description}</p>
               </div>
             ) : null}
-          </div>
-          <div className="flex flex-col items-start gap-2">
-            <span
-              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
-                deckMeta.isPublic
-                  ? 'bg-[color:var(--accent)]/15 text-[color:var(--accent)]'
-                  : 'bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]'
-              }`}
-            >
-              {deckMeta.isPublic ? labels.myDecks.publicTag : labels.myDecks.privateTag}
-            </span>
-            <p className="max-w-xs text-xs text-[color:var(--text-secondary)]">
-              {deckMeta.isPublic ? labels.deckDetails.publicNotice : labels.deckDetails.privateNotice}
-            </p>
           </div>
         </div>
 

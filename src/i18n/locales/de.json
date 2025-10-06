@@ -106,7 +106,7 @@
     "notesHeading": "Beschreibung",
     "privateNotice": "Dieses Deck ist derzeit privat.",
     "publicNotice": "Dieses Deck ist öffentlich und kann in Community-Listen erscheinen.",
-    "backButton": "Zurück zu Meine Decks"
+    "backButton": "Zurück zu den Decks"
   },
   "deckFeed": {
     "heading": "Community-Decks",
@@ -117,6 +117,18 @@
     "cardsLabel": "Karten",
     "favoritesLabel": "Favoriten",
     "viewsLabel": "Aufrufe"
+  },
+  "publicProfile": {
+    "heading": "Community-Profil",
+    "subtitle": "Entdecke öffentliche Decks und Social Links dieses Creators.",
+    "socialsHeading": "Social Links",
+    "socialsEmpty": "Keine Social Links vorhanden.",
+    "decksHeading": "Öffentliche Decks",
+    "noDecks": "Keine öffentlichen Decks verfügbar.",
+    "backButton": "Zurück zu den Community-Decks",
+    "xLabel": "X",
+    "youtubeLabel": "YouTube",
+    "unknownUser": "Anonymer Spieler"
   },
   "cards": {
     "title": "Alle Karten",

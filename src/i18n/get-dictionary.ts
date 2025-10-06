@@ -240,6 +240,21 @@ type ProfileDictionaryShape = {
   };
 };
 
+type PublicProfileDictionary = {
+  publicProfile: {
+    heading: string;
+    subtitle: string;
+    socialsHeading: string;
+    socialsEmpty: string;
+    decksHeading: string;
+    noDecks: string;
+    backButton: string;
+    xLabel: string;
+    youtubeLabel: string;
+    unknownUser: string;
+  };
+};
+
 type MyDecksDictionary = {
   myDecks: {
     heading: string;
@@ -287,7 +302,7 @@ type DeckFeedDictionary = {
 };
 
 type DictionaryModule = {
-  default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
+  default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & PublicProfileDictionary & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
 };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
@@ -299,7 +314,7 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
+export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & PublicProfileDictionary & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
 export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 export type SignInDictionary = AuthDictionary["auth"]["signIn"];
 export type ForgotPasswordDictionary = AuthDictionary["auth"]["forgotPassword"];

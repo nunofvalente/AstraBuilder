@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { getDeckSummariesForUser, type DeckSummary } from '@/lib/supabase/decks';
+import { DeckSummaryCard } from '@/components/deck-summary-card';
 
 export type MyDecksClientProps = {
   locale: Locale;
@@ -145,60 +146,21 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
 
     return (
       <div className="grid gap-4 md:grid-cols-2">
-        {decks.map((deck) => {
-          const title = deck.title && deck.title.trim().length > 0 ? deck.title.trim() : labels.untitledLabel;
-          const description = deck.description?.trim();
-          let createdLabel: string | null = null;
-          if (deck.createdAt) {
-            const createdDate = new Date(deck.createdAt);
-            if (!Number.isNaN(createdDate.getTime())) {
-              try {
-                createdLabel = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(createdDate);
-              } catch (error) {
-                createdLabel = createdDate.toLocaleDateString();
-              }
-            }
-          }
-
-          return (
-            <Link
-              key={deck.id}
-              href={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
-              className="flex h-full flex-col gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{title}</h3>
-                  {description ? (
-                    <p className="mt-1 text-sm text-[color:var(--text-secondary)]">{description}</p>
-                  ) : null}
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
-                    deck.isPublic
-                      ? 'bg-[color:var(--accent)]/15 text-[color:var(--accent)]'
-                      : 'bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]'
-                  }`}
-                >
-                  {deck.isPublic ? labels.publicTag : labels.privateTag}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4 text-sm text-[color:var(--text-secondary)]">
-                <span>
-                  {labels.cardsLabel}: {deck.cardCount}
-                </span>
-                <span>
-                  {labels.favoritesLabel}: {deck.favoritesTotal}
-                </span>
-                <span>
-                  {labels.viewsLabel}: {deck.viewsTotal}
-                </span>
-                {createdLabel ? <span>{labels.createdLabel}: {createdLabel}</span> : null}
-              </div>
-            </Link>
-          );
-        })}
+        {decks.map((deck) => (
+          <DeckSummaryCard
+            key={deck.id}
+            locale={locale}
+            deck={deck}
+            detailHref={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
+            labels={{
+              cards: labels.cardsLabel,
+              untitled: labels.untitledLabel,
+              publicTag: labels.publicTag,
+              privateTag: labels.privateTag,
+            }}
+            showPrivacyTag
+          />
+        ))}
       </div>
     );
   }, [decks, errorMessage, labels, locale, signInHref, status]);
