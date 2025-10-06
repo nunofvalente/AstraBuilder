@@ -66,7 +66,25 @@ type BuilderDictionary = {
     shareCopyError: string;
     shareEmpty: string;
     shareError: string;
+    save: {
+      heading: string;
+      titleLabel: string;
+      titlePlaceholder: string;
+      descriptionLabel: string;
+      descriptionPlaceholder: string;
+      cancel: string;
+      submit: string;
+      saving: string;
+      signInPrompt: string;
+      signInButton: string;
+      emptyDeckError: string;
+      genericError: string;
+    successMessage: string;
+    dismissNotice: string;
+    publicLabel: string;
+    publicHelp: string;
   };
+};
 };
 
 type CardsDictionary = {
@@ -221,7 +239,56 @@ type ProfileDictionaryShape = {
     };
   };
 };
-type DictionaryModule = { default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape };
+
+type MyDecksDictionary = {
+  myDecks: {
+    heading: string;
+    description: string;
+    empty: string;
+    loading: string;
+    error: string;
+    signInPrompt: string;
+    signInButton: string;
+    publicTag: string;
+    privateTag: string;
+    createdLabel: string;
+    cardsLabel: string;
+    emptyStateCta: string;
+    untitledLabel: string;
+    openButton: string;
+    favoritesLabel: string;
+    viewsLabel: string;
+    retryButton: string;
+  };
+};
+type DeckDetailsDictionary = {
+  deckDetails: {
+    heading: string;
+    description: string;
+    sectionsHeading: string;
+    notesHeading: string;
+    privateNotice: string;
+    publicNotice: string;
+    backButton: string;
+  };
+};
+
+type DeckFeedDictionary = {
+  deckFeed: {
+    heading: string;
+    description: string;
+    empty: string;
+    authorLabel: string;
+    createdLabel: string;
+    cardsLabel: string;
+    favoritesLabel: string;
+    viewsLabel: string;
+  };
+};
+
+type DictionaryModule = {
+  default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
+};
 
 type ImportDictionary = () => Promise<DictionaryModule>;
 
@@ -232,7 +299,7 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape;
+export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
 export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 export type SignInDictionary = AuthDictionary["auth"]["signIn"];
 export type ForgotPasswordDictionary = AuthDictionary["auth"]["forgotPassword"];
@@ -243,4 +310,3 @@ export type ProfileDictionary = ProfileDictionaryShape["profile"];
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);
 }
-
