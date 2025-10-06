@@ -44,6 +44,13 @@ const PROFILE_MENU_LABELS: Record<Locale, string> = {
   ms: 'Profil',
 };
 
+const MY_DECKS_LABELS: Record<Locale, string> = {
+  de: 'Meine Decks',
+  en: 'My Decks',
+  fr: 'Mes decks',
+  ms: 'Dek Saya',
+};
+
 const RESET_FLAG_STORAGE_KEY = 'astrabuilder-auth-reset';
 
 export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
@@ -250,6 +257,14 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     router.push(`/${locale}/profile`);
   }
 
+  function handleMyDecksNavigate() {
+    setIsUserMenuOpen(false);
+    setIsSettingsMenuOpen(false);
+    setIsLanguageMenuOpen(false);
+    const destination = `/${locale}/my-decks`;
+    router.push(destination);
+  }
+
   async function handleSignOut() {
     if (isSigningOut) {
       return;
@@ -325,6 +340,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const signInLabel = SIGN_IN_LABELS[locale];
   const accountFallbackLabel = ACCOUNT_FALLBACK_LABELS[locale];
   const profileMenuLabel = PROFILE_MENU_LABELS[locale];
+  const myDecksLabel = MY_DECKS_LABELS[locale];
 
   const shouldShowSignInButton = isAuthReady && !user;
   const shouldShowProfileButton = isAuthReady && !!user;
@@ -424,6 +440,15 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                 >
                   <button
                     type="button"
+                    onClick={handleMyDecksNavigate}
+                    className={`block w-full px-4 py-2 text-left text-sm font-semibold transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${menuTextClass}`}
+                    role="menuitem"
+                  >
+                    {myDecksLabel}
+                  </button>
+                  <div className="border-t border-[color:var(--border)]" />
+                  <button
+                    type="button"
                     onClick={handleProfileNavigate}
                     className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
                     role="menuitem"
@@ -497,6 +522,3 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     </header>
   );
 }
-
-
-
