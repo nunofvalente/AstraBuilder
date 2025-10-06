@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { CARD_IMAGE_SIZES } from '../constants';
-import { getTransformedImageUrl } from '../image-url';
+import { getCardImageVariantUrl } from '../image-url';
 import type { Card } from '../types';
 import type { ZoomAnchor } from './zoom-overlay';
 
@@ -56,11 +56,7 @@ export function CardLibrary({
         const isSelected = copies > 0;
         const isMaxed = copies >= 3;
 
-        const transformedSrc = getTransformedImageUrl(card.imageSrc, {
-          width: 220,
-          height: 308,
-          quality: 70,
-        });
+        const thumbnailSrc = getCardImageVariantUrl(card.imageSrc, 'small');
 
         return (
           <li key={card.id}>
@@ -87,7 +83,7 @@ export function CardLibrary({
                   }`}
                 >
                   <Image
-                    src={transformedSrc}
+                    src={thumbnailSrc}
                     alt={card.name}
                     width={220}
                     height={308}
