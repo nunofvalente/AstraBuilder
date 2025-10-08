@@ -7,11 +7,31 @@ import { SUPPORTED_LOCALES, type Locale } from '@/i18n/config';
 import type { SettingsDictionary } from '@/i18n/get-dictionary';
 import { useTheme } from '@/theme/theme-provider';
 
-const LANGUAGE_LABELS: Record<Locale, string> = {
-  de: 'German',
-  en: 'English',
-  fr: 'French',
-  ms: 'Malay',
+const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
+  en: {
+    de: 'German',
+    en: 'English',
+    fr: 'French',
+    ms: 'Malay',
+  },
+  fr: {
+    de: 'Allemand',
+    en: 'Anglais',
+    fr: 'Français',
+    ms: 'Malais',
+  },
+  de: {
+    de: 'Deutsch',
+    en: 'Englisch',
+    fr: 'Französisch',
+    ms: 'Malaiisch',
+  },
+  ms: {
+    de: 'Jerman',
+    en: 'Inggeris',
+    fr: 'Perancis',
+    ms: 'Melayu',
+  },
 };
 
 type SettingsClientProps = {
@@ -93,7 +113,7 @@ export function SettingsClient({ locale, dictionary }: SettingsClientProps) {
             className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm text-[color:var(--text-primary)] transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
           >
             {SUPPORTED_LOCALES.map((availableLocale) => {
-              const label = LANGUAGE_LABELS[availableLocale];
+              const label = LANGUAGE_LABELS[locale][availableLocale];
               return (
                 <option key={availableLocale} value={availableLocale}>
                   {label}
@@ -102,7 +122,7 @@ export function SettingsClient({ locale, dictionary }: SettingsClientProps) {
             })}
           </select>
           <span className="text-xs text-[color:var(--text-secondary)]">
-            {dictionary.language.active}: {LANGUAGE_LABELS[locale]}
+            {dictionary.language.active}: {LANGUAGE_LABELS[locale][locale]}
           </span>
         </div>
       </section>
