@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
 import { PrimaryButton } from '@/components/primary-button';
-import { TertiaryButton } from '@/components/tertiary-button';
+import { SecondaryButton } from '@/components/secondary-button';
 import { getPublicAssetUrl } from '@/lib/storage/public-asset-url';
 
 type LocaleParams = {
@@ -44,9 +44,9 @@ export default async function HomePage({ params }: LocalePageProps) {
             {home.subtitle}
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            {/* <TertiaryButton className="w-full sm:w-auto">
+            <SecondaryButton className="w-full sm:w-auto" href={`/${locale}/decks`}>
               {home.actions.browse}
-            </TertiaryButton> */}
+            </SecondaryButton>
             <PrimaryButton
               className="w-full sm:w-auto"
               href={`/${locale}/create`}

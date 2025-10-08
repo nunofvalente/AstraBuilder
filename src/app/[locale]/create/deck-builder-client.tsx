@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import { AffinityFilterBar } from './deck-builder/components/affinity-filter-bar';
 import { CardSearchBar } from './deck-builder/components/card-search-bar';
@@ -8,6 +9,7 @@ import { CardLibrary } from './deck-builder/components/card-library';
 import { DeckExportModal } from './deck-builder/components/deck-export-modal';
 import { DeckImportModal } from './deck-builder/components/deck-import-modal';
 import { DeckShareModal } from './deck-builder/components/deck-share-modal';
+import { DeckSaveModal } from './deck-builder/components/deck-save-modal';
 import { DeckPanel } from './deck-builder/components/deck-panel';
 import { SortMenu } from './deck-builder/components/sort-menu';
 import { ZoomOverlay } from './deck-builder/components/zoom-overlay';
@@ -25,6 +27,7 @@ import {
   type SearchQuery,
   type SearchSuggestion,
 } from './deck-builder/search';
+import { supabase } from '@/lib/supabase/supabaseClient';
 
 const SORT_OPTIONS = [
   { value: 'affinity', label: 'Affinity' },
@@ -36,10 +39,21 @@ type SortOption = (typeof SORT_OPTIONS)[number]['value'];
 
 const DEFAULT_ZOOM_LABEL = 'Zoom';
 
+type SaveDeckFormValues = {
+  title: string;
+  description: string;
+  isPublic: boolean;
+};
 
-export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuilderProps) {
+
+export function DeckBuilder({ dictionary, initialCards, initialError, locale }: DeckBuilderProps) {
   const zoomButtonLabel = DEFAULT_ZOOM_LABEL;
   const { builder, cards: cardsCopy } = dictionary;
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const deckIdQuery = searchParams.get('deck');
+  const saveLabels = builder.save;
+  const [saveNotice, setSaveNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<SearchQuery[]>([]);
   const [deck, setDeck] = useState<Record<string, number>>({});
@@ -59,8 +73,14 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isSavingDeck, setIsSavingDeck] = useState(false);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [saveRequiresAuth, setSaveRequiresAuth] = useState(false);
   const [isCostCurveVisible, setIsCostCurveVisible] = useState(false);
   const [activeMobilePane, setActiveMobilePane] = useState<'catalogue' | 'deck'>('catalogue');
+  const redirectPath = pathname ?? `/${locale}/create`;
+  const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(redirectPath)}`;
 
   useEffect(() => {
     if (cards.length === 0) {
@@ -178,6 +198,78 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   }, [cards, combinedQueries, searchTerms, activeAffinitySet, sortOption]);
 
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
+  const prefilledDeckIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!deckIdQuery) {
+      prefilledDeckIdRef.current = null;
+      return;
+    }
+
+    const deckId = deckIdQuery.trim();
+    if (!deckId || cards.length === 0) {
+      return;
+    }
+
+    if (prefilledDeckIdRef.current === deckId) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function prefillDeckFromId() {
+      try {
+        const { data, error } = await supabase
+          .from('deck_cards')
+          .select('card_id, quantity')
+          .eq('deck_id', deckId);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (error) {
+          console.error('Failed to load deck for builder', error);
+          prefilledDeckIdRef.current = deckId;
+          return;
+        }
+
+        const rows = Array.isArray(data) ? data : [];
+        const nextDeck: Record<string, number> = {};
+
+        for (const row of rows) {
+          const cardId = typeof row.card_id === 'string' ? row.card_id : null;
+          const quantity = Number(row.quantity ?? 0);
+          if (!cardId || quantity <= 0) {
+            continue;
+          }
+
+          if (!cardMap.has(cardId)) {
+            continue;
+          }
+
+          const current = nextDeck[cardId] ?? 0;
+          const cappedQuantity = Math.min(3, quantity);
+          nextDeck[cardId] = Math.min(3, current + cappedQuantity);
+        }
+
+        setDeck(nextDeck);
+        prefilledDeckIdRef.current = deckId;
+      } catch (prefillError) {
+        if (!isActive) {
+          return;
+        }
+        console.error('Unexpected error while prefilling deck', prefillError);
+        prefilledDeckIdRef.current = deckId;
+      }
+    }
+
+    void prefillDeckFromId();
+
+    return () => {
+      isActive = false;
+    };
+  }, [cardMap, cards.length, deckIdQuery]);
 
   const deckEntries = useMemo<DeckEntry[]>(() => {
     return Object.entries(deck)
@@ -205,6 +297,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
   }, [deck, cardMap]);
 
   const totalCards = useMemo(() => deckEntries.reduce((sum, entry) => sum + entry.count, 0), [deckEntries]);
+  const initialSaveTitle = deckEntries.length > 0 ? deckEntries[0].card.name : '';
 
   const highestCost = useMemo(() => cards.reduce((max, card) => (card.cost > max ? card.cost : max), 0), [cards]);
 
@@ -311,10 +404,104 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
         setIsShareModalOpen(true);
         break;
       case 'save':
-        console.warn('Deck saving is not yet available.');
+        setSaveErrorMessage(null);
+        setSaveRequiresAuth(false);
+        setIsSaveModalOpen(true);
         break;
       default:
         break;
+    }
+  }
+
+  function handleCloseSaveModal() {
+    if (isSavingDeck) {
+      return;
+    }
+    setIsSaveModalOpen(false);
+    setSaveErrorMessage(null);
+    setSaveRequiresAuth(false);
+  }
+
+  async function handleSaveDeckSubmit(values: SaveDeckFormValues) {
+    if (isSavingDeck) {
+      return;
+    }
+
+    if (deckEntries.length === 0) {
+      setSaveErrorMessage(saveLabels.emptyDeckError);
+      setSaveRequiresAuth(false);
+      return;
+    }
+
+    setIsSavingDeck(true);
+    setSaveErrorMessage(null);
+    setSaveRequiresAuth(false);
+
+    const { data: userResult, error: userError } = await supabase.auth.getUser();
+    if (userError || !userResult?.user) {
+      setSaveErrorMessage(saveLabels.signInPrompt);
+      setSaveRequiresAuth(true);
+      setIsSavingDeck(false);
+      return;
+    }
+
+    const userId = userResult.user.id;
+    const trimmedTitle = values.title.trim();
+    const trimmedDescription = values.description.trim();
+    const isPublic = values.isPublic;
+    const finalTitle = trimmedTitle.length > 0 ? trimmedTitle : saveLabels.titlePlaceholder;
+
+    try {
+      const { data: insertedDeck, error: deckInsertError } = await supabase
+        .from('decks')
+        .insert({
+          user_id: userId,
+          title: finalTitle,
+          description: trimmedDescription.length > 0 ? trimmedDescription : null,
+          is_public: isPublic,
+        })
+        .select('id')
+        .single();
+
+      if (deckInsertError || !insertedDeck) {
+        throw deckInsertError ?? new Error('Deck insertion failed');
+      }
+
+      const deckId = insertedDeck.id;
+
+      const cardsPayload = deckEntries.map((entry) => ({
+        deck_id: deckId,
+        card_id: entry.card.id,
+        quantity: entry.count,
+      }));
+
+      if (cardsPayload.length > 0) {
+        const { error: cardsError } = await supabase.from('deck_cards').insert(cardsPayload);
+        if (cardsError) {
+          try {
+            await supabase.from('decks').delete().eq('id', deckId);
+          } catch (cleanupError) {
+            console.error('Failed to clean up deck after card insertion error', cleanupError);
+          }
+          throw cardsError;
+        }
+      }
+
+      setIsSaveModalOpen(false);
+      setSaveErrorMessage(null);
+      setSaveRequiresAuth(false);
+      setSaveNotice({ type: 'success', message: saveLabels.successMessage });
+    } catch (error) {
+      console.error('Failed to save deck', error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+            ? String((error as { message?: unknown }).message)
+            : null;
+      setSaveErrorMessage(message ? `${saveLabels.genericError} (${message})` : saveLabels.genericError);
+    } finally {
+      setIsSavingDeck(false);
     }
   }
 
@@ -445,6 +632,30 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
         <div
           className={`min-h-0 flex-1 flex-col ${isDeckVisible ? 'flex' : 'hidden'} lg:flex lg:min-h-0 lg:min-w-0 lg:basis-1/2 xl:basis-2/5 min-[1920px]:basis-1/3`}
         >
+          {saveNotice ? (
+            <div className="mx-4 mt-4 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/70 px-4 py-3 text-sm text-[color:var(--text-primary)] lg:mx-6">
+              <div className="flex items-start justify-between gap-4">
+                <span>{saveNotice.message}</span>
+                <button
+                  type="button"
+                  onClick={() => setSaveNotice(null)}
+                  className="rounded-full bg-black/40 p-1 text-xs text-white transition hover:bg-black/60 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                  aria-label={saveLabels.dismissNotice}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="M6 6l12 12M6 18L18 6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ) : null}
           <DeckPanel
             deckEntries={deckEntries}
             totalCards={totalCards}
@@ -516,6 +727,20 @@ export function DeckBuilder({ dictionary, initialCards, initialError }: DeckBuil
         variant={zoomVariant}
         anchor={zoomAnchor}
         onClose={() => handleZoom(null)}
+      />
+
+      <DeckSaveModal
+        isOpen={isSaveModalOpen}
+        onClose={handleCloseSaveModal}
+        onSubmit={handleSaveDeckSubmit}
+        isSaving={isSavingDeck}
+        errorMessage={saveErrorMessage}
+        requiresAuth={saveRequiresAuth}
+        labels={saveLabels}
+        totalCards={totalCards}
+        totalCardsLabel={builder.totalCardsLabel}
+        initialTitle={initialSaveTitle}
+        signInHref={signInHref}
       />
 
       <DeckImportModal

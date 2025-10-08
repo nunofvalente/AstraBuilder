@@ -1,9 +1,11 @@
 import type { Dictionary } from '@/i18n/get-dictionary';
+import type { Locale } from '@/i18n/config';
 
 export type DeckBuilderProps = {
   dictionary: Dictionary;
   initialCards: Card[];
   initialError: string | null;
+  locale: Locale;
 };
 
 export type CardRow = {

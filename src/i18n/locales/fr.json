@@ -28,39 +28,128 @@
     "totalCardsLabel": "Total cartes",
     "filtersDescription": "Les options de filtrage arrivent bientot.",
     "noResults": "Aucune carte ne correspond a votre recherche.",
-  "cardsHeading": "Bibliotheque de cartes",
-  "costCurveHeading": "Courbe de cout",
-  "showCostCurve": "Afficher la courbe de coût",
-  "hideCostCurve": "Masquer la courbe de coût",
-  "menuImport": "Importer",
-  "menuExport": "Exporter",
-  "menuShare": "Partager l'image",
-  "menuSave": "Enregistrer le deck",
-  "importHeading": "Importer le deck",
-  "importInstructions": "Collez le JSON exporté ci-dessous ou téléversez un fichier pour importer un deck.",
-  "importPlaceholder": "[\n  {\n    \"name\": \"Nom de carte\",\n    \"count\": 2\n  }\n]",
-  "importUploadLabel": "Télécharger un fichier JSON",
-  "importButton": "Importer le deck",
-  "importCancel": "Annuler",
-  "importErrorInvalid": "Le JSON fourni n'a pas pu être analysé. Vérifiez le format et réessayez.",
-  "importErrorUnknown": "Ces cartes sont introuvables dans le catalogue :",
-  "importErrorEmpty": "Aucune carte valide trouvée dans les données importées.",
-  "addButton": "Ajouter",
-  "searchPlaceholder": "Recherche par nom ou mot cle",
-  "filtersHeading": "Filtres",
-  "menuButton": "Menu",
-  "exportOptionTTS": "Exporter vers TTS",
-  "exportCopy": "Copier le JSON",
-  "exportCopySuccess": "JSON copié dans le presse-papiers.",
-  "exportCopyError": "Impossible de copier automatiquement. Veuillez copier manuellement.",
-  "shareButton": "Partager l'image",
-    "shareGenerating": "Génération de l'image...",
-    "shareDownload": "Télécharger l'image",
+    "cardsHeading": "Bibliotheque de cartes",
+    "costCurveHeading": "Courbe de cout",
+    "showCostCurve": "Afficher la courbe de coÃ»t",
+    "hideCostCurve": "Masquer la courbe de coÃ»t",
+    "menuImport": "Importer",
+    "menuExport": "Exporter",
+    "menuShare": "Partager l'image",
+    "menuSave": "Enregistrer le deck",
+    "importHeading": "Importer le deck",
+    "importInstructions": "Collez le JSON exportÃ© ci-dessous ou tÃ©lÃ©versez un fichier pour importer un deck.",
+    "importPlaceholder": "[\n  {\n    \"name\": \"Nom de carte\",\n    \"count\": 2\n  }\n]",
+    "importUploadLabel": "TÃ©lÃ©charger un fichier JSON",
+    "importButton": "Importer le deck",
+    "importCancel": "Annuler",
+    "importErrorInvalid": "Le JSON fourni n'a pas pu Ãªtre analysÃ©. VÃ©rifiez le format et rÃ©essayez.",
+    "importErrorUnknown": "Ces cartes sont introuvables dans le catalogue :",
+    "importErrorEmpty": "Aucune carte valide trouvÃ©e dans les donnÃ©es importÃ©es.",
+    "addButton": "Ajouter",
+    "searchPlaceholder": "Recherche par nom ou mot cle",
+    "filtersHeading": "Filtres",
+    "menuButton": "Menu",
+    "exportOptionTTS": "Exporter vers TTS",
+    "exportCopy": "Copier le JSON",
+    "exportCopySuccess": "JSON copiÃ© dans le presse-papiers.",
+    "exportCopyError": "Impossible de copier automatiquement. Veuillez copier manuellement.",
+    "shareButton": "Partager l'image",
+    "shareGenerating": "GÃ©nÃ©ration de l'image...",
+    "shareDownload": "TÃ©lÃ©charger l'image",
     "shareCopy": "Copier l'image",
-    "shareCopySuccess": "Image copiée dans le presse-papiers.",
-    "shareCopyError": "Impossible de copier l'image. Veuillez télécharger à la place.",
-    "shareEmpty": "Ajoutez des cartes pour générer une image à partager.",
-    "shareError": "Impossible de générer l'image. Veuillez réessayer."
+    "shareCopySuccess": "Image copiÃ©e dans le presse-papiers.",
+    "shareCopyError": "Impossible de copier l'image. Veuillez tÃ©lÃ©charger Ã  la place.",
+    "shareEmpty": "Ajoutez des cartes pour gÃ©nÃ©rer une image Ã  partager.",
+    "shareError": "Impossible de gÃ©nÃ©rer l'image. Veuillez rÃ©essayer.",
+    "save": {
+      "heading": "Enregistrer le deck",
+      "titleLabel": "Titre du deck",
+      "titlePlaceholder": "Deck sans titre",
+      "descriptionLabel": "Description (optionnelle)",
+      "descriptionPlaceholder": "Ajoutez une petite note sur ce deck.",
+      "cancel": "Annuler",
+      "submit": "Enregistrer le deck",
+      "saving": "Enregistrement...",
+      "signInPrompt": "Connectez-vous pour enregistrer des decks.",
+      "signInButton": "Se connecter",
+      "emptyDeckError": "Ajoutez au moins une carte avant d'enregistrer.",
+      "genericError": "Impossible d'enregistrer votre deck. RÃ©essayez.",
+      "successMessage": "Deck enregistrÃ©. Retrouvez-le dans Mes decks.",
+      "dismissNotice": "Fermer",
+      "publicLabel": "Rendre ce deck public",
+      "publicHelp": "Les decks publics peuvent apparaÃ®tre dans les listes Populaire ou Tendance. Laissez dÃ©cochÃ© pour le garder privÃ©."
+    }
+  },
+  "myDecks": {
+    "heading": "Mes decks",
+    "description": "Gérez les decks que vous avez enregistrés dans le builder.",
+    "empty": "Vous n'avez pas encore enregistré de deck.",
+    "loading": "Chargement de vos decks...",
+    "error": "Impossible de charger vos decks. Veuillez réessayer.",
+    "signInPrompt": "Connectez-vous pour voir vos decks enregistrés.",
+    "signInButton": "Se connecter",
+    "publicTag": "Public",
+    "privateTag": "Privé",
+    "createdLabel": "Créé",
+    "cardsLabel": "Cartes",
+    "emptyStateCta": "Créer un deck",
+    "untitledLabel": "Deck sans titre",
+    "openButton": "Ouvrir dans le builder",
+    "favoritesLabel": "Favoris",
+    "viewsLabel": "Vues",
+    "retryButton": "Réessayer",
+    "editLabel": "Edit deck",
+    "editHeading": "Edit deck",
+    "editTitleLabel": "Title",
+    "editTitlePlaceholder": "Enter a deck title",
+    "editDescriptionLabel": "Description",
+    "editDescriptionPlaceholder": "Write a short description",
+    "editPublicLabel": "Public deck",
+    "editPublicHelp": "Public decks can appear in community listings.",
+    "editCancel": "Cancel",
+    "editSave": "Save changes",
+    "editSaving": "Saving...",
+    "editOpenBuilder": "Edit in builder",
+    "editError": "Unable to update deck. Please try again.",
+    "editSuccess": "Deck updated successfully.",
+    "editDelete": "Delete deck",
+    "editDeleteConfirm": "Are you sure you want to delete this deck? This action cannot be undone.",
+    "editDeleteConfirmLabel": "Type DELETE to confirm",
+    "editDeletePlaceholder": "DELETE",
+    "editDeleteError": "Unable to delete deck. Please try again.",
+    "editDeleteSuccess": "Deck deleted successfully.",
+    "editDeleteConfirmButton": "Delete"
+  },
+  "deckDetails": {
+    "heading": "Détails du deck",
+    "description": "Répartition des cartes et statistiques de ce deck.",
+    "sectionsHeading": "Sections de cartes",
+    "notesHeading": "Description",
+    "privateNotice": "Ce deck est actuellement privé.",
+    "publicNotice": "Ce deck est public et peut apparaître dans les listes de la communauté.",
+    "backButton": "Retour aux decks"
+  },
+  "deckFeed": {
+    "heading": "Decks de la communauté",
+    "description": "Découvrez tous les decks publics partagés par la communauté.",
+    "empty": "Aucun deck public pour le moment. Soyez le premier à en publier un !",
+    "authorLabel": "Auteur",
+    "createdLabel": "Créé",
+    "cardsLabel": "Cartes",
+    "favoritesLabel": "Favoris",
+    "viewsLabel": "Vues"
+  },
+  "publicProfile": {
+    "heading": "Profil de la communauté",
+    "subtitle": "Découvrez les decks publics et les liens sociaux de ce créateur.",
+    "socialsHeading": "Liens sociaux",
+    "socialsEmpty": "Aucun lien social partagé.",
+    "decksHeading": "Decks",
+    "noDecks": "Aucun deck public disponible.",
+    "backButton": "Retour aux decks de la communauté",
+    "xLabel": "X",
+    "youtubeLabel": "YouTube",
+    "unknownUser": "Joueur anonyme"
   },
   "cards": {
     "title": "Toutes les cartes",
@@ -98,6 +187,128 @@
       "footer": {
         "haveAccount": "Deja un compte ?",
         "signInLink": "Se connecter"
+      }
+    },
+    "signIn": {
+      "title": "Bon retour",
+      "description": "Connectez-vous pour continuer à créer et partager vos decks.",
+      "dividerLabel": "Ou continuer avec",
+      "form": {
+        "emailLabel": "E-mail",
+        "passwordLabel": "Mot de passe",
+        "submit": "Se connecter"
+      },
+      "google": {
+        "button": "Continuer avec Google"
+      },
+      "messages": {
+        "invalidCredentials": "L'adresse e-mail ou le mot de passe est incorrect.",
+        "genericError": "Nous n'avons pas pu vous connecter. Veuillez réessayer.",
+        "passwordResetSuccess": "Mot de passe mis à jour. Veuillez vous reconnecter avec votre nouveau mot de passe.",
+        "passwordResetExpired": "Ce lien de réinitialisation a expiré. Veuillez en demander un nouveau.",
+        "accountDeleted": "Votre compte a �t� supprim�. Nous sommes d�sol�s de vous voir partir."
+      },
+      "footer": {
+        "noAccount": "Vous n'avez pas encore de compte ?",
+        "signUpLink": "Inscrivez-vous"
+      },
+      "forgotPasswordLink": "Mot de passe oublié ?"
+    },
+    "forgotPassword": {
+      "title": "Réinitialiser votre mot de passe",
+      "description": "Entrez l'adresse e-mail de votre compte et nous vous enverrons un lien de réinitialisation.",
+      "form": {
+        "emailLabel": "E-mail",
+        "submit": "Envoyer le lien de réinitialisation"
+      },
+      "messages": {
+        "success": "Consultez votre boîte de réception pour le lien de réinitialisation.",
+        "genericError": "Impossible d'envoyer l'e-mail. Veuillez réessayer."
+      },
+      "footer": {
+        "backToSignIn": "Retour à la connexion"
+      }
+    },
+    "resetPassword": {
+      "title": "Créer un nouveau mot de passe",
+      "description": "Saisissez un nouveau mot de passe pour votre compte.",
+      "form": {
+        "passwordLabel": "Nouveau mot de passe",
+        "confirmPasswordLabel": "Confirmer le mot de passe",
+        "submit": "Mettre à jour le mot de passe"
+      },
+      "messages": {
+        "mismatch": "Les mots de passe ne correspondent pas.",
+        "genericError": "Impossible de mettre à jour le mot de passe. Veuillez réessayer.",
+        "success": "Mot de passe mis à jour. Vous pouvez continuer."
+      },
+      "footer": {
+        "backToHome": "Retour à l’accueil"
+      }
+    },
+    "passwordStrength": {
+      "label": "Solidité du mot de passe",
+      "values": {
+        "tooWeak": "Très faible",
+        "weak": "Faible",
+        "medium": "Correct",
+        "strong": "Bon",
+        "veryStrong": "Très bon"
+      }
+    }
+  },
+  "profile": {
+    "heading": "Profil",
+    "description": "Mettez à jour la façon dont les autres joueurs vous voient sur AstraBuilder.",
+    "fields": {
+      "username": "Nom d'affichage",
+      "usernameHint": "Affiché à côté des decks que vous partagez.",
+      "bio": "Bio",
+      "bioHint": "Facultatif. Jusqu'à 280 caractères.",
+      "xLink": "Lien X (Twitter)",
+      "xPlaceholder": "https://x.com/votreprofil",
+      "youtubeLink": "Lien YouTube",
+      "youtubePlaceholder": "https://youtube.com/@votrechaine"
+    },
+    "actions": {
+      "save": "Enregistrer les modifications",
+      "saving": "Enregistrement..."
+    },
+    "messages": {
+      "loading": "Chargement du profil...",
+      "success": "Profil mis à jour avec succès.",
+      "error": "Nous n'avons pas pu mettre à jour votre profil. Veuillez réessayer.",
+      "usernameRequired": "Le nom d'affichage est obligatoire."
+    },
+    "deleteAccount": {
+      "title": "Supprimer le compte",
+      "description": "Supprime d�finitivement votre compte AstraBuilder et toutes les donn�es associ�es. Cette action est irr�versible.",
+      "trigger": "Supprimer le compte",
+      "confirmationLabel": "Confirmation",
+      "confirmationDescription": "Tapez \"delete\" pour confirmer. Cette action est irr�versible.",
+      "confirmationPlaceholder": "delete",
+      "confirmationKeyword": "delete",
+      "confirmButton": "Confirmer la suppression",
+      "cancelButton": "Annuler",
+      "success": "Votre compte a �t� supprim�.",
+      "error": "Impossible de supprimer votre compte. Veuillez r�essayer.",
+    "keywordMismatch": "Saisissez delete pour confirmer."
+    }
+  },
+  "settings": {
+    "heading": "Settings",
+    "description": "Manage your language and appearance preferences.",
+    "language": {
+      "title": "Language",
+      "description": "Choose the language used across AstraBuilder.",
+      "active": "Active"
+    },
+    "theme": {
+      "title": "Appearance",
+      "description": "Switch between light and dark themes.",
+      "options": {
+        "light": "Light",
+        "dark": "Dark"
       }
     }
   }

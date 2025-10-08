@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useCallback, type FocusEvent, type MouseEvent as ReactMouseEvent } from 'react';
 
+import { getAffinityIconPath } from '@/lib/cards/affinity';
 import { getAffinityColorScheme } from '../constants';
 import type { Card } from '../types';
 import type { ZoomAnchor } from './zoom-overlay';
@@ -20,27 +21,19 @@ const COST_ICON_PATHS: Record<number, string> = {
   9: '/images/icons/cost/frame_number_9.png',
 };
 
-const AFFINITY_ICON_PATHS: Record<string, string> = {
-  caelum: '/images/icons/affinity/icon_caelum.png',
-  lux: '/images/icons/affinity/icon_lux.png',
-  neutral: '/images/icons/affinity/icon_neutral.png',
-  nox: '/images/icons/affinity/icon_nox.png',
-  solara: '/images/icons/affinity/icon_solara.png',
-  terra: '/images/icons/affinity/icon_terra.png',
-};
-
 type ZoomEvent = ReactMouseEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>;
 
 export type DeckCardChipProps = {
   card: Card;
   count: number;
-  labels: {
+  labels?: {
     add: string;
     remove: string;
   };
-  onIncrement: (cardId: string) => void;
-  onDecrement: (cardId: string) => void;
+  onIncrement?: (cardId: string) => void;
+  onDecrement?: (cardId: string) => void;
   onZoom: (card: Card | null, variant?: 'default' | 'compact', anchor?: ZoomAnchor | null) => void;
+  readOnly?: boolean;
 };
 
 function getCostIconPath(cost: number): string | null {
@@ -52,15 +45,12 @@ function getCostIconPath(cost: number): string | null {
   return COST_ICON_PATHS[rounded] ?? null;
 }
 
-function getAffinityIconPath(affinity: string): string | null {
-  const key = affinity.trim().toLowerCase();
-  return AFFINITY_ICON_PATHS[key] ?? null;
-}
-
-export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, onZoom }: DeckCardChipProps) {
+export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, onZoom, readOnly = false }: DeckCardChipProps) {
   const scheme = getAffinityColorScheme(card.affinity);
   const costIcon = getCostIconPath(card.cost);
   const affinityIcon = getAffinityIconPath(card.affinity);
+  const addLabel = labels?.add ?? 'Add card';
+  const removeLabel = labels?.remove ?? 'Remove card';
 
   const handlePreview = useCallback(
     (event: ZoomEvent) => {
@@ -102,6 +92,20 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
 
   const handleClosePreview = useCallback(() => onZoom(null), [onZoom]);
 
+  const handleIncrement = useCallback(() => {
+    if (readOnly || !onIncrement) {
+      return;
+    }
+    onIncrement(card.id);
+  }, [card.id, onIncrement, readOnly]);
+
+  const handleDecrement = useCallback(() => {
+    if (readOnly || !onDecrement) {
+      return;
+    }
+    onDecrement(card.id);
+  }, [card.id, onDecrement, readOnly]);
+
   return (
     <li
       className="flex items-center justify-between gap-4 rounded-full border px-4 py-2 shadow-sm transition-shadow hover:shadow-md"
@@ -138,29 +142,33 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
         </span>
       </button>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onDecrement(card.id)}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-          aria-label={`${labels.remove} ${card.name}`}
-        >
-          -
-        </button>
+        {readOnly ? null : (
+          <button
+            type="button"
+            onClick={handleDecrement}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            aria-label={`${removeLabel} ${card.name}`}
+            disabled={readOnly || !onDecrement}
+          >
+            -
+          </button>
+        )}
         <span className="min-w-[1.5rem] text-center text-sm font-semibold" style={{ color: scheme.textColor }}>
           {count}
         </span>
-        <button
-          type="button"
-          onClick={() => onIncrement(card.id)}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-          aria-label={`${labels.add} ${card.name}`}
-        >
-          +
-        </button>
+        {readOnly ? null : (
+          <button
+            type="button"
+            onClick={handleIncrement}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            aria-label={`${addLabel} ${card.name}`}
+            disabled={readOnly || !onIncrement}
+          >
+            +
+          </button>
+        )}
       </div>
     </li>
   );
 }
-
-
 

@@ -6,11 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "generate:cards": "node scripts/generate-card-data.mjs"
+    "generate:cards": "node scripts/generate-card-data.mjs",
+    "storage:set-cache": "node scripts/set-storage-cache-control.mjs --bucket cards --seconds 31536000"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.57.4",
+    "dotenv": "^16.4.5",
+    "sharp": "^0.33.4",
     "html-to-image": "^1.11.13",
     "next": "^15.5.4",
     "react": "^19.1.0",

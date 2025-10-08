@@ -60,7 +60,96 @@
     "shareCopySuccess": "Image copied to clipboard.",
     "shareCopyError": "Unable to copy image. Please download instead.",
     "shareEmpty": "Add cards to generate a share image.",
-    "shareError": "Unable to generate the share image. Please try again."
+    "shareError": "Unable to generate the share image. Please try again.",
+    "save": {
+      "heading": "Save deck",
+      "titleLabel": "Deck title",
+      "titlePlaceholder": "Untitled deck",
+      "descriptionLabel": "Description (optional)",
+      "descriptionPlaceholder": "Add a short note about this deck.",
+      "cancel": "Cancel",
+      "submit": "Save deck",
+      "saving": "Saving...",
+      "signInPrompt": "Sign in to save decks.",
+      "signInButton": "Sign in",
+      "emptyDeckError": "Add at least one card before saving.",
+      "genericError": "We couldn't save your deck. Please try again.",
+      "successMessage": "Deck saved. You can find it under My Decks.",
+      "dismissNotice": "Dismiss",
+      "publicLabel": "Make this deck public",
+      "publicHelp": "Public decks may appear in Popular or Trending lists. Leave unchecked to keep it private."
+    }
+  },
+  "myDecks": {
+    "heading": "My decks",
+    "description": "Manage the decks you've saved in the builder.",
+    "empty": "You haven't saved any decks yet.",
+    "loading": "Loading your decks...",
+    "error": "We couldn't load your decks. Please try again.",
+    "signInPrompt": "Sign in to view your saved decks.",
+    "signInButton": "Sign in",
+    "publicTag": "Public",
+    "privateTag": "Private",
+    "createdLabel": "Created",
+    "cardsLabel": "Cards",
+    "emptyStateCta": "Create a deck",
+    "untitledLabel": "Untitled deck",
+    "openButton": "Open in builder",
+    "favoritesLabel": "Favorites",
+    "viewsLabel": "Views",
+    "retryButton": "Retry",
+    "editLabel": "Edit deck",
+    "editHeading": "Edit deck",
+    "editTitleLabel": "Title",
+    "editTitlePlaceholder": "Enter a deck title",
+    "editDescriptionLabel": "Description",
+    "editDescriptionPlaceholder": "Write a short description",
+    "editPublicLabel": "Public deck",
+    "editPublicHelp": "Public decks can appear in community listings.",
+    "editCancel": "Cancel",
+    "editSave": "Save changes",
+    "editSaving": "Saving...",
+    "editOpenBuilder": "Edit in builder",
+    "editError": "Unable to update deck. Please try again.",
+    "editSuccess": "Deck updated successfully.",
+    "editDelete": "Delete deck",
+    "editDeleteConfirm": "Are you sure you want to delete this deck? This action cannot be undone.",
+    "editDeleteConfirmLabel": "Type DELETE to confirm",
+    "editDeletePlaceholder": "DELETE",
+    "editDeleteError": "Unable to delete deck. Please try again.",
+    "editDeleteSuccess": "Deck deleted successfully.",
+    "editDeleteConfirmButton": "Delete"
+  },
+  "deckDetails": {
+    "heading": "Deck details",
+    "description": "Card breakdown and statistics for this deck.",
+    "sectionsHeading": "Card sections",
+    "notesHeading": "Description",
+    "privateNotice": "This deck is currently private.",
+    "publicNotice": "This deck is public and may appear in community listings.",
+    "backButton": "Back to Decks"
+  },
+  "deckFeed": {
+    "heading": "Community decks",
+    "description": "Browse every public deck shared by the community.",
+    "empty": "No public decks yet. Be the first to publish one!",
+    "authorLabel": "Author",
+    "createdLabel": "Created",
+    "cardsLabel": "Cards",
+    "favoritesLabel": "Favorites",
+    "viewsLabel": "Views"
+  },
+  "publicProfile": {
+    "heading": "Community profile",
+    "subtitle": "Explore public decks and social links from this creator.",
+    "socialsHeading": "Social links",
+    "socialsEmpty": "No social links shared yet.",
+    "decksHeading": "Decks",
+    "noDecks": "No public decks available.",
+    "backButton": "Back to Community decks",
+    "xLabel": "X",
+    "youtubeLabel": "YouTube",
+    "unknownUser": "Anonymous player"
   },
   "cards": {
     "title": "All Cards",
@@ -98,6 +187,128 @@
       "footer": {
         "haveAccount": "Already have an account?",
         "signInLink": "Sign in"
+      }
+    },
+    "signIn": {
+      "title": "Welcome back",
+      "description": "Sign in to continue building and sharing your decks.",
+      "dividerLabel": "Or continue with",
+      "form": {
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "submit": "Sign in"
+      },
+      "google": {
+        "button": "Continue with Google"
+      },
+      "messages": {
+        "invalidCredentials": "The email or password is incorrect.",
+        "genericError": "We could not sign you in. Please try again.",
+        "passwordResetSuccess": "Password updated. Please sign in with your new password.",
+        "passwordResetExpired": "This reset link has expired. Please request a new one.",
+        "accountDeleted": "Your account has been deleted. We're sorry to see you go."
+      },
+      "footer": {
+        "noAccount": "Don't have an account yet?",
+        "signUpLink": "Create one"
+      },
+      "forgotPasswordLink": "Forgot password?"
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "description": "Enter your account email and we will send you a reset link.",
+      "form": {
+        "emailLabel": "Email",
+        "submit": "Send reset link"
+      },
+      "messages": {
+        "success": "Check your inbox for a password reset link.",
+        "genericError": "We could not send the reset email. Please try again."
+      },
+      "footer": {
+        "backToSignIn": "Back to sign in"
+      }
+    },
+    "resetPassword": {
+      "title": "Create a new password",
+      "description": "Enter a new password for your account.",
+      "form": {
+        "passwordLabel": "New password",
+        "confirmPasswordLabel": "Confirm new password",
+        "submit": "Update password"
+      },
+      "messages": {
+        "mismatch": "Passwords do not match.",
+        "genericError": "We could not update your password. Please try again.",
+        "success": "Password updated. You can continue."
+      },
+      "footer": {
+        "backToHome": "Back to home"
+      }
+    },
+    "passwordStrength": {
+      "label": "Password strength",
+      "values": {
+        "tooWeak": "Too weak",
+        "weak": "Weak",
+        "medium": "Fair",
+        "strong": "Strong",
+        "veryStrong": "Very strong"
+      }
+    }
+  },
+  "profile": {
+    "heading": "Profile",
+    "description": "Update how other players see you across AstraBuilder.",
+    "fields": {
+      "username": "Display name",
+      "usernameHint": "Shown next to decks you share.",
+      "bio": "Bio",
+      "bioHint": "Optional. Up to 280 characters.",
+      "xLink": "X (Twitter) link",
+      "xPlaceholder": "https://x.com/yourhandle",
+      "youtubeLink": "YouTube link",
+      "youtubePlaceholder": "https://youtube.com/@yourchannel"
+    },
+    "actions": {
+      "save": "Save changes",
+      "saving": "Saving..."
+    },
+    "messages": {
+      "loading": "Loading profile...",
+      "success": "Profile updated successfully.",
+      "error": "We couldn't update your profile. Please try again.",
+      "usernameRequired": "Display name is required."
+    },
+    "deleteAccount": {
+      "title": "Delete account",
+      "description": "Permanently remove your AstraBuilder account and profile. This action cannot be undone.",
+      "trigger": "Delete Account",
+      "confirmationLabel": "Confirm deletion",
+      "confirmationDescription": "Type \"delete\" to confirm. This cannot be undone.",
+      "confirmationPlaceholder": "delete",
+      "confirmationKeyword": "delete",
+      "confirmButton": "Confirm deletion",
+      "cancelButton": "Cancel",
+      "success": "Your account has been deleted.",
+      "error": "We couldn't delete your account. Please try again.",
+      "keywordMismatch": "Enter delete to confirm."
+    }
+  },
+  "settings": {
+    "heading": "Settings",
+    "description": "Manage your language and appearance preferences.",
+    "language": {
+      "title": "Language",
+      "description": "Choose the language used across AstraBuilder.",
+      "active": "Active"
+    },
+    "theme": {
+      "title": "Appearance",
+      "description": "Switch between light and dark themes.",
+      "options": {
+        "light": "Light",
+        "dark": "Dark"
       }
     }
   }

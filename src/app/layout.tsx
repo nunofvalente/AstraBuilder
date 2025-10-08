@@ -17,7 +17,11 @@ const geistMono = Geist_Mono({
 
 const metadataTitle = 'AstraBuilder';
 const metadataDescription = 'Deckbuilding website for Echoes of Astra';
-const metadataIcon = '/favicon.png';
+const appleTouchIcon = '/apple-touch-icon.png';
+const favicon32 = '/favicon-32x32.png';
+const favicon16 = '/favicon-16x16.png';
+const siteManifest = '/site.webmanifest';
+const metadataIcon = '/favicon.ico';
 
 export const metadata: Metadata = {
   title: metadataTitle,
@@ -27,13 +31,19 @@ export const metadata: Metadata = {
     description: metadataDescription,
   },
   icons: {
-    icon: metadataIcon,
+    icon: [
+      { url: metadataIcon },
+      { url: favicon32, rel: 'icon', type: 'image/png', sizes: '32x32' },
+      { url: favicon16, rel: 'icon', type: 'image/png', sizes: '16x16' },
+    ],
+    apple: [{ url: appleTouchIcon, rel: 'apple-touch-icon', sizes: '180x180' }],
   },
   twitter: {
     card: 'summary',
     title: metadataTitle,
     description: metadataDescription,
   },
+  manifest: siteManifest,
 };
 
 export default function RootLayout({
@@ -53,3 +63,6 @@ export default function RootLayout({
     </html>
   );
 }
+
+
+

@@ -1,19 +1,29 @@
-"use client";
+﻿"use client";
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 
 import { PrimaryButton } from "@/components/primary-button";
-import type { SignUpDictionary } from "@/i18n/get-dictionary";
+import { PasswordStrengthMeter } from "@/components/auth/password-strength-meter";
+import type { PasswordStrengthDictionary, SignUpDictionary } from "@/i18n/get-dictionary";
 import type { Locale } from "@/i18n/config";
 import { supabase } from "@/lib/supabase/supabaseClient";
+import { ensureProfileForUser } from "@/lib/supabase/profiles";
+
+const LOCALE_STORAGE_KEY = "astrabuilder-auth-locale";
+const REDIRECT_STORAGE_KEY = "astrabuilder-auth-redirect";
 
 type SignUpFormProps = {
   locale: Locale;
   dictionary: SignUpDictionary;
+  passwordStrengthDictionary: PasswordStrengthDictionary;
 };
 
-export function SignUpForm({ locale, dictionary }: SignUpFormProps) {
+function buildProfilePath(locale: Locale) {
+  return `/${locale}/profile`;
+}
+
+export function SignUpForm({ locale, dictionary, passwordStrengthDictionary }: SignUpFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -36,14 +46,30 @@ export function SignUpForm({ locale, dictionary }: SignUpFormProps) {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const emailRedirectTo = typeof window === "undefined"
+        ? undefined
+        : `${window.location.origin}/auth/callback?redirect=/${locale}`;
+
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          emailRedirectTo,
+        },
       });
 
       if (error) {
         setErrorMessage(error.message || dictionary.messages.genericError);
         return;
+      }
+
+      const authenticatedUser = data.session?.user ?? null;
+      if (authenticatedUser) {
+        try {
+          await ensureProfileForUser(authenticatedUser);
+        } catch (profileError) {
+          console.error("Failed to ensure profile for user", profileError);
+        }
       }
 
       setSuccessMessage(dictionary.messages.checkInbox);
@@ -73,7 +99,8 @@ export function SignUpForm({ locale, dictionary }: SignUpFormProps) {
       : `${window.location.origin}/auth/callback`;
 
     if (redirectTo) {
-      window.localStorage.setItem("astrabuilder-auth-locale", locale);
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+      window.localStorage.setItem(REDIRECT_STORAGE_KEY, buildProfilePath(locale));
     }
 
     try {
@@ -85,14 +112,16 @@ export function SignUpForm({ locale, dictionary }: SignUpFormProps) {
       if (error) {
         setErrorMessage(error.message || dictionary.messages.genericError);
         if (redirectTo) {
-          window.localStorage.removeItem("astrabuilder-auth-locale");
+          window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+          window.localStorage.removeItem(REDIRECT_STORAGE_KEY);
         }
         setIsGoogleLoading(false);
       }
     } catch (error) {
       setErrorMessage(dictionary.messages.genericError);
       if (redirectTo) {
-        window.localStorage.removeItem("astrabuilder-auth-locale");
+        window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+        window.localStorage.removeItem(REDIRECT_STORAGE_KEY);
       }
       setIsGoogleLoading(false);
       console.error("Google sign-in failed", error);
@@ -139,6 +168,7 @@ export function SignUpForm({ locale, dictionary }: SignUpFormProps) {
             minLength={8}
           />
           <p className="text-xs text-[color:var(--text-secondary)]">{dictionary.form.passwordHint}</p>
+          <PasswordStrengthMeter password={password} dictionary={passwordStrengthDictionary} />
         </div>
 
         <div className="space-y-2">
@@ -212,5 +242,3 @@ export function SignUpForm({ locale, dictionary }: SignUpFormProps) {
     </div>
   );
 }
-
-

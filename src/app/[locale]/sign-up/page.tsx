@@ -21,6 +21,7 @@ export default async function SignUpPage({ params }: SignUpPageProps) {
 
   const dictionary = await getDictionary(locale);
   const signUpCopy = dictionary.auth.signUp;
+  const passwordStrengthCopy = dictionary.auth.passwordStrength;
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
@@ -29,7 +30,11 @@ export default async function SignUpPage({ params }: SignUpPageProps) {
           <h1 className="text-2xl font-semibold">{signUpCopy.title}</h1>
           <p className="text-sm text-[color:var(--text-secondary)]">{signUpCopy.description}</p>
         </div>
-        <SignUpForm locale={locale as Locale} dictionary={signUpCopy} />
+        <SignUpForm
+          locale={locale as Locale}
+          dictionary={signUpCopy}
+          passwordStrengthDictionary={passwordStrengthCopy}
+        />
       </div>
     </div>
   );

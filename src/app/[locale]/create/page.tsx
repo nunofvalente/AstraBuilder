@@ -28,7 +28,7 @@ export default async function CreateDeckPage({ params }: CreateDeckPageProps) {
 
   return (
     <div className="flex h-full flex-1 min-h-0 flex-col overflow-hidden">
-      <DeckBuilder dictionary={dictionary} initialCards={cards} initialError={error} />
+      <DeckBuilder dictionary={dictionary} initialCards={cards} initialError={error} locale={locale} />
     </div>
   );
 }

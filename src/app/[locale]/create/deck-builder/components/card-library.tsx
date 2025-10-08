@@ -1,6 +1,6 @@
 import Image from 'next/image';
-
 import { CARD_IMAGE_SIZES } from '../constants';
+import { getCardImageVariantUrl } from '../image-url';
 import type { Card } from '../types';
 import type { ZoomAnchor } from './zoom-overlay';
 
@@ -56,6 +56,8 @@ export function CardLibrary({
         const isSelected = copies > 0;
         const isMaxed = copies >= 3;
 
+        const thumbnailSrc = getCardImageVariantUrl(card.imageSrc, 'small');
+
         return (
           <li key={card.id}>
             <div className="group relative h-full">
@@ -81,12 +83,14 @@ export function CardLibrary({
                   }`}
                 >
                   <Image
-                    src={card.imageSrc}
+                    src={thumbnailSrc}
                     alt={card.name}
                     width={220}
                     height={308}
                     className="h-auto w-full select-none"
                     sizes={CARD_IMAGE_SIZES}
+                    loading="lazy"
+                    fetchPriority="low"
                   />
                   {copies > 0 ? (
                     <span className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-[color:var(--accent)] px-2 py-0.5 text-xs font-semibold text-[color:var(--text-on-accent)] shadow-md">

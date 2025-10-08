@@ -98,6 +98,11 @@ button {
   background-clip: text;
   color: transparent;
 }
+
+[data-theme='light'] .banner-text-gradient {
+  background-image: none;
+  color: #ffffff;
+}
 .google-button-icon {
   display: inline-flex;
   align-items: center;
@@ -111,6 +116,5 @@ button {
   width: 100%;
   height: 100%;
 }
-
 
 
