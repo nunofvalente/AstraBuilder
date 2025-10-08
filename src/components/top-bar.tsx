@@ -1,26 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { User } from '@supabase/supabase-js';
 import { usePathname, useRouter } from 'next/navigation';
+
 import { PrimaryButton } from '@/components/primary-button';
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from '@/i18n/config';
+import { DEFAULT_LOCALE, type Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { ensureProfileForUser, type Profile } from '@/lib/supabase/profiles';
-import { useTheme } from '@/theme/theme-provider';
-import Link from 'next/link';
 
 type TopBarProps = {
   locale?: Locale;
   onSettings?: () => void;
-};
-
-const LANGUAGE_LABELS: Record<Locale, string> = {
-  de: 'German',
-  en: 'English',
-  fr: 'French',
-  ms: 'Malay',
 };
 
 const SIGN_IN_LABELS: Record<Locale, string> = {
@@ -55,7 +48,6 @@ const RESET_FLAG_STORAGE_KEY = 'astrabuilder-auth-reset';
 
 export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
-  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -63,9 +55,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
-  const { theme, toggleTheme } = useTheme();
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
-  const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -134,7 +124,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   }, [authEvent, locale, pathname, router, isAuthReady]);
 
   useEffect(() => {
-    if (!isSettingsMenuOpen && !isLanguageMenuOpen && !isUserMenuOpen) {
+    if (!isSettingsMenuOpen && !isUserMenuOpen) {
       return;
     }
 
@@ -146,13 +136,6 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
         !settingsMenuRef.current.contains(target)
       ) {
         setIsSettingsMenuOpen(false);
-      }
-      if (
-        isLanguageMenuOpen &&
-        languageMenuRef.current &&
-        !languageMenuRef.current.contains(target)
-      ) {
-        setIsLanguageMenuOpen(false);
       }
       if (
         isUserMenuOpen &&
@@ -168,9 +151,6 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
         if (isSettingsMenuOpen) {
           setIsSettingsMenuOpen(false);
         }
-        if (isLanguageMenuOpen) {
-          setIsLanguageMenuOpen(false);
-        }
         if (isUserMenuOpen) {
           setIsUserMenuOpen(false);
         }
@@ -184,7 +164,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isLanguageMenuOpen, isSettingsMenuOpen, isUserMenuOpen]);
+  }, [isSettingsMenuOpen, isUserMenuOpen]);
 
   useEffect(() => {
     if (!user || !userId) {
@@ -222,34 +202,24 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   }, [user, userId]);
 
   function toggleSettingsMenu() {
-    setIsLanguageMenuOpen(false);
     setIsUserMenuOpen(false);
     setIsSettingsMenuOpen((previous) => !previous);
   }
 
   function toggleUserMenu() {
-    setIsLanguageMenuOpen(false);
-    setIsSettingsMenuOpen(false);
     setIsUserMenuOpen((previous) => !previous);
   }
 
-  function toggleLanguageMenu() {
-    setIsSettingsMenuOpen(false);
-    setIsUserMenuOpen(false);
-    setIsLanguageMenuOpen((previous) => !previous);
-  }
-
-  function handleSettingsClick() {
+  function handleSettingsNavigate() {
     setIsSettingsMenuOpen(false);
     setIsUserMenuOpen(false);
 
     if (onSettings) {
       onSettings();
+      return;
     }
-  }
 
-  function handleThemeToggle() {
-    toggleTheme();
+    router.push(`/${locale}/settings`);
   }
 
   function handleProfileNavigate() {
@@ -259,10 +229,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
 
   function handleMyDecksNavigate() {
     setIsUserMenuOpen(false);
-    setIsSettingsMenuOpen(false);
-    setIsLanguageMenuOpen(false);
-    const destination = `/${locale}/my-decks`;
-    router.push(destination);
+    router.push(`/${locale}/my-decks`);
   }
 
   async function handleSignOut() {
@@ -281,8 +248,8 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
       console.error('Failed to sign out', error);
     } finally {
       setIsSigningOut(false);
-      setIsUserMenuOpen(false);
       setIsSettingsMenuOpen(false);
+      setIsUserMenuOpen(false);
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(RESET_FLAG_STORAGE_KEY);
       }
@@ -292,51 +259,9 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     }
   }
 
-  function buildLocaleHref(targetLocale: Locale) {
-    if (!pathname || pathname === '/') {
-      return `/${targetLocale}`;
-    }
-
-    const segments = pathname.split('/').filter(Boolean);
-    if (segments.length === 0) {
-      return `/${targetLocale}`;
-    }
-
-    const [firstSegment, ...rest] = segments;
-    if (SUPPORTED_LOCALES.includes(firstSegment as Locale)) {
-      return `/${[targetLocale, ...rest].join('/')}`;
-    }
-
-    return `/${targetLocale}/${segments.join('/')}`;
-  }
-
-  function handleLanguageSelect(targetLocale: Locale) {
-    setIsLanguageMenuOpen(false);
-    setIsSettingsMenuOpen(false);
-    setIsUserMenuOpen(false);
-
-    if (targetLocale === locale) {
-      return;
-    }
-
-    const href = buildLocaleHref(targetLocale);
-    router.push(href);
-  }
-
-  const isDark = theme === 'dark';
   const toolbarTextClass = 'text-white';
-  const toolbarSecondaryTextClass = 'text-white/80';
   const menuTextClass = 'text-[color:var(--text-primary)]';
-  const menuSecondaryTextClass = 'text-[color:var(--text-secondary)]';
   const barColorClass = 'bg-white';
-  const themeLabel = isDark ? 'Dark Mode' : 'Light Mode';
-  const trackClasses = `relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
-    isDark ? 'bg-[color:var(--accent)]/80' : 'bg-[color:var(--surface-muted)]'
-  }`;
-  const thumbStyle: CSSProperties = {
-    transform: isDark ? 'translateX(16px)' : 'translateX(2px)',
-  };
-  const languageLabel = LANGUAGE_LABELS[locale];
   const signInLabel = SIGN_IN_LABELS[locale];
   const accountFallbackLabel = ACCOUNT_FALLBACK_LABELS[locale];
   const profileMenuLabel = PROFILE_MENU_LABELS[locale];
@@ -345,7 +270,10 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const shouldShowSignInButton = isAuthReady && !user;
   const shouldShowProfileButton = isAuthReady && !!user;
   const profileFallbackLabel = user?.email ?? accountFallbackLabel;
-  const profileName = profile?.username && profile.username.trim().length > 0 ? profile.username.trim() : profileFallbackLabel;
+  const profileName =
+    profile?.username && profile.username.trim().length > 0
+      ? profile.username.trim()
+      : profileFallbackLabel;
   const profileDisplayLabel = isProfileLoading ? '...' : profileName;
   const profileButtonTitle = profileName;
   const signOutLabel = isSigningOut ? 'Signing out...' : 'Sign out';
@@ -365,57 +293,8 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
           </Link>
         </span>
         <div className="flex items-center gap-4">
-          <div className="relative" ref={languageMenuRef}>
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={isLanguageMenuOpen}
-              onClick={toggleLanguageMenu}
-              className={`group flex items-center gap-2 rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${toolbarTextClass} hover:text-[color:var(--text-primary)] hover:bg-[var(--surface-muted)]`}
-            >
-              <span>{languageLabel}</span>
-              <span
-                aria-hidden="true"
-                className={`text-xs ${toolbarSecondaryTextClass} group-hover:text-[color:var(--text-secondary)]`}
-              >
-                {isLanguageMenuOpen ? '^' : 'v'}
-              </span>
-            </button>
-            {isLanguageMenuOpen ? (
-              <div
-                className="absolute right-0 mt-2 w-40 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] shadow-lg"
-                role="menu"
-              >
-                {SUPPORTED_LOCALES.map((supportedLocale) => {
-                  const label = LANGUAGE_LABELS[supportedLocale];
-                  const isActive = supportedLocale === locale;
-
-                  return (
-                    <button
-                      key={supportedLocale}
-                      type="button"
-                      onClick={() => handleLanguageSelect(supportedLocale)}
-                      className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${
-                        isActive
-                          ? `text-sm font-semibold ${menuTextClass} bg-[color:var(--surface-muted)]`
-                          : `text-sm ${menuSecondaryTextClass}`
-                      }`}
-                      role="menuitemradio"
-                      aria-checked={isActive}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
           {shouldShowSignInButton ? (
-            <PrimaryButton
-              className="px-4"
-              type="button"
-              href={`/${locale}/sign-in`}
-            >
+            <PrimaryButton className="px-4" type="button" href={`/${locale}/sign-in`}>
               {signInLabel}
             </PrimaryButton>
           ) : null}
@@ -429,7 +308,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                 aria-label={profileMenuLabel}
                 title={profileButtonTitle}
                 onClick={toggleUserMenu}
-                className={`max-w-[200px] truncate rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${isUserMenuOpen ? 'bg-[var(--surface-muted)]' : ''}`}
+                className={`max-w-[200px] truncate rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]/60 ${isUserMenuOpen ? 'opacity-90' : ''}`}
               >
                 {profileDisplayLabel}
               </button>
@@ -491,28 +370,11 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
               >
                 <button
                   type="button"
-                  onClick={handleSettingsClick}
+                  onClick={handleSettingsNavigate}
                   className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
                   role="menuitem"
                 >
                   Settings
-                </button>
-                <div className="border-t border-[color:var(--border)]" />
-                <button
-                  type="button"
-                  onClick={handleThemeToggle}
-                  className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
-                  role="menuitem"
-                >
-                  <span className={`font-semibold ${menuTextClass}`}>
-                    {themeLabel}
-                  </span>
-                  <span className={trackClasses} aria-hidden="true">
-                    <span
-                      className="inline-block h-4 w-4 rounded-full bg-[color:var(--surface)] shadow transition-transform"
-                      style={thumbStyle}
-                    />
-                  </span>
                 </button>
               </div>
             ) : null}

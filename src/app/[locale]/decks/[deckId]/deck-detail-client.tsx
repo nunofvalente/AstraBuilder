@@ -431,13 +431,13 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       ) : null}
 
       <div
-        className="relative space-y-3 rounded-2xl border border-[color:var(--border)] p-6 shadow-sm"
+        className="relative space-y-3 rounded-2xl border border-[color:var(--border)] p-6 shadow-sm text-white"
         style={{
           backgroundImage: `linear-gradient(rgba(12, 15, 21, 0.35), rgba(12, 15, 21, 0.35)), ${buildAffinityGradient(bannerAffinities)}`,
         }}
       >
-        <div className="absolute right-6 top-6 flex flex-wrap justify-end gap-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] md:flex-nowrap">
-            <span className="inline-flex items-center gap-1 rounded-md border border-[color:var(--surface-muted)] bg-[color:var(--surface-muted)] px-2.5 py-1">
+        <div className="absolute right-6 top-6 flex flex-wrap justify-end gap-3 text-xs font-semibold uppercase tracking-wide text-white md:flex-nowrap">
+            <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
               <span className="sr-only">{labels.myDecks.viewsLabel}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -452,7 +452,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
               </svg>
               {deckMeta?.viewsTotal ?? 0}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-[color:var(--surface-muted)] bg-[color:var(--surface-muted)] px-2.5 py-1">
+            <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
               <span className="sr-only">{labels.myDecks.favoritesLabel}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -466,14 +466,14 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
             </span>
         </div>
         {formattedCreatedAt ? (
-          <div className="absolute bottom-6 right-6 text-sm font-semibold text-[color:var(--text-primary)]">
+          <div className="absolute bottom-6 right-6 text-sm font-semibold text-white">
             {formattedCreatedAt}
           </div>
         ) : null}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-3 pr-20 md:pr-0 md:max-w-[80%]">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="w-full break-words text-3xl font-semibold text-[color:var(--text-primary)]">{title}</h1>
+              <h1 className="w-full break-words text-3xl font-semibold text-white">{title}</h1>
               {bannerAffinities.length > 0 ? (
                 <span className="flex items-center gap-1">
                   {bannerAffinities.map((affinity) => {
@@ -497,10 +497,10 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
             </div>
             {description ? (
               <div className="space-y-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-white/80">
                   {labels.deckDetails.notesHeading}
                 </h2>
-                <p className="break-words text-sm leading-6 text-[color:var(--text-primary)] whitespace-pre-line">
+                <p className="break-words text-sm leading-6 text-white/80 whitespace-pre-line">
                   {description}
                 </p>
               </div>
@@ -508,10 +508,10 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
           </div>
         </div>
 
-        <dl className="mt-6 grid grid-cols-1 gap-4 text-sm text-[color:var(--text-secondary)]">
+        <dl className="mt-6 grid grid-cols-1 gap-4 text-sm text-white/80">
           <div>
             <dt className="mb-1 text-xs uppercase tracking-wide">{labels.myDecks.cardsLabel}</dt>
-            <dd className="text-base font-semibold text-[color:var(--text-primary)]">{totalCards}</dd>
+            <dd className="text-base font-semibold text-white">{totalCards}</dd>
           </div>
         </dl>
       </div>

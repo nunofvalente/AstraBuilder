@@ -55,8 +55,12 @@ function formatDate(value: string | null, locale: Locale): string | null {
   }
 }
 
-const statPillClassName =
-  'inline-flex items-center gap-1 rounded-md border border-[color:var(--border)] bg-transparent px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]';
+const pillBaseClassName =
+  'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide';
+const statPillClassName = `${pillBaseClassName} border border-white/40 bg-white/10 text-white`;
+const mutedStatPillClassName = `${pillBaseClassName} border border-white/20 bg-white/10 text-white/80`;
+const privacyTagClassName =
+  'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide bg-white/15 text-white';
 
 export function DeckSummaryCard({
   locale,
@@ -78,10 +82,7 @@ export function DeckSummaryCard({
   const descriptionDisplay =
     description && description.length > 100 ? `${description.slice(0, 100)}…` : description ?? '';
   const formattedCreatedAt = formatDate(deck.createdAt, locale);
-  const metricPillClassName = showPrivacyTag || mutedMetrics
-    ? 'inline-flex items-center gap-1 rounded-md border border-[color:var(--surface-muted)] bg-[color:var(--surface-muted)] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]'
-    : statPillClassName;
-  const privacyTagClassName = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]';
+  const metricPillClassName = showPrivacyTag || mutedMetrics ? mutedStatPillClassName : statPillClassName;
 
   return (
     <div className="flex h-full w-full flex-col gap-3">
@@ -93,7 +94,7 @@ export function DeckSummaryCard({
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-3">
-                <span className="block break-words text-lg font-semibold text-[color:var(--text-primary)] group-hover:underline">
+                <span className="block break-words text-lg font-semibold text-white group-hover:underline">
                   {titleDisplay}
                 </span>
                 {displayAffinities.length > 0 ? (
@@ -122,7 +123,7 @@ export function DeckSummaryCard({
                 ) : null}
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white">
                 <span className={metricPillClassName}>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -151,18 +152,18 @@ export function DeckSummaryCard({
               </div>
             </div>
 
-            <p className="min-h-[3.5rem] break-words text-sm text-[color:var(--text-secondary)] line-clamp-3">
+            <p className="min-h-[3.5rem] break-words text-sm text-white/80 line-clamp-3">
               {descriptionDisplay || ' '}
             </p>
           </div>
 
-          <div className="mt-auto flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
-            <span className="font-semibold text-[color:var(--text-primary)]">
-              {labels.cards}: <span className="font-normal text-[color:var(--text-secondary)]">{deck.cardCount}</span>
+          <div className="mt-auto flex items-center justify-between text-xs text-white/80">
+            <span className="font-semibold text-white">
+              {labels.cards}: <span className="font-normal text-white/75">{deck.cardCount}</span>
             </span>
             <div className="flex items-center gap-2">
               {formattedCreatedAt ? (
-                <span className="font-semibold text-[color:var(--text-primary)]">{formattedCreatedAt}</span>
+                <span className="font-semibold text-white">{formattedCreatedAt}</span>
               ) : null}
               {onEdit ? (
                 <button
@@ -172,7 +173,7 @@ export function DeckSummaryCard({
                     event.stopPropagation();
                     onEdit();
                   }}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--surface-muted)] bg-[color:var(--surface)] text-[color:var(--text-secondary)] transition hover:-translate-y-0.5 hover:text-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white transition hover:-translate-y-0.5 hover:text-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                   aria-label={editLabel ?? 'Edit deck'}
                 >
                   <svg
