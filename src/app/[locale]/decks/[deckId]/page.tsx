@@ -29,7 +29,7 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
     <DeckDetailClient
       locale={locale}
       deckId={deckId}
-      labels={{ deckDetails: dictionary.deckDetails, myDecks: dictionary.myDecks }}
+      labels={{ deckDetails: dictionary.deckDetails, myDecks: dictionary.myDecks, publicProfile: dictionary.publicProfile }}
       emptyDeckLabel={dictionary.builder.emptyDeck}
     />
   );

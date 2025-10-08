@@ -274,6 +274,27 @@ type MyDecksDictionary = {
     favoritesLabel: string;
     viewsLabel: string;
     retryButton: string;
+    editLabel: string;
+    editHeading: string;
+    editTitleLabel: string;
+    editTitlePlaceholder: string;
+    editDescriptionLabel: string;
+    editDescriptionPlaceholder: string;
+    editPublicLabel: string;
+    editPublicHelp: string;
+    editCancel: string;
+    editSave: string;
+    editSaving: string;
+    editOpenBuilder: string;
+    editError: string;
+    editSuccess: string;
+    editDelete: string;
+    editDeleteConfirm: string;
+    editDeleteConfirmLabel: string;
+    editDeletePlaceholder: string;
+    editDeleteError: string;
+    editDeleteSuccess: string;
+    editDeleteConfirmButton: string;
   };
 };
 type DeckDetailsDictionary = {

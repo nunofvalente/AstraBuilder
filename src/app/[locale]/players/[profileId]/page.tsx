@@ -1,13 +1,11 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
-import { isLocale, type Locale } from '@/i18n/config';
+import { isLocale } from '@/i18n/config';
 import { getProfileById } from '@/lib/supabase/profiles';
 import { getPublicDeckSummariesByAuthor } from '@/lib/supabase/decks';
-import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
-import { TertiaryButton } from '@/components/tertiary-button';
+import { DeckSummaryCard } from '@/components/deck-summary-card';
 
 interface PlayerPageParams {
   locale: string;
@@ -63,39 +61,35 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
         ← {publicProfile.backButton}
       </Link>
 
-      <section className="space-y-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-[color:var(--text-primary)]">{username}</h1>
-          <p className="text-sm text-[color:var(--text-secondary)]">{publicProfile.subtitle}</p>
-        </div>
-        {profile.bio ? (
-          <p className="max-w-3xl whitespace-pre-line text-sm leading-6 text-[color:var(--text-primary)]">
-            {profile.bio}
-          </p>
-        ) : null}
-        <div className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-            {publicProfile.socialsHeading}
-          </h2>
-          {socials.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-secondary)]">{publicProfile.socialsEmpty}</p>
-          ) : (
-            <div className="flex flex-wrap items-center gap-3">
+      <div className="space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <h1 className="text-4xl font-bold tracking-tight text-[color:var(--text-primary)] sm:text-5xl">
+            {username}
+          </h1>
+          {socials.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
               {socials.map((social) => (
                 <Link
                   key={social.label}
                   href={social.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-[color:var(--accent)] hover:underline"
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
                   {social.label}
                 </Link>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
-      </section>
+        {profile.bio ? (
+          <p className="max-w-3xl whitespace-pre-line text-sm leading-6 text-[color:var(--text-primary)]">
+            {profile.bio}
+          </p>
+        ) : (
+          <p className="text-sm text-[color:var(--text-secondary)]">{publicProfile.socialsEmpty}</p>
+        )}
+      </div>
 
       <section className="space-y-4">
         <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">{publicProfile.decksHeading}</h2>
@@ -104,113 +98,24 @@ export default async function PlayerProfilePage({ params }: PlayerPageProps) {
             {publicProfile.noDecks}
           </p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {decks.map((deck) => {
-              const createdLabel = formatDate(deck.createdAt, locale);
-              const displayAffinities = deck.affinities.filter((affinity) => normalizeAffinity(affinity) !== 'Neutral');
-              const gradient = buildAffinityGradient(displayAffinities);
-              const backgroundImage = `linear-gradient(rgba(12, 15, 21, 0.8), rgba(12, 15, 21, 0.8)), ${gradient}`;
-
-              return (
-                <article
-                  key={deck.id}
-                  className="flex h-full flex-col gap-4 rounded-2xl border border-[color:var(--border)] p-5 shadow-md transition hover:shadow-lg"
-                  style={{ backgroundImage }}
-                >
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-col gap-2">
-                        <Link
-                          href={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
-                          className="text-lg font-semibold text-[color:var(--text-primary)] hover:underline"
-                        >
-                          {deck.title && deck.title.trim().length > 0 ? deck.title.trim() : myDecks.untitledLabel}
-                        </Link>
-                        {displayAffinities.length > 0 ? (
-                          <span className="flex items-center gap-1">
-                            {displayAffinities.map((affinity) => {
-                              const iconSrc = getAffinityIconPath(affinity);
-                              if (!iconSrc) {
-                                return null;
-                              }
-                              return (
-                                <Image
-                                  key={affinity}
-                                  src={iconSrc}
-                                  alt={`${affinity} affinity`}
-                                  width={20}
-                                  height={20}
-                                  className="h-5 w-5"
-                                />
-                              );
-                            })}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                        <span className="inline-flex items-center gap-1">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            className="h-4 w-4"
-                          >
-                            <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                          {deck.viewsTotal}
-                        </span>
-                        <TertiaryButton className="px-2 py-1">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            className="h-4 w-4 text-[color:var(--accent)]"
-                          >
-                            <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
-                          </svg>
-                          {deck.favoritesTotal}
-                        </TertiaryButton>
-                      </div>
-                    </div>
-                    {deck.description ? (
-                      <p className="text-sm text-[color:var(--text-secondary)] line-clamp-3">{deck.description}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-auto grid grid-cols-2 gap-2 text-xs text-[color:var(--text-secondary)]">
-                    {createdLabel ? (
-                      <span className="font-semibold text-[color:var(--text-primary)]">
-                        {deckFeed.createdLabel}: <span className="font-normal text-[color:var(--text-secondary)]">{createdLabel}</span>
-                      </span>
-                    ) : null}
-                    <span className="font-semibold text-[color:var(--text-primary)]">
-                      {deckFeed.cardsLabel}: <span className="font-normal text-[color:var(--text-secondary)]">{deck.cardCount}</span>
-                    </span>
-                  </div>
-                </article>
-              );
-            })}
+          <div className="grid gap-5 md:grid-cols-2 min-[2000px]:grid-cols-3">
+            {decks.map((deck) => (
+              <DeckSummaryCard
+                key={deck.id}
+                locale={locale}
+                deck={deck}
+                detailHref={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
+                labels={{
+                  cards: deckFeed.cardsLabel,
+                  untitled: myDecks.untitledLabel,
+                  publicTag: myDecks.publicTag,
+                  privateTag: myDecks.privateTag,
+                }}
+              />
+            ))}
           </div>
         )}
       </section>
     </div>
   );
-}
-
-function formatDate(value: string | null, locale: Locale): string | null {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date);
-  } catch (error) {
-    return date.toLocaleDateString();
-  }
 }

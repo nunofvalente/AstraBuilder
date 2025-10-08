@@ -13,12 +13,21 @@ import { supabase } from '@/lib/supabase/supabaseClient';
 import Image from 'next/image';
 
 import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
-import { TertiaryButton } from '@/components/tertiary-button';
 
 const CARD_TYPE_ORDER = ['Unit', 'Tactic', 'Territory'];
 const FALLBACK_SECTION_LABEL = 'Other';
 
- type DeckRecord = {
+function ensureHttps(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  return `https://${url}`;
+}
+
+type DeckRecord = {
   id: string;
   title: string | null;
   description: string | null;
@@ -48,6 +57,20 @@ const FALLBACK_SECTION_LABEL = 'Other';
     favorites_total?: number | null;
     views_total?: number | null;
   }> | null;
+  profiles?:
+    | Array<{
+        id?: string | null;
+        username?: string | null;
+        x_link?: string | null;
+        youtube_link?: string | null;
+      } | null>
+    | {
+        id?: string | null;
+        username?: string | null;
+        x_link?: string | null;
+        youtube_link?: string | null;
+      }
+    | null;
 };
 
 type DeckDetailsClientProps = {
@@ -75,6 +98,12 @@ type DeckDetailsClientProps = {
       loading: string;
       error: string;
     };
+    publicProfile: {
+      socialsHeading: string;
+      socialsEmpty: string;
+      xLabel: string;
+      youtubeLabel: string;
+    };
   };
   emptyDeckLabel: string;
 };
@@ -100,6 +129,10 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     createdAt: string | null;
     favoritesTotal: number;
     viewsTotal: number;
+    authorName: string | null;
+    authorId: string | null;
+    authorXLink: string | null;
+    authorYoutubeLink: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -110,7 +143,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       setErrorMessage(null);
 
       const select =
-        'id,title,description,created_at,is_public,deck_cards(quantity,cards(*)),deck_stats(favorites_total,views_total)';
+        'id,title,description,created_at,is_public,deck_cards(quantity,cards(*)),deck_stats(favorites_total,views_total),profiles:profiles!decks_user_id_profiles_fkey(id,username,x_link,youtube_link)';
 
       const { data, error } = await supabase
         .from('decks')
@@ -139,6 +172,29 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
         ? Number(data.deck_stats[0]?.views_total ?? 0)
         : 0;
 
+      let authorName: string | null = null;
+      let authorId: string | null = null;
+      let authorXLink: string | null = null;
+      let authorYoutubeLink: string | null = null;
+      const profileRelation = data.profiles;
+      if (Array.isArray(profileRelation) && profileRelation.length > 0) {
+        authorName = profileRelation[0]?.username ?? null;
+        authorId = profileRelation[0]?.id ?? null;
+        authorXLink = profileRelation[0]?.x_link ?? null;
+        authorYoutubeLink = profileRelation[0]?.youtube_link ?? null;
+      } else if (profileRelation && profileRelation !== null && typeof profileRelation === 'object') {
+        const profileObject = profileRelation as {
+          id?: string | null;
+          username?: string | null;
+          x_link?: string | null;
+          youtube_link?: string | null;
+        };
+        authorName = profileObject.username ?? null;
+        authorId = profileObject.id ?? null;
+        authorXLink = profileObject.x_link ?? null;
+        authorYoutubeLink = profileObject.youtube_link ?? null;
+      }
+
       const entries: DeckEntry[] = Array.isArray(data.deck_cards)
         ? data.deck_cards
             .filter((entry): entry is { quantity: number | null; cards: NonNullable<typeof entry.cards> } =>
@@ -158,6 +214,10 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
         createdAt: data.created_at ?? null,
         favoritesTotal,
         viewsTotal,
+        authorName,
+        authorId,
+        authorXLink,
+        authorYoutubeLink,
       });
       setDeckEntries(entries);
       setStatus('ready');
@@ -239,6 +299,17 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       return date.toLocaleDateString();
     }
   }, [deckMeta?.createdAt, locale]);
+
+  const authorSocials = useMemo(() => {
+    if (!deckMeta) {
+      return [];
+    }
+    const socials = [
+      { label: labels.publicProfile.xLabel, href: ensureHttps(deckMeta.authorXLink) },
+      { label: labels.publicProfile.youtubeLabel, href: ensureHttps(deckMeta.authorYoutubeLink) },
+    ];
+    return socials.filter((entry): entry is { label: string; href: string } => Boolean(entry.href));
+  }, [deckMeta?.authorXLink, deckMeta?.authorYoutubeLink, labels.publicProfile.xLabel, labels.publicProfile.youtubeLabel]);
 
   function handleZoom(nextCard: Card | null, variant: 'default' | 'compact' = 'default', anchor: ZoomAnchor | null = null) {
     setZoomCard(nextCard);
@@ -322,16 +393,87 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
         </Link>
       </div>
 
+      {deckMeta?.authorName ? (
+        <div className="flex flex-col items-center gap-3 text-center">
+          {deckMeta.authorId ? (
+            <Link
+              href={`/${locale}/players/${encodeURIComponent(deckMeta.authorId)}`}
+              className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)] transition hover:text-[color:var(--accent)]"
+            >
+              {deckMeta.authorName}
+            </Link>
+          ) : (
+            <span className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)]">
+              {deckMeta.authorName}
+            </span>
+          )}
+          <div className="flex flex-col items-center gap-2 text-xs text-[color:var(--text-secondary)]">
+            <span className="font-semibold uppercase tracking-wide">{labels.publicProfile.socialsHeading}</span>
+            {authorSocials.length > 0 ? (
+              <div className="flex flex-wrap justify-center gap-3">
+                {authorSocials.map((social) => (
+                  <Link
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-[color:var(--accent)] hover:underline"
+                  >
+                    {social.label}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <span className="text-xs text-[color:var(--text-secondary)]">{labels.publicProfile.socialsEmpty}</span>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       <div
-        className="space-y-3 rounded-2xl border border-[color:var(--border)] p-6 shadow-sm"
+        className="relative space-y-3 rounded-2xl border border-[color:var(--border)] p-6 shadow-sm"
         style={{
           backgroundImage: `linear-gradient(rgba(12, 15, 21, 0.35), rgba(12, 15, 21, 0.35)), ${buildAffinityGradient(bannerAffinities)}`,
         }}
       >
+        <div className="absolute right-6 top-6 flex flex-wrap justify-end gap-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] md:flex-nowrap">
+            <span className="inline-flex items-center gap-1 rounded-md border border-[color:var(--surface-muted)] bg-[color:var(--surface-muted)] px-2.5 py-1">
+              <span className="sr-only">{labels.myDecks.viewsLabel}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className="h-4 w-4"
+              >
+                <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              {deckMeta?.viewsTotal ?? 0}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-[color:var(--surface-muted)] bg-[color:var(--surface-muted)] px-2.5 py-1">
+              <span className="sr-only">{labels.myDecks.favoritesLabel}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="h-4 w-4 text-[color:var(--accent)]"
+              >
+                <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+              {deckMeta?.favoritesTotal ?? 0}
+            </span>
+        </div>
+        {formattedCreatedAt ? (
+          <div className="absolute bottom-6 right-6 text-sm font-semibold text-[color:var(--text-primary)]">
+            {formattedCreatedAt}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-3">
+          <div className="space-y-3 pr-20 md:pr-0 md:max-w-[80%]">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-semibold text-[color:var(--text-primary)]">{title}</h1>
+              <h1 className="w-full break-words text-3xl font-semibold text-[color:var(--text-primary)]">{title}</h1>
               {bannerAffinities.length > 0 ? (
                 <span className="flex items-center gap-1">
                   {bannerAffinities.map((affinity) => {
@@ -353,66 +495,23 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
                 </span>
               ) : null}
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-              <span className="inline-flex items-center gap-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className="h-4 w-4"
-                >
-                  <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                {deckMeta?.viewsTotal ?? 0}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="h-4 w-4 text-[color:var(--accent)]"
-                >
-                  <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
-                </svg>
-                {deckMeta?.favoritesTotal ?? 0}
-              </span>
-              <span className="font-semibold text-[color:var(--text-primary)]">
-                {labels.myDecks.cardsLabel}: <span className="font-normal text-[color:var(--text-secondary)]">{totalCards}</span>
-              </span>
-              {formattedCreatedAt ? (
-                <span className="font-semibold text-[color:var(--text-primary)]">{formattedCreatedAt}</span>
-              ) : null}
-            </div>
             {description ? (
               <div className="space-y-2">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                   {labels.deckDetails.notesHeading}
                 </h2>
-                <p className="text-sm leading-6 text-[color:var(--text-primary)] whitespace-pre-line">{description}</p>
+                <p className="break-words text-sm leading-6 text-[color:var(--text-primary)] whitespace-pre-line">
+                  {description}
+                </p>
               </div>
             ) : null}
           </div>
         </div>
 
-        <dl className="mt-6 grid grid-cols-2 gap-4 text-sm text-[color:var(--text-secondary)] sm:grid-cols-4">
+        <dl className="mt-6 grid grid-cols-1 gap-4 text-sm text-[color:var(--text-secondary)]">
           <div>
             <dt className="mb-1 text-xs uppercase tracking-wide">{labels.myDecks.cardsLabel}</dt>
             <dd className="text-base font-semibold text-[color:var(--text-primary)]">{totalCards}</dd>
-          </div>
-          <div>
-            <dt className="mb-1 text-xs uppercase tracking-wide">{labels.myDecks.favoritesLabel}</dt>
-            <dd className="text-base font-semibold text-[color:var(--text-primary)]">{deckMeta.favoritesTotal}</dd>
-          </div>
-          <div>
-            <dt className="mb-1 text-xs uppercase tracking-wide">{labels.myDecks.viewsLabel}</dt>
-            <dd className="text-base font-semibold text-[color:var(--text-primary)]">{deckMeta.viewsTotal}</dd>
-          </div>
-          <div>
-            <dt className="mb-1 text-xs uppercase tracking-wide">{labels.myDecks.createdLabel}</dt>
-            <dd className="text-base font-semibold text-[color:var(--text-primary)]">{formattedCreatedAt ?? '—'}</dd>
           </div>
         </dl>
       </div>

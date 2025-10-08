@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import { AffinityFilterBar } from './deck-builder/components/affinity-filter-bar';
 import { CardSearchBar } from './deck-builder/components/card-search-bar';
@@ -50,6 +50,8 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   const zoomButtonLabel = DEFAULT_ZOOM_LABEL;
   const { builder, cards: cardsCopy } = dictionary;
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const deckIdQuery = searchParams.get('deck');
   const saveLabels = builder.save;
   const [saveNotice, setSaveNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -196,6 +198,78 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   }, [cards, combinedQueries, searchTerms, activeAffinitySet, sortOption]);
 
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
+  const prefilledDeckIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!deckIdQuery) {
+      prefilledDeckIdRef.current = null;
+      return;
+    }
+
+    const deckId = deckIdQuery.trim();
+    if (!deckId || cards.length === 0) {
+      return;
+    }
+
+    if (prefilledDeckIdRef.current === deckId) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function prefillDeckFromId() {
+      try {
+        const { data, error } = await supabase
+          .from('deck_cards')
+          .select('card_id, quantity')
+          .eq('deck_id', deckId);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (error) {
+          console.error('Failed to load deck for builder', error);
+          prefilledDeckIdRef.current = deckId;
+          return;
+        }
+
+        const rows = Array.isArray(data) ? data : [];
+        const nextDeck: Record<string, number> = {};
+
+        for (const row of rows) {
+          const cardId = typeof row.card_id === 'string' ? row.card_id : null;
+          const quantity = Number(row.quantity ?? 0);
+          if (!cardId || quantity <= 0) {
+            continue;
+          }
+
+          if (!cardMap.has(cardId)) {
+            continue;
+          }
+
+          const current = nextDeck[cardId] ?? 0;
+          const cappedQuantity = Math.min(3, quantity);
+          nextDeck[cardId] = Math.min(3, current + cappedQuantity);
+        }
+
+        setDeck(nextDeck);
+        prefilledDeckIdRef.current = deckId;
+      } catch (prefillError) {
+        if (!isActive) {
+          return;
+        }
+        console.error('Unexpected error while prefilling deck', prefillError);
+        prefilledDeckIdRef.current = deckId;
+      }
+    }
+
+    void prefillDeckFromId();
+
+    return () => {
+      isActive = false;
+    };
+  }, [cardMap, cards.length, deckIdQuery]);
 
   const deckEntries = useMemo<DeckEntry[]>(() => {
     return Object.entries(deck)

@@ -33,6 +33,9 @@ type DeckSummaryCardProps = {
     label: string;
     href?: string | null;
   };
+  onEdit?: () => void;
+  editLabel?: string;
+  mutedMetrics?: boolean;
 };
 
 function formatDate(value: string | null, locale: Locale): string | null {
@@ -62,60 +65,64 @@ export function DeckSummaryCard({
   labels,
   showPrivacyTag = false,
   author,
+  onEdit,
+  editLabel,
+  mutedMetrics = false,
 }: DeckSummaryCardProps) {
   const displayAffinities = deck.affinities.filter((affinity) => normalizeAffinity(affinity) !== 'Neutral');
   const gradient = buildAffinityGradient(displayAffinities);
   const backgroundImage = `linear-gradient(rgba(12, 15, 21, 0.45), rgba(12, 15, 21, 0.45)), ${gradient}`;
   const title = deck.title && deck.title.trim().length > 0 ? deck.title.trim() : labels.untitled;
   const description = deck.description?.trim();
+  const titleDisplay = title.length > 20 ? `${title.slice(0, 20)}…` : title;
+  const descriptionDisplay =
+    description && description.length > 100 ? `${description.slice(0, 100)}…` : description ?? '';
   const formattedCreatedAt = formatDate(deck.createdAt, locale);
-  const metricPillClassName = showPrivacyTag
+  const metricPillClassName = showPrivacyTag || mutedMetrics
     ? 'inline-flex items-center gap-1 rounded-md border border-[color:var(--surface-muted)] bg-[color:var(--surface-muted)] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]'
     : statPillClassName;
   const privacyTagClassName = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]';
 
   return (
-    <div className="flex flex-col gap-3">
-      <Link href={detailHref} className="group block">
+    <div className="flex h-full w-full flex-col gap-3">
+      <Link href={detailHref} className="group block h-full">
         <article
-          className="flex h-full flex-col gap-4 rounded-2xl border border-[color:var(--border)] p-5 shadow-md transition hover:shadow-lg"
+          className="flex h-full flex-col gap-4 overflow-hidden rounded-2xl border border-[color:var(--border)] p-5 shadow-md transition hover:shadow-lg"
           style={{ backgroundImage }}
         >
           <div className="space-y-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-lg font-semibold text-[color:var(--text-primary)] group-hover:underline">
-                    {title}
-                  </span>
-                  {displayAffinities.length > 0 ? (
-                    <span className="flex items-center gap-1">
-                      {displayAffinities.map((affinity) => {
-                        const iconSrc = getAffinityIconPath(affinity);
-                        if (!iconSrc) {
-                          return null;
-                        }
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <span className="block break-words text-lg font-semibold text-[color:var(--text-primary)] group-hover:underline">
+                  {titleDisplay}
+                </span>
+                {displayAffinities.length > 0 ? (
+                  <span className="flex items-center gap-1">
+                    {displayAffinities.map((affinity) => {
+                      const iconSrc = getAffinityIconPath(affinity);
+                      if (!iconSrc) {
+                        return null;
+                      }
 
-                        return (
-                          <Image
-                            key={affinity}
-                            src={iconSrc}
-                            alt={`${affinity} affinity`}
-                            width={20}
-                            height={20}
-                            className="h-5 w-5"
-                          />
-                        );
-                      })}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="min-h-[4.5rem] text-sm text-[color:var(--text-secondary)] line-clamp-3">
-                  {description ?? ' '}
-                </p>
+                      return (
+                        <Image
+                          key={affinity}
+                          src={iconSrc}
+                          alt={`${affinity} affinity`}
+                          width={20}
+                          height={20}
+                          className="h-5 w-5"
+                        />
+                      );
+                    })}
+                  </span>
+                ) : null}
+                {showPrivacyTag ? (
+                  <span className={privacyTagClassName}>{deck.isPublic ? labels.publicTag : labels.privateTag}</span>
+                ) : null}
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                 <span className={metricPillClassName}>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -141,20 +148,47 @@ export function DeckSummaryCard({
                   </svg>
                   {deck.favoritesTotal}
                 </span>
-                {showPrivacyTag ? (
-                  <span className={privacyTagClassName}>{deck.isPublic ? labels.publicTag : labels.privateTag}</span>
-                ) : null}
               </div>
             </div>
+
+            <p className="min-h-[3.5rem] break-words text-sm text-[color:var(--text-secondary)] line-clamp-3">
+              {descriptionDisplay || ' '}
+            </p>
           </div>
 
           <div className="mt-auto flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
             <span className="font-semibold text-[color:var(--text-primary)]">
               {labels.cards}: <span className="font-normal text-[color:var(--text-secondary)]">{deck.cardCount}</span>
             </span>
-            {formattedCreatedAt ? (
-              <span className="font-semibold text-[color:var(--text-primary)]">{formattedCreatedAt}</span>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {formattedCreatedAt ? (
+                <span className="font-semibold text-[color:var(--text-primary)]">{formattedCreatedAt}</span>
+              ) : null}
+              {onEdit ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onEdit();
+                  }}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--surface-muted)] bg-[color:var(--surface)] text-[color:var(--text-secondary)] transition hover:-translate-y-0.5 hover:text-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                  aria-label={editLabel ?? 'Edit deck'}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-4 w-4"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
           </div>
         </article>
       </Link>

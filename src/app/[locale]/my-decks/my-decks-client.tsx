@@ -8,6 +8,7 @@ import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { getDeckSummariesForUser, type DeckSummary } from '@/lib/supabase/decks';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
+import { DeckEditModal } from './deck-edit-modal';
 
 export type MyDecksClientProps = {
   locale: Locale;
@@ -29,6 +30,27 @@ export type MyDecksClientProps = {
     favoritesLabel: string;
     viewsLabel: string;
     retryButton: string;
+    editLabel: string;
+    editHeading: string;
+    editTitleLabel: string;
+    editTitlePlaceholder: string;
+    editDescriptionLabel: string;
+    editDescriptionPlaceholder: string;
+    editPublicLabel: string;
+    editPublicHelp: string;
+    editCancel: string;
+    editSave: string;
+    editSaving: string;
+    editOpenBuilder: string;
+    editError: string;
+    editSuccess: string;
+    editDelete: string;
+    editDeleteConfirm: string;
+    editDeleteConfirmLabel: string;
+    editDeletePlaceholder: string;
+    editDeleteError: string;
+    editDeleteSuccess: string;
+    editDeleteConfirmButton: string;
   };
 };
 
@@ -41,6 +63,12 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
   const [decks, setDecks] = useState<DeckWithMeta[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [editingDeck, setEditingDeck] = useState<DeckWithMeta | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
+  const [editSuccessMessage, setEditSuccessMessage] = useState<string | null>(null);
+  const [isDeletingDeck, setIsDeletingDeck] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const pathname = usePathname();
   const redirectPath = pathname ?? `/${locale}/my-decks`;
   const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(redirectPath)}`;
@@ -89,6 +117,115 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
       isMounted = false;
     };
   }, [labels.error, locale, redirectPath, reloadNonce]);
+
+  async function handleEditSubmit(values: { title: string; description: string; isPublic: boolean }) {
+    if (!editingDeck) {
+      return;
+    }
+
+    const limitedTitle = values.title.slice(0, 45);
+    const limitedDescription = values.description.slice(0, 100);
+
+    setIsSavingEdit(true);
+    setEditErrorMessage(null);
+    setDeleteErrorMessage(null);
+
+    const { data: userResult, error: userError } = await supabase.auth.getUser();
+    if (userError || !userResult?.user) {
+      setEditErrorMessage(labels.signInPrompt);
+      setIsSavingEdit(false);
+      return;
+    }
+
+    const trimmedTitle = limitedTitle.trim();
+    const trimmedDescription = limitedDescription.trim();
+
+    const updatePayload = {
+      title: trimmedTitle.length > 0 ? trimmedTitle : null,
+      description: trimmedDescription.length > 0 ? trimmedDescription : null,
+      is_public: values.isPublic,
+    };
+
+    const { error } = await supabase
+      .from('decks')
+      .update(updatePayload)
+      .eq('id', editingDeck.id)
+      .eq('user_id', userResult.user.id);
+
+    if (error) {
+      console.error('Failed to update deck', error);
+      setEditErrorMessage(labels.editError);
+      setIsSavingEdit(false);
+      return;
+    }
+
+    setDecks((previous) =>
+      previous.map((deck) =>
+        deck.id === editingDeck.id
+          ? {
+              ...deck,
+              title: updatePayload.title ?? null,
+              description: updatePayload.description ?? null,
+              isPublic: values.isPublic,
+            }
+          : deck
+      )
+    );
+
+    setEditingDeck(null);
+    setIsSavingEdit(false);
+    setEditSuccessMessage(labels.editSuccess);
+  }
+
+  async function handleDeleteDeck(confirmation: string) {
+    if (!editingDeck) {
+      return;
+    }
+
+    const expected = 'DELETE';
+    if (confirmation.trim().toUpperCase() !== expected) {
+      setDeleteErrorMessage(labels.editDeleteConfirmLabel);
+      return;
+    }
+
+    setIsSavingEdit(false);
+    setIsDeletingDeck(true);
+    setDeleteErrorMessage(null);
+    setEditErrorMessage(null);
+
+    const { data: userResult, error: userError } = await supabase.auth.getUser();
+    if (userError || !userResult?.user) {
+      setDeleteErrorMessage(labels.signInPrompt);
+      setIsDeletingDeck(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('decks')
+      .delete()
+      .eq('id', editingDeck.id)
+      .eq('user_id', userResult.user.id);
+
+    if (error) {
+      console.error('Failed to delete deck', error);
+      setDeleteErrorMessage(labels.editDeleteError);
+      setIsDeletingDeck(false);
+      return;
+    }
+
+    setDecks((previous) => previous.filter((deck) => deck.id !== editingDeck.id));
+    setEditingDeck(null);
+    setIsDeletingDeck(false);
+    setEditSuccessMessage(labels.editDeleteSuccess);
+  }
+
+  function handleCloseEditModal() {
+    setEditingDeck(null);
+    setEditErrorMessage(null);
+    setDeleteErrorMessage(null);
+    setIsSavingEdit(false);
+    setIsDeletingDeck(false);
+  }
 
   const content = useMemo(() => {
     if (status === 'loading' || status === 'idle') {
@@ -145,7 +282,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
     }
 
     return (
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {decks.map((deck) => (
           <DeckSummaryCard
             key={deck.id}
@@ -159,6 +296,13 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
               privateTag: labels.privateTag,
             }}
             showPrivacyTag
+            onEdit={() => {
+              setEditErrorMessage(null);
+              setDeleteErrorMessage(null);
+              setEditSuccessMessage(null);
+              setEditingDeck(deck);
+            }}
+            editLabel={labels.editLabel}
           />
         ))}
       </div>
@@ -166,12 +310,67 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
   }, [decks, errorMessage, labels, locale, signInHref, status]);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 text-[color:var(--text-primary)]">
-      <div className="space-y-2 text-center md:text-left">
+    <div className="flex w-full flex-col gap-6 px-4 py-10 text-[color:var(--text-primary)] sm:px-6 lg:px-10 xl:px-16">
+      <div className="text-center md:text-left">
         <h1 className="text-3xl font-semibold">{labels.heading}</h1>
-        <p className="text-sm text-[color:var(--text-secondary)]">{labels.description}</p>
       </div>
+      {editSuccessMessage ? (
+        <div className="rounded-md border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-100">
+          <div className="flex items-start justify-between gap-3">
+            <span>{editSuccessMessage}</span>
+            <button
+              type="button"
+              onClick={() => setEditSuccessMessage(null)}
+              className="rounded-full border border-green-500/40 p-1 text-green-100 transition hover:bg-green-500/20 focus:outline-none focus-visible:ring focus-visible:ring-green-400"
+              aria-label="Dismiss notification"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className="h-4 w-4"
+              >
+                <path d="M6 6l12 12M6 18L18 6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ) : null}
       {content}
+      <DeckEditModal
+        deck={editingDeck}
+        isOpen={Boolean(editingDeck)}
+        onClose={handleCloseEditModal}
+        onSubmit={handleEditSubmit}
+        onDelete={handleDeleteDeck}
+        isSaving={isSavingEdit}
+        isDeleting={isDeletingDeck}
+        errorMessage={editErrorMessage}
+        deleteErrorMessage={deleteErrorMessage}
+        labels={{
+          heading: labels.editHeading,
+          titleLabel: labels.editTitleLabel,
+          titlePlaceholder: labels.editTitlePlaceholder,
+          descriptionLabel: labels.editDescriptionLabel,
+          descriptionPlaceholder: labels.editDescriptionPlaceholder,
+          publicLabel: labels.editPublicLabel,
+          publicHelp: labels.editPublicHelp,
+          cancel: labels.editCancel,
+          save: labels.editSave,
+          saving: labels.editSaving,
+          openBuilder: labels.editOpenBuilder,
+          delete: labels.editDelete,
+          deleteConfirm: labels.editDeleteConfirm,
+          deleteConfirmLabel: labels.editDeleteConfirmLabel,
+          deletePlaceholder: labels.editDeletePlaceholder,
+          deleteConfirmButton: labels.editDeleteConfirmButton,
+        }}
+        builderHref={
+          editingDeck ? `/${locale}/create?deck=${encodeURIComponent(editingDeck.id)}` : `/${locale}/create`
+        }
+      />
     </div>
   );
 }
