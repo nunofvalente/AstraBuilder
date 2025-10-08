@@ -292,7 +292,24 @@
       "cancelButton": "Batal",
       "success": "Akaun anda telah dipadam.",
       "error": "Kami tidak dapat memadam akaun anda. Sila cuba lagi.",
-      "keywordMismatch": "Sila taip delete untuk mengesahkan."
+    "keywordMismatch": "Sila taip delete untuk mengesahkan."
+    }
+  },
+  "settings": {
+    "heading": "Settings",
+    "description": "Manage your language and appearance preferences.",
+    "language": {
+      "title": "Language",
+      "description": "Choose the language used across AstraBuilder.",
+      "active": "Active"
+    },
+    "theme": {
+      "title": "Appearance",
+      "description": "Switch between light and dark themes.",
+      "options": {
+        "light": "Light",
+        "dark": "Dark"
+      }
     }
   }
 }

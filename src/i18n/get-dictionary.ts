@@ -322,8 +322,37 @@ type DeckFeedDictionary = {
   };
 };
 
+type SettingsDictionaryShape = {
+  settings: {
+    heading: string;
+    description: string;
+    language: {
+      title: string;
+      description: string;
+      active: string;
+    };
+    theme: {
+      title: string;
+      description: string;
+      options: {
+        light: string;
+        dark: string;
+      };
+    };
+  };
+};
+
 type DictionaryModule = {
-  default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & PublicProfileDictionary & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
+  default: HomeDictionary &
+    BuilderDictionary &
+    CardsDictionary &
+    AuthDictionary &
+    ProfileDictionaryShape &
+    PublicProfileDictionary &
+    MyDecksDictionary &
+    DeckDetailsDictionary &
+    DeckFeedDictionary &
+    SettingsDictionaryShape;
 };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
@@ -335,13 +364,23 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & PublicProfileDictionary & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
+export type Dictionary = HomeDictionary &
+  BuilderDictionary &
+  CardsDictionary &
+  AuthDictionary &
+  ProfileDictionaryShape &
+  PublicProfileDictionary &
+  MyDecksDictionary &
+  DeckDetailsDictionary &
+  DeckFeedDictionary &
+  SettingsDictionaryShape;
 export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 export type SignInDictionary = AuthDictionary["auth"]["signIn"];
 export type ForgotPasswordDictionary = AuthDictionary["auth"]["forgotPassword"];
 export type ResetPasswordDictionary = AuthDictionary["auth"]["resetPassword"];
 export type PasswordStrengthDictionary = AuthDictionary["auth"]["passwordStrength"];
 export type ProfileDictionary = ProfileDictionaryShape["profile"];
+export type SettingsDictionary = SettingsDictionaryShape["settings"];
 
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   return dictionaries[locale]().then((module) => module.default);
