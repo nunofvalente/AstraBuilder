@@ -282,7 +282,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
     <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <span className={`text-lg font-semibold ${toolbarTextClass}`}>
-          <Link href="/" className="flex items-center">
+          <Link href={`/${locale}`} className="flex items-center">
             <Image
               src="/images/astrabuilder_logo.png"
               alt="AstraBuilder Logo"

@@ -296,19 +296,19 @@
     }
   },
   "settings": {
-    "heading": "Settings",
-    "description": "Manage your language and appearance preferences.",
+    "heading": "Einstellungen",
+    "description": "Verwalte deine Sprach- und Darstellungspräferenzen.",
     "language": {
-      "title": "Language",
-      "description": "Choose the language used across AstraBuilder.",
-      "active": "Active"
+      "title": "Sprache",
+      "description": "Wähle die Sprache für AstraBuilder.",
+      "active": "Aktive Sprache"
     },
     "theme": {
-      "title": "Appearance",
-      "description": "Switch between light and dark themes.",
+      "title": "Design",
+      "description": "Wechsle zwischen hellen und dunklen Darstellungen.",
       "options": {
-        "light": "Light",
-        "dark": "Dark"
+        "light": "Hell",
+        "dark": "Dunkel"
       }
     }
   }

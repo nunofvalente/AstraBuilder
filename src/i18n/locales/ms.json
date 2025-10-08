@@ -296,19 +296,19 @@
     }
   },
   "settings": {
-    "heading": "Settings",
-    "description": "Manage your language and appearance preferences.",
+    "heading": "Tetapan",
+    "description": "Urus pilihan bahasa dan rupa anda.",
     "language": {
-      "title": "Language",
-      "description": "Choose the language used across AstraBuilder.",
-      "active": "Active"
+      "title": "Bahasa",
+      "description": "Pilih bahasa yang digunakan dalam AstraBuilder.",
+      "active": "Bahasa aktif"
     },
     "theme": {
-      "title": "Appearance",
-      "description": "Switch between light and dark themes.",
+      "title": "Tema",
+      "description": "Tukar antara tema terang dan gelap.",
       "options": {
-        "light": "Light",
-        "dark": "Dark"
+        "light": "Terang",
+        "dark": "Gelap"
       }
     }
   }
