@@ -56,7 +56,7 @@ export function DeckSaveModal({
       return;
     }
 
-    setTitle(initialTitle ?? '');
+    setTitle((initialTitle ?? '').slice(0, 45));
     setDescription('');
     setIsPublic(false);
   }, [isOpen, initialTitle]);
@@ -67,7 +67,11 @@ export function DeckSaveModal({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSubmit({ title, description, isPublic });
+    onSubmit({
+      title: title.slice(0, 45),
+      description: description.slice(0, 100),
+      isPublic,
+    });
   }
 
   const saveButtonLabel = isSaving ? labels.saving : labels.submit;
@@ -105,8 +109,9 @@ export function DeckSaveModal({
               id="deck-save-title"
               type="text"
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => setTitle(event.target.value.slice(0, 45))}
               placeholder={labels.titlePlaceholder}
+              maxLength={45}
               className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/50 px-3 py-2 text-sm text-[color:var(--text-primary)] focus:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
               disabled={isSaving}
             />
@@ -119,9 +124,10 @@ export function DeckSaveModal({
             <textarea
               id="deck-save-description"
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(event) => setDescription(event.target.value.slice(0, 100))}
               placeholder={labels.descriptionPlaceholder}
               rows={4}
+              maxLength={100}
               className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/50 px-3 py-2 text-sm text-[color:var(--text-primary)] focus:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
               disabled={isSaving}
             />

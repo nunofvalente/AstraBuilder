@@ -97,7 +97,28 @@
     "openButton": "Im Builder öffnen",
     "favoritesLabel": "Favoriten",
     "viewsLabel": "Aufrufe",
-    "retryButton": "Erneut versuchen"
+    "retryButton": "Erneut versuchen",
+    "editLabel": "Edit deck",
+    "editHeading": "Edit deck",
+    "editTitleLabel": "Title",
+    "editTitlePlaceholder": "Enter a deck title",
+    "editDescriptionLabel": "Description",
+    "editDescriptionPlaceholder": "Write a short description",
+    "editPublicLabel": "Public deck",
+    "editPublicHelp": "Public decks can appear in community listings.",
+    "editCancel": "Cancel",
+    "editSave": "Save changes",
+    "editSaving": "Saving...",
+    "editOpenBuilder": "Edit in builder",
+    "editError": "Unable to update deck. Please try again.",
+    "editSuccess": "Deck updated successfully.",
+    "editDelete": "Delete deck",
+    "editDeleteConfirm": "Are you sure you want to delete this deck? This action cannot be undone.",
+    "editDeleteConfirmLabel": "Type DELETE to confirm",
+    "editDeletePlaceholder": "DELETE",
+    "editDeleteError": "Unable to delete deck. Please try again.",
+    "editDeleteSuccess": "Deck deleted successfully.",
+    "editDeleteConfirmButton": "Delete"
   },
   "deckDetails": {
     "heading": "Deck-Details",
@@ -106,7 +127,7 @@
     "notesHeading": "Beschreibung",
     "privateNotice": "Dieses Deck ist derzeit privat.",
     "publicNotice": "Dieses Deck ist öffentlich und kann in Community-Listen erscheinen.",
-    "backButton": "Zurück zu Meine Decks"
+    "backButton": "Zurück zu den Decks"
   },
   "deckFeed": {
     "heading": "Community-Decks",
@@ -117,6 +138,18 @@
     "cardsLabel": "Karten",
     "favoritesLabel": "Favoriten",
     "viewsLabel": "Aufrufe"
+  },
+  "publicProfile": {
+    "heading": "Community-Profil",
+    "subtitle": "Entdecke öffentliche Decks und Social Links dieses Creators.",
+    "socialsHeading": "Social Links",
+    "socialsEmpty": "Keine Social Links vorhanden.",
+    "decksHeading": "Decks",
+    "noDecks": "Keine öffentlichen Decks verfügbar.",
+    "backButton": "Zurück zu den Community-Decks",
+    "xLabel": "X",
+    "youtubeLabel": "YouTube",
+    "unknownUser": "Anonymer Spieler"
   },
   "cards": {
     "title": "Alle Karten",

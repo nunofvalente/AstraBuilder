@@ -13,12 +13,24 @@ const SOURCE_BUCKET = process.env.CARDS_SOURCE_BUCKET ?? 'cards';
 const CARDS_DATA_FILE = process.env.CARDS_DATA_FILE ?? path.join('src', 'data', 'cards.json');
 const CARDS_TABLE = process.env.CARDS_TABLE ?? 'cards';
 const CARDS_PAGE_SIZE = Number.parseInt(process.env.CARDS_PAGE_SIZE ?? '1000', 10);
+const VARIANT_FILTER = process.env.CARD_VARIANTS
+  ? process.env.CARD_VARIANTS.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean)
+  : null;
 
 const VARIANTS = [
-  { name: 'small', width: 220, height: 308, quality: 70 },
-  { name: 'medium', width: 400, height: 560, quality: 80 },
-  { name: 'large', width: 600, height: 840, quality: 85 },
+  { name: 'small', width: 880, height: 1232, quality: 90 },
+  { name: 'medium', width: 1120, height: 1568, quality: 93 },
+  { name: 'large', width: 1440, height: 2016, quality: 96 },
 ];
+
+const ACTIVE_VARIANTS = VARIANT_FILTER
+  ? VARIANTS.filter((variant) => VARIANT_FILTER.includes(variant.name))
+  : VARIANTS;
+
+if (ACTIVE_VARIANTS.length === 0) {
+  console.error('CARD_VARIANTS filter did not match any known variants.');
+  process.exit(1);
+}
 
 if (!SUPABASE_URL) {
   console.error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable.');
@@ -129,10 +141,19 @@ async function uploadVariant(key, buffer) {
 }
 
 async function processImage(objectPath, buffer) {
-  for (const variant of VARIANTS) {
+  for (const variant of ACTIVE_VARIANTS) {
     const output = await sharp(buffer)
-      .resize({ width: variant.width, height: variant.height, fit: 'cover' })
-      .webp({ quality: variant.quality })
+      .resize({
+        width: variant.width,
+        height: variant.height,
+        fit: 'cover',
+        withoutEnlargement: true,
+      })
+      .webp({
+        quality: variant.quality,
+        effort: 6,
+        smartSubsample: true,
+      })
       .toBuffer();
 
     const targetKey = buildVariantKey(objectPath, variant.name);

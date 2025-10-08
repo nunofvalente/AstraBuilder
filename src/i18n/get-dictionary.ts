@@ -240,6 +240,21 @@ type ProfileDictionaryShape = {
   };
 };
 
+type PublicProfileDictionary = {
+  publicProfile: {
+    heading: string;
+    subtitle: string;
+    socialsHeading: string;
+    socialsEmpty: string;
+    decksHeading: string;
+    noDecks: string;
+    backButton: string;
+    xLabel: string;
+    youtubeLabel: string;
+    unknownUser: string;
+  };
+};
+
 type MyDecksDictionary = {
   myDecks: {
     heading: string;
@@ -259,6 +274,27 @@ type MyDecksDictionary = {
     favoritesLabel: string;
     viewsLabel: string;
     retryButton: string;
+    editLabel: string;
+    editHeading: string;
+    editTitleLabel: string;
+    editTitlePlaceholder: string;
+    editDescriptionLabel: string;
+    editDescriptionPlaceholder: string;
+    editPublicLabel: string;
+    editPublicHelp: string;
+    editCancel: string;
+    editSave: string;
+    editSaving: string;
+    editOpenBuilder: string;
+    editError: string;
+    editSuccess: string;
+    editDelete: string;
+    editDeleteConfirm: string;
+    editDeleteConfirmLabel: string;
+    editDeletePlaceholder: string;
+    editDeleteError: string;
+    editDeleteSuccess: string;
+    editDeleteConfirmButton: string;
   };
 };
 type DeckDetailsDictionary = {
@@ -287,7 +323,7 @@ type DeckFeedDictionary = {
 };
 
 type DictionaryModule = {
-  default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
+  default: HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & PublicProfileDictionary & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
 };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
@@ -299,7 +335,7 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   ms: () => import("./locales/ms.json"),
 };
 
-export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
+export type Dictionary = HomeDictionary & BuilderDictionary & CardsDictionary & AuthDictionary & ProfileDictionaryShape & PublicProfileDictionary & MyDecksDictionary & DeckDetailsDictionary & DeckFeedDictionary;
 export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 export type SignInDictionary = AuthDictionary["auth"]["signIn"];
 export type ForgotPasswordDictionary = AuthDictionary["auth"]["forgotPassword"];
