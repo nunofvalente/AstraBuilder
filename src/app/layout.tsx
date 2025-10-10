@@ -19,8 +19,8 @@ const metadataTitle = 'AstraBuilder';
 const metadataDescription =
   "Build, share, and discover Echoes of Astra decks with AstraBuilder's intuitive deck builder and community highlights.";
 const appleTouchIcon = '/apple-touch-icon.png';
-const favicon32 = '/favicon-32x32.png';
-const favicon16 = '/favicon-16x16.png';
+const faviconSvg = '/favicon.svg';
+const favicon96 = '/favicon-96x96.png';
 const siteManifest = '/site.webmanifest';
 const metadataIcon = '/favicon.ico';
 
@@ -33,10 +33,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: metadataIcon },
-      { url: favicon32, rel: 'icon', type: 'image/png', sizes: '32x32' },
-      { url: favicon16, rel: 'icon', type: 'image/png', sizes: '16x16' },
+      { url: faviconSvg, rel: 'icon', type: 'image/svg+xml' },
+      { url: favicon96, rel: 'icon', type: 'image/png', sizes: '96x96' },
     ],
+    shortcut: [{ url: metadataIcon }],
     apple: [{ url: appleTouchIcon, rel: 'apple-touch-icon', sizes: '180x180' }],
   },
   twitter: {
@@ -64,5 +64,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
