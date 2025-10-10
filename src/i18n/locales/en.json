@@ -1,15 +1,15 @@
 {
   "home": {
     "title": "AstraBuilder",
-    "subtitle": "Echoes of Astra deckbuilding website",
+    "subtitle": "Craft and share Echoes of Astra decks with a modern community builder.",
     "sections": {
       "popular": {
         "title": "Popular Decks",
-        "placeholder": "Popular decks will appear here soon."
+        "placeholder": "Featured community builds appear here after players publish new decks."
       },
       "trending": {
         "title": "Trending Decks",
-        "placeholder": "Trending decks will appear here soon."
+        "placeholder": "See which Echoes of Astra decks the community is buzzing about."
       }
     },
     "actions": {

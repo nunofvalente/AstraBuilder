@@ -16,7 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 const metadataTitle = 'AstraBuilder';
-const metadataDescription = 'Deckbuilding website for Echoes of Astra';
+const metadataDescription =
+  "Build, share, and discover Echoes of Astra decks with AstraBuilder's intuitive deck builder and community highlights.";
 const appleTouchIcon = '/apple-touch-icon.png';
 const favicon32 = '/favicon-32x32.png';
 const favicon16 = '/favicon-16x16.png';
@@ -63,6 +64,5 @@ export default function RootLayout({
     </html>
   );
 }
-
 
 

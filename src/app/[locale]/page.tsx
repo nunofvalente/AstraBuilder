@@ -66,7 +66,10 @@ export default async function HomePage({ params }: LocalePageProps) {
               </h2>
               <div className="mt-2 h-px w-full bg-[color:var(--border)]" />
             </div>
-            <div className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
+            <div
+              className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]"
+              data-nosnippet
+            >
               {home.sections.popular.placeholder}
             </div>
           </div>
@@ -77,7 +80,10 @@ export default async function HomePage({ params }: LocalePageProps) {
               </h2>
               <div className="mt-2 h-px w-full bg-[color:var(--border)]" />
             </div>
-            <div className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
+            <div
+              className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]"
+              data-nosnippet
+            >
               {home.sections.trending.placeholder}
             </div>
           </div>
