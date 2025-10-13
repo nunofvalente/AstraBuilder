@@ -3,7 +3,10 @@ import type { Locale } from "./config";
 type HomeDictionary = {
   home: {
     title: string;
-    subtitle: string;
+    tagline: {
+      intro: string;
+      highlight: string;
+    };
     sections: {
       popular: {
         title: string;

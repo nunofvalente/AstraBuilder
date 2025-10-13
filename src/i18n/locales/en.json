@@ -1,7 +1,10 @@
 {
   "home": {
     "title": "AstraBuilder",
-    "subtitle": "Echoes of Astra deckbuilding website",
+    "tagline": {
+      "intro": "Deckbuilding website for",
+      "highlight": "Echoes of Astra"
+    },
     "sections": {
       "popular": {
         "title": "Popular Decks",

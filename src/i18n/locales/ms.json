@@ -1,7 +1,10 @@
 {
   "home": {
     "title": "AstraBuilder",
-    "subtitle": "Laman deckbuilding Echoes of Astra",
+    "tagline": {
+      "intro": "Laman web deckbuilding untuk",
+      "highlight": "Echoes of Astra"
+    },
     "sections": {
       "popular": {
         "title": "Dek popular",
