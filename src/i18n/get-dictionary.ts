@@ -309,6 +309,10 @@ type DeckDetailsDictionary = {
     privateNotice: string;
     publicNotice: string;
     backButton: string;
+    favoriteAdd: string;
+    favoriteRemove: string;
+    favoriteSignIn: string;
+    favoriteError: string;
   };
 };
 

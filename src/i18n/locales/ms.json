@@ -130,7 +130,11 @@
     "notesHeading": "Deskripsi",
     "privateNotice": "Dek ini buat masa ini adalah peribadi.",
     "publicNotice": "Dek ini adalah awam dan mungkin muncul dalam senarai komuniti.",
-    "backButton": "Kembali ke dek"
+    "backButton": "Kembali ke dek",
+    "favoriteAdd": "Tambah ke kegemaran",
+    "favoriteRemove": "Buang dari kegemaran",
+    "favoriteSignIn": "Log masuk untuk menanda dek sebagai kegemaran.",
+    "favoriteError": "Kami tidak dapat mengemas kini kegemaran anda. Sila cuba lagi."
   },
   "deckFeed": {
     "heading": "Dek komuniti",
