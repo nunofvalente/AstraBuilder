@@ -211,6 +211,25 @@ export async function getPublicDeckSummaries(limit = 50): Promise<PublicDeckSumm
   return data.map((row) => mapPublicDeckRow(row as PublicDeckRow));
 }
 
+export async function getPublicDeckSummaryById(deckId: string): Promise<PublicDeckSummary | null> {
+  const { data, error } = await supabase
+    .from('decks')
+    .select(PUBLIC_DECK_SELECT)
+    .eq('is_public', true)
+    .eq('id', deckId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return mapPublicDeckRow(data as PublicDeckRow);
+}
+
 export async function getPublicDeckSummariesByAuthor(authorId: string, limit = 50): Promise<PublicDeckSummary[]> {
   const { data, error } = await supabase
     .from('decks')

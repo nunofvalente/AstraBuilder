@@ -12,6 +12,7 @@ import { DeckCardChip } from '@/app/[locale]/create/deck-builder/components/deck
 import { ZoomOverlay } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import type { ZoomAnchor } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import { supabase } from '@/lib/supabase/supabaseClient';
+import type { PublicDeckSummary } from '@/lib/supabase/decks';
 import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 
 const CARD_TYPE_ORDER = ['Unit', 'Tactic', 'Territory'];
@@ -32,6 +33,7 @@ type DeckRecord = {
   title: string | null;
   description: string | null;
   is_public: boolean | null;
+  user_id?: string | null;
   created_at: string | null;
   deck_cards?: Array<{
     quantity: number | null;
@@ -110,6 +112,7 @@ type DeckDetailsClientProps = {
     };
   };
   emptyDeckLabel: string;
+  initialSummary?: Pick<PublicDeckSummary, 'authorId' | 'authorName'>;
 };
 
 type Section = {
@@ -155,7 +158,7 @@ function persistDeckStatsOverride(deckId: string, updates: DeckStatsOverride) {
   }
 }
 
-export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: DeckDetailsClientProps) {
+export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initialSummary }: DeckDetailsClientProps) {
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
   const [zoomAnchor, setZoomAnchor] = useState<ZoomAnchor | null>(null);
@@ -195,7 +198,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       setErrorMessage(null);
 
       const select =
-        'id,title,description,created_at,is_public,deck_cards(quantity,cards(*)),deck_stats(favorites_total,views_total),profiles:profiles!decks_user_id_profiles_fkey(id,username,x_link,youtube_link)';
+        'id,title,description,created_at,is_public,user_id,deck_cards(quantity,cards(*)),deck_stats(favorites_total,views_total),profiles:profiles!decks_user_id_profiles_fkey(id,username,x_link,youtube_link)';
 
       const { data, error } = await supabase
         .from('decks')
@@ -251,13 +254,13 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       }
 
       let authorName: string | null = null;
-      let authorId: string | null = null;
+      let authorId: string | null = data.user_id ? String(data.user_id) : null;
       let authorXLink: string | null = null;
       let authorYoutubeLink: string | null = null;
       const profileRelation = data.profiles;
       if (Array.isArray(profileRelation) && profileRelation.length > 0) {
         authorName = profileRelation[0]?.username ?? null;
-        authorId = profileRelation[0]?.id ?? null;
+        authorId = profileRelation[0]?.id ?? authorId;
         authorXLink = profileRelation[0]?.x_link ?? null;
         authorYoutubeLink = profileRelation[0]?.youtube_link ?? null;
       } else if (profileRelation && profileRelation !== null && typeof profileRelation === 'object') {
@@ -268,7 +271,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
           youtube_link?: string | null;
         };
         authorName = profileObject.username ?? null;
-        authorId = profileObject.id ?? null;
+        authorId = profileObject.id ?? authorId;
         authorXLink = profileObject.x_link ?? null;
         authorYoutubeLink = profileObject.youtube_link ?? null;
       }
@@ -292,8 +295,8 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
         createdAt: data.created_at ?? null,
         favoritesTotal,
         viewsTotal,
-        authorName,
-        authorId,
+        authorName: authorName ?? initialSummary?.authorName ?? null,
+        authorId: authorId ?? initialSummary?.authorId ?? null,
         authorXLink,
         authorYoutubeLink,
       });
@@ -543,6 +546,18 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     return socials.filter((entry): entry is { label: string; href: string } => Boolean(entry.href));
   }, [deckMeta?.authorXLink, deckMeta?.authorYoutubeLink, labels.publicProfile.xLabel, labels.publicProfile.youtubeLabel]);
 
+  const effectiveAuthorName = deckMeta?.authorName ?? initialSummary?.authorName ?? null;
+  const effectiveAuthorId = deckMeta?.authorId ?? initialSummary?.authorId ?? null;
+
+  const authorDisplayName = useMemo(() => {
+    const trimmedName = effectiveAuthorName?.trim();
+    if (trimmedName && trimmedName.length > 0) {
+      return trimmedName;
+    }
+
+    return labels.publicProfile.unknownUser;
+  }, [effectiveAuthorName, labels.publicProfile.unknownUser]);
+
   function handleZoom(nextCard: Card | null, variant: 'default' | 'compact' = 'default', anchor: ZoomAnchor | null = null) {
     setZoomCard(nextCard);
     setZoomVariant(variant);
@@ -756,18 +771,18 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
         ) : null}
       </div>
 
-      {deckMeta?.authorName ? (
+      {authorDisplayName ? (
         <div className="flex flex-col items-center gap-3 text-center">
-          {deckMeta.authorId ? (
+          {effectiveAuthorId ? (
             <Link
-              href={`/${locale}/players/${encodeURIComponent(deckMeta.authorId)}`}
+              href={`/${locale}/players/${encodeURIComponent(effectiveAuthorId)}`}
               className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)] transition hover:text-[color:var(--accent)]"
             >
-              {deckMeta.authorName}
+              {authorDisplayName}
             </Link>
           ) : (
             <span className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)]">
-              {deckMeta.authorName}
+              {authorDisplayName}
             </span>
           )}
           <div className="flex flex-col items-center gap-2 text-xs text-[color:var(--text-secondary)]">

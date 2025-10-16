@@ -326,6 +326,11 @@ type DeckFeedDictionary = {
     cardsLabel: string;
     favoritesLabel: string;
     viewsLabel: string;
+    sortOptions: {
+      popular: string;
+      trending: string;
+      new: string;
+    };
   };
 };
 
