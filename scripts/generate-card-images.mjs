@@ -16,6 +16,16 @@ const CARDS_PAGE_SIZE = Number.parseInt(process.env.CARDS_PAGE_SIZE ?? '1000', 1
 const VARIANT_FILTER = process.env.CARD_VARIANTS
   ? process.env.CARD_VARIANTS.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean)
   : null;
+const SKIP_EXISTING_VARIANTS =
+  (process.env.CARD_SKIP_EXISTING ?? process.env.SKIP_EXISTING_VARIANTS ?? '').toLowerCase() === 'true';
+const CARD_ID_FILTER = process.env.CARD_ID_FILTER
+  ? new Set(
+      process.env.CARD_ID_FILTER.split(',').map((value) => value.trim()).filter(Boolean).map((value) => value.toLowerCase()),
+    )
+  : null;
+const CARD_OBJECT_FILTER = process.env.CARD_OBJECT_FILTER
+  ? process.env.CARD_OBJECT_FILTER.split(',').map((value) => value.trim()).filter(Boolean)
+  : null;
 
 const VARIANTS = [
   { name: 'small', width: 880, height: 1232, quality: 90 },
@@ -130,6 +140,17 @@ function buildVariantKey(objectPath, variantName) {
   return [...segments, variantName, variantFilename].filter(Boolean).join('/');
 }
 
+function splitVariantKey(key) {
+  const segments = key.split('/');
+  const filename = segments.pop();
+  if (!filename) {
+    throw new Error(`Unable to derive filename from ${key}`);
+  }
+  return { folder: segments.join('/'), filename };
+}
+
+const variantExistenceCache = new Map();
+
 async function uploadVariant(key, buffer) {
   const { error } = await supabase.storage.from(SOURCE_BUCKET).upload(key, buffer, {
     contentType: 'image/webp',
@@ -140,8 +161,60 @@ async function uploadVariant(key, buffer) {
   }
 }
 
-async function processImage(objectPath, buffer) {
+async function variantExists(variantKey) {
+  if (variantExistenceCache.has(variantKey)) {
+    return variantExistenceCache.get(variantKey);
+  }
+
+  const { folder, filename } = splitVariantKey(variantKey);
+  const listPath = folder.length > 0 ? folder : '';
+
+  try {
+    const { data, error } = await supabase.storage.from(SOURCE_BUCKET).list(listPath, {
+      limit: 1,
+      search: filename,
+    });
+
+    if (error) {
+      console.warn(
+        `Unable to inspect existing variant ${SOURCE_BUCKET}/${variantKey} (${error.message}). Regenerating.`,
+      );
+      variantExistenceCache.set(variantKey, false);
+      return false;
+    }
+
+    const exists = Array.isArray(data) && data.some((item) => item.name === filename);
+    variantExistenceCache.set(variantKey, exists);
+    return exists;
+  } catch (error) {
+    console.warn(`Unable to inspect existing variant ${SOURCE_BUCKET}/${variantKey}. Regenerating.`, error);
+    variantExistenceCache.set(variantKey, false);
+    return false;
+  }
+}
+
+async function determineVariantsToGenerate(objectPath) {
+  if (!SKIP_EXISTING_VARIANTS) {
+    return ACTIVE_VARIANTS;
+  }
+
+  const variantsToGenerate = [];
+
   for (const variant of ACTIVE_VARIANTS) {
+    const variantKey = buildVariantKey(objectPath, variant.name);
+    const exists = await variantExists(variantKey);
+    if (!exists) {
+      variantsToGenerate.push(variant);
+    }
+  }
+
+  return variantsToGenerate;
+}
+
+async function processImage(objectPath, buffer, variants) {
+  let generated = 0;
+
+  for (const variant of variants) {
     const output = await sharp(buffer)
       .resize({
         width: variant.width,
@@ -159,7 +232,10 @@ async function processImage(objectPath, buffer) {
     const targetKey = buildVariantKey(objectPath, variant.name);
     await uploadVariant(targetKey, output);
     console.log(`Uploaded ${SOURCE_BUCKET}/${targetKey}`);
+    generated += 1;
   }
+
+  return generated;
 }
 
 async function downloadOriginal(objectPath) {
@@ -188,30 +264,60 @@ async function downloadOriginal(objectPath) {
 }
 
 async function main() {
-  let images = [];
+  let records = [];
 
   try {
     const dbRows = await loadCardsFromDatabase();
-    images = dbRows
-      .map((row) => row?.image_url ?? null)
-      .filter((value) => typeof value === 'string' && value.length > 0);
-    console.log(`Loaded ${images.length} image URLs from Supabase table ${CARDS_TABLE}.`);
+    records = dbRows
+      .filter((row) => typeof row?.image_url === 'string' && row.image_url.length > 0)
+      .map((row) => ({
+        imageUrl: row.image_url,
+        id: row?.id != null ? String(row.id) : null,
+        source: 'database',
+      }));
+    console.log(`Loaded ${records.length} image URLs from Supabase table ${CARDS_TABLE}.`);
   } catch (error) {
     console.warn(`Unable to load cards from database (${error.message}). Falling back to ${CARDS_DATA_FILE}.`);
   }
 
-  if (images.length === 0) {
+  if (records.length === 0) {
     const fallbackCards = await loadCardsFile();
-    images = fallbackCards
-      .map((card) => card?.imageSrc ?? null)
-      .filter((value) => typeof value === 'string' && value.length > 0);
-    console.log(`Loaded ${images.length} image URLs from ${CARDS_DATA_FILE}.`);
+    records = fallbackCards
+      .filter((card) => typeof card?.imageSrc === 'string' && card.imageSrc.length > 0)
+      .map((card) => ({
+        imageUrl: card.imageSrc,
+        id: card?.id != null ? String(card.id) : null,
+        source: 'file',
+      }));
+    console.log(`Loaded ${records.length} image URLs from ${CARDS_DATA_FILE}.`);
+  }
+
+  if (CARD_ID_FILTER) {
+    console.log(`Filtering to card IDs: ${Array.from(CARD_ID_FILTER).join(', ')}`);
+  }
+
+  if (CARD_OBJECT_FILTER) {
+    console.log(`Filtering to object paths containing: ${CARD_OBJECT_FILTER.join(', ')}`);
+  }
+
+  if (SKIP_EXISTING_VARIANTS) {
+    console.log('CARD_SKIP_EXISTING enabled; existing variants will be skipped.');
   }
 
   const uniqueImages = new Map();
 
-  for (const imageSrc of images) {
-    const parsed = parseSupabaseObject(imageSrc);
+  for (const record of records) {
+    if (CARD_ID_FILTER) {
+      if (!record.id) {
+        continue;
+      }
+      const recordId = record.id.toLowerCase();
+      if (!CARD_ID_FILTER.has(recordId)) {
+        continue;
+      }
+    }
+
+    const parsed = parseSupabaseObject(record.imageUrl);
     if (!parsed) {
       continue;
     }
@@ -219,25 +325,52 @@ async function main() {
       console.warn(`Skipping image in bucket ${parsed.bucket}; expected ${SOURCE_BUCKET}`);
       continue;
     }
-    if (!uniqueImages.has(parsed.encodedPath)) {
-      uniqueImages.set(parsed.encodedPath, parsed);
+
+    if (CARD_OBJECT_FILTER && !CARD_OBJECT_FILTER.some((pattern) => parsed.objectPath.includes(pattern))) {
+      continue;
     }
+
+    if (!uniqueImages.has(parsed.encodedPath)) {
+      uniqueImages.set(parsed.encodedPath, { ...parsed, record });
+    }
+  }
+
+  if (uniqueImages.size === 0) {
+    console.log('No images matched the provided filters.');
+    return;
   }
 
   console.log(`Processing ${uniqueImages.size} unique card images from ${SOURCE_BUCKET}`);
 
-  let processed = 0;
+  let processedImages = 0;
+  let skippedImages = 0;
+  let generatedVariants = 0;
+
   for (const { objectPath } of uniqueImages.values()) {
     try {
+      const variantsToGenerate = await determineVariantsToGenerate(objectPath);
+      if (variantsToGenerate.length === 0) {
+        if (SKIP_EXISTING_VARIANTS) {
+          skippedImages += 1;
+          console.log(`Skipping ${objectPath}; all variants already exist.`);
+        }
+        continue;
+      }
+
       const originalBuffer = await downloadOriginal(objectPath);
-      await processImage(objectPath, originalBuffer);
-      processed += 1;
+      const produced = await processImage(objectPath, originalBuffer, variantsToGenerate);
+      generatedVariants += produced;
+      processedImages += 1;
     } catch (error) {
       console.error(error);
     }
   }
 
-  console.log(`Finished processing ${processed} images.`);
+  console.log(`Finished processing ${processedImages} images.`);
+  console.log(`Generated ${generatedVariants} variant files.`);
+  if (SKIP_EXISTING_VARIANTS) {
+    console.log(`Skipped ${skippedImages} images because all variants were already present.`);
+  }
 }
 
 main().catch((error) => {
