@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 
 import type { Locale } from '@/i18n/config';
@@ -23,6 +23,11 @@ type CommunityDecksClientProps = {
   };
 };
 
+type DeckStatsOverride = {
+  viewsTotal?: number;
+  favoritesTotal?: number;
+};
+
 type DeckWithAuthor = PublicDeckSummary & {
   authorLabel: string | null;
   authorHref: string | null;
@@ -43,6 +48,34 @@ export function CommunityDecksClient({
   myDeckLabels,
 }: CommunityDecksClientProps) {
   const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(() => buildInitialAffinityState());
+  const [resolvedDecks, setResolvedDecks] = useState<PublicDeckSummary[]>(decks);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setResolvedDecks(decks);
+      return;
+    }
+
+    const nextDecks = decks.map((deck) => {
+      const overrideRaw = window.sessionStorage.getItem(`deck-stats:${deck.id}`);
+      if (!overrideRaw) {
+        return deck;
+      }
+
+      try {
+        const override = JSON.parse(overrideRaw) as DeckStatsOverride;
+        return {
+          ...deck,
+          viewsTotal: Math.max(deck.viewsTotal, Number(override.viewsTotal ?? deck.viewsTotal)),
+          favoritesTotal: Math.max(deck.favoritesTotal, Number(override.favoritesTotal ?? deck.favoritesTotal)),
+        };
+      } catch {
+        return deck;
+      }
+    });
+
+    setResolvedDecks(nextDecks);
+  }, [decks]);
 
   const toggleAffinity = useCallback((value: string) => {
     setActiveAffinities((previous) => {
@@ -82,12 +115,13 @@ export function CommunityDecksClient({
   }, [activeAffinities]);
 
   const decksWithAuthor = useMemo<DeckWithAuthor[]>(() => {
-    return decks.map((deck) => {
-      const authorLabel = deck.authorName && deck.authorName.trim().length > 0
-        ? deck.authorName.trim()
-        : deck.authorId
-          ? `${deck.authorId.slice(0, 8)}…`
-          : null;
+    return resolvedDecks.map((deck) => {
+      const authorLabel =
+        deck.authorName && deck.authorName.trim().length > 0
+          ? deck.authorName.trim()
+          : deck.authorId
+            ? `${deck.authorId.slice(0, 8)}...`
+            : null;
       const authorHref = deck.authorId ? `/${locale}/players/${encodeURIComponent(deck.authorId)}` : null;
 
       return {
@@ -96,7 +130,7 @@ export function CommunityDecksClient({
         authorHref,
       };
     });
-  }, [decks, locale]);
+  }, [resolvedDecks, locale]);
 
   const filteredDecks = useMemo(() => {
     if (!enabledAffinitySet) {

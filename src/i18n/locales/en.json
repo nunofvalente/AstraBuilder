@@ -128,9 +128,13 @@
     "description": "Card breakdown and statistics for this deck.",
     "sectionsHeading": "Card sections",
     "notesHeading": "Description",
-    "privateNotice": "This deck is currently private.",
-    "publicNotice": "This deck is public and may appear in community listings.",
-    "backButton": "Back to Decks"
+   "privateNotice": "This deck is currently private.",
+   "publicNotice": "This deck is public and may appear in community listings.",
+    "backButton": "Back to Decks",
+    "favoriteAdd": "Add to favorites",
+    "favoriteRemove": "Remove from favorites",
+    "favoriteSignIn": "Sign in to favorite decks.",
+    "favoriteError": "We couldn't update your favorites. Please try again."
   },
   "deckFeed": {
     "heading": "Community decks",

@@ -130,7 +130,11 @@
     "notesHeading": "Description",
     "privateNotice": "Ce deck est actuellement privé.",
     "publicNotice": "Ce deck est public et peut apparaître dans les listes de la communauté.",
-    "backButton": "Retour aux decks"
+    "backButton": "Retour aux decks",
+    "favoriteAdd": "Ajouter aux favoris",
+    "favoriteRemove": "Retirer des favoris",
+    "favoriteSignIn": "Connectez-vous pour ajouter des decks aux favoris.",
+    "favoriteError": "Impossible de mettre à jour vos favoris. Veuillez réessayer."
   },
   "deckFeed": {
     "heading": "Decks de la communauté",
