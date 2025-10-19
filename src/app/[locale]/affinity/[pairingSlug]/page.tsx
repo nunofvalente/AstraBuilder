@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { isLocale } from '@/i18n/config';
@@ -10,6 +11,7 @@ import {
   parseAffinityPairingSlug,
 } from '@/lib/decks/affinity-pairings';
 import { CommunityDecksClient } from '@/app/[locale]/decks/community-decks-client';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +23,21 @@ type AffinityPairingPageParams = {
 type AffinityPairingPageProps = {
   params: Promise<AffinityPairingPageParams>;
 };
+
+export async function generateMetadata({ params }: AffinityPairingPageProps): Promise<Metadata> {
+  const { locale, pairingSlug } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  const pairingAffinities = parseAffinityPairingSlug(pairingSlug);
+  if (!pairingAffinities) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['affinity', pairingSlug]);
+}
 
 export default async function AffinityPairingPage({ params }: AffinityPairingPageProps) {
   const { locale, pairingSlug } = await params;

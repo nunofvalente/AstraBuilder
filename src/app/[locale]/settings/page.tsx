@@ -1,7 +1,9 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 import { SettingsClient } from './settings-client';
 
@@ -11,6 +13,16 @@ interface SettingsPageParams {
 
 interface SettingsPageProps {
   params: Promise<SettingsPageParams>;
+}
+
+export async function generateMetadata({ params }: SettingsPageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['settings']);
 }
 
 export default async function SettingsPage({ params }: SettingsPageProps) {

@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { isLocale } from '@/i18n/config';
@@ -15,6 +16,7 @@ import {
   isUnknownPairing,
   type AffinityPairingStat,
 } from '@/lib/decks/affinity-pairings';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
 
 const HOME_DECK_SAMPLE_LIMIT = 24;
@@ -28,6 +30,16 @@ type LocaleParams = {
 type LocalePageProps = {
   params: Promise<LocaleParams>;
 };
+
+export async function generateMetadata({ params }: LocalePageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale);
+}
 
 export default async function HomePage({ params }: LocalePageProps) {
   const { locale } = await params;

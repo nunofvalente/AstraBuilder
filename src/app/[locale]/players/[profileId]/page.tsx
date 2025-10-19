@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
@@ -6,6 +7,7 @@ import { isLocale } from '@/i18n/config';
 import { getProfileById } from '@/lib/supabase/profiles';
 import { getPublicDeckSummariesByAuthor } from '@/lib/supabase/decks';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 interface PlayerPageParams {
   locale: string;
@@ -14,6 +16,20 @@ interface PlayerPageParams {
 
 interface PlayerPageProps {
   params: Promise<PlayerPageParams>;
+}
+
+export async function generateMetadata({ params }: PlayerPageProps): Promise<Metadata> {
+  const { locale, profileId } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  if (!profileId || profileId.trim().length === 0) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['players', profileId]);
 }
 
 function ensureHttps(url: string | null | undefined): string | null {

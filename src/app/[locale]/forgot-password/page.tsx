@@ -1,8 +1,10 @@
-﻿import { notFound } from "next/navigation";
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 
-import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
-import { getDictionary } from "@/i18n/get-dictionary";
-import { isLocale, type Locale } from "@/i18n/config";
+import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
+import { getDictionary } from '@/i18n/get-dictionary';
+import { isLocale, type Locale } from '@/i18n/config';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 interface ForgotPasswordPageParams {
   locale: string;
@@ -10,6 +12,16 @@ interface ForgotPasswordPageParams {
 
 interface ForgotPasswordPageProps {
   params: Promise<ForgotPasswordPageParams>;
+}
+
+export async function generateMetadata({ params }: ForgotPasswordPageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['forgot-password']);
 }
 
 export default async function ForgotPasswordPage({ params }: ForgotPasswordPageProps) {

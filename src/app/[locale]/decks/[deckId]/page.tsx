@@ -1,8 +1,10 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
 import { getPublicDeckSummaryById } from '@/lib/supabase/decks';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 import { DeckDetailClient } from './deck-detail-client';
 
@@ -15,6 +17,20 @@ interface DeckDetailsParams {
 
 interface DeckDetailsPageProps {
   params: Promise<DeckDetailsParams>;
+}
+
+export async function generateMetadata({ params }: DeckDetailsPageProps): Promise<Metadata> {
+  const { locale, deckId } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  if (!deckId || deckId.trim().length === 0) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['decks', deckId]);
 }
 
 export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) {

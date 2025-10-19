@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 
 import './globals.css';
 import { DEFAULT_LOCALE } from '@/i18n/config';
+import { getMetadataBase } from '@/lib/metadata/site';
 import { ThemeProvider } from '@/theme/theme-provider';
 
 const geistSans = Geist({
@@ -24,6 +25,7 @@ const siteManifest = '/site.webmanifest';
 const metadataIcon = '/favicon.ico';
 
 export const metadata: Metadata = {
+  metadataBase: getMetadataBase(),
   title: metadataTitle,
   description: metadataDescription,
   openGraph: {
