@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
-import { getDeckSummariesForUser, type DeckSummary } from '@/lib/supabase/decks';
+import { getDeckSummariesForUser, getFavoriteDeckSummariesForUser, type DeckSummary } from '@/lib/supabase/decks';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
 import { DeckEditModal } from './deck-edit-modal';
 
@@ -15,10 +15,16 @@ export type MyDecksClientProps = {
   labels: {
     heading: string;
     description: string;
+    tabs: {
+      mine: string;
+      favorites: string;
+    };
     empty: string;
+    favoritesEmpty: string;
     loading: string;
     error: string;
     signInPrompt: string;
+    favoritesSignInPrompt: string;
     signInButton: string;
     publicTag: string;
     privateTag: string;
@@ -60,9 +66,14 @@ type DeckWithMeta = DeckSummary;
 
 export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
   const [status, setStatus] = useState<Status>('idle');
-  const [decks, setDecks] = useState<DeckWithMeta[]>([]);
+  const [myDecks, setMyDecks] = useState<DeckWithMeta[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [activeCollection, setActiveCollection] = useState<'mine' | 'favorites'>('mine');
+  const [favoriteStatus, setFavoriteStatus] = useState<Status>('idle');
+  const [favoriteDecks, setFavoriteDecks] = useState<DeckWithMeta[]>([]);
+  const [favoriteErrorMessage, setFavoriteErrorMessage] = useState<string | null>(null);
+  const [favoritesReloadNonce, setFavoritesReloadNonce] = useState(0);
   const [editingDeck, setEditingDeck] = useState<DeckWithMeta | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editErrorMessage, setEditErrorMessage] = useState<string | null>(null);
@@ -84,6 +95,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
       if (userError || !userResult?.user) {
         if (isMounted) {
           setStatus('auth');
+          setMyDecks([]);
         }
         return;
       }
@@ -93,7 +105,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
         if (!isMounted) {
           return;
         }
-        setDecks(summaries);
+        setMyDecks(summaries);
         setStatus('ready');
       } catch (error) {
         console.error('Failed to load decks', error);
@@ -108,6 +120,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
               : null;
         setErrorMessage(message ?? labels.error);
         setStatus('error');
+        setMyDecks([]);
       }
     }
 
@@ -117,6 +130,65 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
       isMounted = false;
     };
   }, [labels.error, locale, redirectPath, reloadNonce]);
+
+  useEffect(() => {
+    if (activeCollection !== 'favorites') {
+      return;
+    }
+
+    if (favoritesReloadNonce === 0) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadFavoriteDecks() {
+      setFavoriteStatus('loading');
+      setFavoriteErrorMessage(null);
+
+      const { data: userResult, error: userError } = await supabase.auth.getUser();
+      if (!isMounted) {
+        return;
+      }
+
+      if (userError || !userResult?.user) {
+        setFavoriteDecks([]);
+        setFavoriteStatus('auth');
+        return;
+      }
+
+      try {
+        const summaries = await getFavoriteDeckSummariesForUser(userResult.user.id);
+        if (!isMounted) {
+          return;
+        }
+
+        setFavoriteDecks(summaries);
+        setFavoriteStatus('ready');
+      } catch (error) {
+        console.error('Failed to load favorite decks', error);
+        if (!isMounted) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error !== null && 'message' in error
+              ? String((error as { message?: unknown }).message)
+              : null;
+        setFavoriteErrorMessage(message ?? labels.error);
+        setFavoriteDecks([]);
+        setFavoriteStatus('error');
+      }
+    }
+
+    void loadFavoriteDecks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeCollection, favoritesReloadNonce, labels.error]);
 
   async function handleEditSubmit(values: { title: string; description: string; isPublic: boolean }) {
     if (!editingDeck) {
@@ -159,7 +231,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
       return;
     }
 
-    setDecks((previous) =>
+    setMyDecks((previous) =>
       previous.map((deck) =>
         deck.id === editingDeck.id
           ? {
@@ -213,7 +285,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
       return;
     }
 
-    setDecks((previous) => previous.filter((deck) => deck.id !== editingDeck.id));
+    setMyDecks((previous) => previous.filter((deck) => deck.id !== editingDeck.id));
     setEditingDeck(null);
     setIsDeletingDeck(false);
     setEditSuccessMessage(labels.editDeleteSuccess);
@@ -227,19 +299,54 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
     setIsDeletingDeck(false);
   }
 
+  useEffect(() => {
+    if (activeCollection !== 'mine' && editingDeck) {
+      setEditingDeck(null);
+      setEditErrorMessage(null);
+      setDeleteErrorMessage(null);
+      setIsSavingEdit(false);
+      setIsDeletingDeck(false);
+    }
+  }, [activeCollection, editingDeck]);
+
+  const deckTabs = useMemo(
+    () => [
+      { value: 'mine' as const, label: labels.tabs.mine },
+      { value: 'favorites' as const, label: labels.tabs.favorites },
+    ],
+    [labels.tabs.favorites, labels.tabs.mine]
+  );
+  const activeTabIndex = deckTabs.findIndex((tab) => tab.value === activeCollection);
+  const tabIndicatorIndex = activeTabIndex >= 0 ? activeTabIndex : 0;
+  const tabIndicatorStyle = useMemo(() => {
+    const segment = Number((100 / deckTabs.length).toFixed(6));
+    const offset = Number((segment * tabIndicatorIndex).toFixed(6));
+    return {
+      width: `calc(${segment}% - 0.5rem)`,
+      left: `calc(${offset}% + 0.25rem)`,
+    } as const;
+  }, [deckTabs.length, tabIndicatorIndex]);
+
   const content = useMemo(() => {
-    if (status === 'loading' || status === 'idle') {
+    const isFavoritesView = activeCollection === 'favorites';
+    const currentStatus = isFavoritesView ? favoriteStatus : status;
+    const currentDecks = isFavoritesView ? favoriteDecks : myDecks;
+    const currentError = isFavoritesView ? favoriteErrorMessage : errorMessage;
+
+    if (currentStatus === 'loading' || currentStatus === 'idle') {
+      const loadingMessage = labels.loading;
       return (
         <div className="flex flex-1 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-sm text-[color:var(--text-secondary)]">
-          {labels.loading}
+          {loadingMessage}
         </div>
       );
     }
 
-    if (status === 'auth') {
+    if (currentStatus === 'auth') {
+      const signInMessage = isFavoritesView ? labels.favoritesSignInPrompt : labels.signInPrompt;
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
-          <p className="text-sm text-[color:var(--text-secondary)]">{labels.signInPrompt}</p>
+          <p className="text-sm text-[color:var(--text-secondary)]">{signInMessage}</p>
           <Link
             href={signInHref}
             className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
@@ -250,14 +357,20 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
       );
     }
 
-    if (status === 'error') {
+    if (currentStatus === 'error') {
       return (
         <div className="flex flex-col gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-100">
-          <span>{errorMessage ?? labels.error}</span>
+          <span>{currentError ?? labels.error}</span>
           <button
             type="button"
             onClick={() => {
-              setReloadNonce((previous) => previous + 1);
+              if (isFavoritesView) {
+                setFavoriteErrorMessage(null);
+                setFavoriteStatus('loading');
+                setFavoritesReloadNonce((previous) => previous + 1);
+              } else {
+                setReloadNonce((previous) => previous + 1);
+              }
             }}
             className="inline-flex w-fit items-center justify-center rounded-md border border-red-400/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-100 transition hover:bg-red-500/20 focus:outline-none focus-visible:ring focus-visible:ring-red-400"
           >
@@ -267,7 +380,15 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
       );
     }
 
-    if (decks.length === 0) {
+    if (currentDecks.length === 0) {
+      if (isFavoritesView) {
+        return (
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-10 text-center">
+            <p className="text-sm text-[color:var(--text-secondary)]">{labels.favoritesEmpty}</p>
+          </div>
+        );
+      }
+
       return (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-10 text-center">
           <p className="text-sm text-[color:var(--text-secondary)]">{labels.empty}</p>
@@ -283,36 +404,93 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
 
     return (
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {decks.map((deck) => (
-          <DeckSummaryCard
-            key={deck.id}
-            locale={locale}
-            deck={deck}
-            detailHref={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
-            labels={{
-              cards: labels.cardsLabel,
-              untitled: labels.untitledLabel,
-              publicTag: labels.publicTag,
-              privateTag: labels.privateTag,
-            }}
-            showPrivacyTag
-            onEdit={() => {
-              setEditErrorMessage(null);
-              setDeleteErrorMessage(null);
-              setEditSuccessMessage(null);
-              setEditingDeck(deck);
-            }}
-            editLabel={labels.editLabel}
-          />
-        ))}
+        {currentDecks.map((deck) => {
+          const trimmedName = deck.authorName?.trim() ?? '';
+          const authorLabel = trimmedName.length > 0 ? trimmedName : null;
+          const authorHref =
+            authorLabel && deck.authorId ? `/${locale}/players/${encodeURIComponent(deck.authorId)}` : undefined;
+          const author = authorLabel ? { label: authorLabel, href: authorHref } : undefined;
+
+          return (
+            <DeckSummaryCard
+              key={deck.id}
+              locale={locale}
+              deck={deck}
+              detailHref={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
+              labels={{
+                cards: labels.cardsLabel,
+                untitled: labels.untitledLabel,
+                publicTag: labels.publicTag,
+                privateTag: labels.privateTag,
+              }}
+              showPrivacyTag={!isFavoritesView}
+              author={author}
+              onEdit={
+                isFavoritesView
+                  ? undefined
+                  : () => {
+                      setEditErrorMessage(null);
+                      setDeleteErrorMessage(null);
+                      setEditSuccessMessage(null);
+                      setEditingDeck(deck);
+                    }
+              }
+              editLabel={!isFavoritesView ? labels.editLabel : undefined}
+            />
+          );
+        })}
       </div>
     );
-  }, [decks, errorMessage, labels, locale, signInHref, status]);
+  }, [
+    activeCollection,
+    errorMessage,
+    favoriteDecks,
+    favoriteErrorMessage,
+    favoriteStatus,
+    labels,
+    locale,
+    myDecks,
+    signInHref,
+    status,
+  ]);
 
   return (
     <div className="flex w-full flex-col gap-6 px-4 py-10 text-[color:var(--text-primary)] sm:px-6 lg:px-10 xl:px-16">
-      <div className="text-center md:text-left">
-        <h1 className="text-3xl font-semibold">{labels.heading}</h1>
+      <div className="flex flex-col gap-4">
+        <h1 className="sr-only">{labels.heading}</h1>
+        <div className="flex justify-center md:justify-start">
+          <div className="relative flex w-full min-w-[16rem] max-w-sm overflow-hidden rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 shadow-sm sm:min-w-[20rem] sm:max-w-md lg:min-w-[24rem] lg:max-w-lg">
+            <span
+              className="pointer-events-none absolute inset-y-1 rounded-full bg-[color:var(--accent)]/15 transition-all duration-200 ease-out"
+              style={tabIndicatorStyle}
+            />
+            {deckTabs.map((tab) => {
+              const isActive = tab.value === activeCollection;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => {
+                    setActiveCollection(tab.value);
+                    if (tab.value === 'favorites') {
+                      setFavoriteErrorMessage(null);
+                      setFavoriteStatus('loading');
+                      setFavoritesReloadNonce((previous) => previous + 1);
+                    }
+                  }}
+                  className={`relative z-10 flex-1 px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                    isActive
+                      ? 'text-[color:var(--accent)]'
+                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--accent)]'
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
       {editSuccessMessage ? (
         <div className="rounded-md border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-100">

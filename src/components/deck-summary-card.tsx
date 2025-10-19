@@ -14,6 +14,8 @@ type DeckSummaryCardDeck = {
   favoritesTotal: number;
   createdAt: string | null;
   isPublic?: boolean;
+  authorId?: string | null;
+  authorName?: string | null;
 };
 
 type DeckSummaryCardLabels = {

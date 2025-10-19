@@ -77,7 +77,7 @@
       "signInButton": "Log masuk",
       "emptyDeckError": "Tambah sekurang-kurangnya satu kad sebelum menyimpan.",
       "genericError": "Kami tidak dapat menyimpan dek anda. Sila cuba lagi.",
-      "successMessage": "Dek disimpan. Anda boleh menemuinya dalam Dek Saya.",
+      "successMessage": "Dek disimpan. Anda boleh menemuinya dalam Dek.",
       "dismissNotice": "Tutup",
       "publicLabel": "Jadikan dek ini awam",
       "publicHelp": "Dek awam mungkin muncul dalam senarai Popular atau Trending. Biarkan tidak ditanda untuk kekalkan sebagai peribadi."
@@ -86,10 +86,16 @@
   "myDecks": {
     "heading": "Dek saya",
     "description": "Urus dek yang anda simpan dalam pembina.",
+    "tabs": {
+      "mine": "Dek Saya",
+      "favorites": "Kegemaran"
+    },
     "empty": "Anda belum menyimpan sebarang dek.",
+    "favoritesEmpty": "Anda belum menanda sebarang dek sebagai kegemaran.",
     "loading": "Memuatkan dek anda...",
     "error": "Kami tidak dapat memuatkan dek anda. Sila cuba lagi.",
     "signInPrompt": "Log masuk untuk melihat dek yang disimpan.",
+    "favoritesSignInPrompt": "Log masuk untuk melihat dek kegemaran anda.",
     "signInButton": "Log masuk",
     "publicTag": "Awam",
     "privateTag": "Peribadi",
@@ -139,6 +145,10 @@
   "deckFeed": {
     "heading": "Dek komuniti",
     "description": "Lihat semua dek awam yang dikongsi oleh komuniti.",
+    "tabs": {
+      "mine": "Dek Saya",
+      "favorites": "Kegemaran"
+    },
     "empty": "Belum ada dek awam. Jadilah yang pertama menerbitkannya!",
     "authorLabel": "Pengarang",
     "createdLabel": "Dicipta",
@@ -325,3 +335,6 @@
     }
   }
 }
+
+
+

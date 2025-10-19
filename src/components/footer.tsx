@@ -47,14 +47,14 @@ export function Footer() {
               <p>
                 AstraBuilder is an unofficial, fan-made deckbuilding companion for{' '}
                 <Link
-                  href="https://www.kickstarter.com/projects/echoesofastra/echoes-of-astra-tcg"
+                  href="https://echoesofastra.com/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium text-[color:var(--accent)] hover:underline"
                 >
                   Echoes of Astra
                 </Link>
-                , an independent trading card game currently on Kickstarter.
+                , an independent trading card game from the original creators.
               </p>
               <p>
                 All card names, artwork, rules text, and related intellectual property are owned by the Echoes of Astra
@@ -62,9 +62,9 @@ export function Footer() {
                 endorsed by, or affiliated with, the Echoes of Astra team, and no copyright ownership is claimed.
               </p>
               <p>
-                AstraBuilder is a free, non-commercial tool. It may not be used for monetary gain, resale, or any
-                activity that infringes upon the rights of the original creators. Please support the official release by
-                backing the Kickstarter campaign.
+                AstraBuilder is a community tool offered free of charge. To keep the site online, limited advertising
+                may appear in the future to help offset hosting costs. Please support Echoes of Astra through their
+                official channels.
               </p>
             </div>
             <div className="mt-6 flex justify-end">
