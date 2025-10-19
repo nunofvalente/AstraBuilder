@@ -88,21 +88,20 @@ export default async function HomePage({ params }: LocalePageProps) {
         style={bannerStyle}
       >
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-4 text-center">
-          <h1 className="banner-text-gradient text-3xl font-semibold tracking-tight sm:text-4xl">
-            {home.title}
-          </h1>
-          {subtitle.length > 0 ? (
-            <p className="banner-text-gradient text-4xl font-bold leading-tight sm:text-5xl">{subtitle}</p>
-          ) : (
-            <div className="flex flex-col items-center gap-4">
-              {taglineIntro.length > 0 ? (
-                <p className="mt-2 text-sm font-medium text-white sm:text-base">{taglineIntro}</p>
-              ) : null}
-              {taglineHighlight.length > 0 ? (
-                <p className="text-4xl font-bold text-white sm:text-5xl">{taglineHighlight}</p>
-              ) : null}
-            </div>
-          )}
+          <div className="flex flex-col items-center gap-4">
+            <h1 className="banner-text-gradient text-3xl font-semibold tracking-tight sm:text-4xl">
+              {home.title}
+            </h1>
+            {taglineIntro.length > 0 ? (
+              <p className="mt-6 text-sm font-medium text-white sm:text-base">{taglineIntro}</p>
+            ) : null}
+            {taglineHighlight.length > 0 ? (
+              <p className="text-4xl font-bold text-white sm:text-5xl">{taglineHighlight}</p>
+            ) : null}
+            {taglineIntro.length === 0 && taglineHighlight.length === 0 && subtitle.length > 0 ? (
+              <p className="banner-text-gradient text-4xl font-bold leading-tight sm:text-5xl">{subtitle}</p>
+            ) : null}
+          </div>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <SecondaryButton className="w-full sm:w-auto" href={`/${locale}/decks`}>
               {home.actions.browse}
