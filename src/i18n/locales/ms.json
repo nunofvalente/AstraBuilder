@@ -6,9 +6,12 @@
       "highlight": "Echoes of Astra"
     },
     "sections": {
-      "popular": {
-        "title": "Dek popular",
-        "placeholder": "Dek popular akan dipaparkan di sini tidak lama lagi."
+      "affinityPairings": {
+        "title": "Dek mengikut padanan afiniti",
+        "placeholder": "Data padanan afiniti akan dipaparkan di sini tidak lama lagi.",
+        "deckLabel": "dek",
+        "decksLabel": "dek",
+        "unknownLabel": "Padanan tidak diketahui"
       },
       "trending": {
         "title": "Dek tular",
@@ -19,6 +22,11 @@
       "browse": "Lihat semua dek",
       "create": "Cipta dek"
     }
+  },
+  "affinityPage": {
+    "resultsHeading": "Dek dengan {pairing}",
+    "empty": "Tiada dek sepadan dengan padanan afiniti ini lagi.",
+    "backLink": "Kembali ke dek"
   },
   "builder": {
     "comingSoon": "Pembina dek akan tiba tidak lama lagi. Datang kembali untuk mula membina dek.",

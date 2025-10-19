@@ -8,9 +8,12 @@ type HomeDictionary = {
       highlight: string;
     };
     sections: {
-      popular: {
+      affinityPairings: {
         title: string;
         placeholder: string;
+        deckLabel: string;
+        decksLabel: string;
+        unknownLabel: string;
       };
       trending: {
         title: string;
@@ -21,6 +24,14 @@ type HomeDictionary = {
       browse: string;
       create: string;
     };
+  };
+};
+
+type AffinityPageDictionary = {
+  affinityPage: {
+    resultsHeading: string;
+    empty: string;
+    backLink: string;
   };
 };
 
@@ -362,6 +373,7 @@ type SettingsDictionaryShape = {
 
 type DictionaryModule = {
   default: HomeDictionary &
+    AffinityPageDictionary &
     BuilderDictionary &
     CardsDictionary &
     AuthDictionary &
@@ -383,6 +395,7 @@ const dictionaries: Record<Locale, ImportDictionary> = {
 };
 
 export type Dictionary = HomeDictionary &
+  AffinityPageDictionary &
   BuilderDictionary &
   CardsDictionary &
   AuthDictionary &
