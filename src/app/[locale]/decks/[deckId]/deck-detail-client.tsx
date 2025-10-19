@@ -109,6 +109,7 @@ type DeckDetailsClientProps = {
       socialsEmpty: string;
       xLabel: string;
       youtubeLabel: string;
+      unknownUser: string;
     };
   };
   emptyDeckLabel: string;
