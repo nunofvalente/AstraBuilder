@@ -123,13 +123,10 @@ export function CommunityDecksClient({
 
   const decksWithAuthor = useMemo<DeckWithAuthor[]>(() => {
     return resolvedDecks.map((deck) => {
-      const authorLabel =
-        deck.authorName && deck.authorName.trim().length > 0
-          ? deck.authorName.trim()
-          : deck.authorId
-            ? `${deck.authorId.slice(0, 8)}...`
-            : null;
-      const authorHref = deck.authorId ? `/${locale}/players/${encodeURIComponent(deck.authorId)}` : null;
+      const trimmedName = deck.authorName?.trim() ?? null;
+      const authorLabel = trimmedName && trimmedName.length > 0 ? trimmedName : null;
+      const authorHref =
+        authorLabel && deck.authorId ? `/${locale}/players/${encodeURIComponent(deck.authorId)}` : null;
 
       return {
         ...deck,
@@ -169,6 +166,14 @@ export function CommunityDecksClient({
   );
   const activeSortIndex = sortOptions.findIndex((option) => option.value === sortOption);
   const indicatorIndex = activeSortIndex >= 0 ? activeSortIndex : 0;
+  const filterIndicatorStyle = useMemo(() => {
+    const segment = Number((100 / sortOptions.length).toFixed(6));
+    const offset = Number((segment * indicatorIndex).toFixed(6));
+    return {
+      width: `calc(${segment}% - 0.5rem)`,
+      left: `calc(${offset}% + 0.25rem)`,
+    } as const;
+  }, [indicatorIndex, sortOptions.length]);
 
   return (
     <div className="flex w-full flex-col gap-8 px-4 py-10 text-[color:var(--text-primary)] sm:px-6 lg:px-10 xl:px-16">
@@ -200,11 +205,8 @@ export function CommunityDecksClient({
         <div className="flex justify-center sm:ml-auto">
           <div className="relative flex w-full min-w-[16rem] max-w-sm overflow-hidden rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 shadow-sm sm:min-w-[20rem] sm:max-w-md lg:min-w-[24rem] lg:max-w-lg">
             <span
-              className="pointer-events-none absolute inset-y-1 left-1 rounded-full bg-[color:var(--accent)]/15 transition-transform duration-200 ease-out"
-              style={{
-                width: `${100 / sortOptions.length}%`,
-                transform: `translateX(${indicatorIndex * 100}%)`,
-              }}
+              className="pointer-events-none absolute inset-y-1 rounded-full bg-[color:var(--accent)]/15 transition-all duration-200 ease-out"
+              style={filterIndicatorStyle}
             />
             {sortOptions.map((option) => {
               const isActive = sortOption === option.value;

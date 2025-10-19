@@ -262,10 +262,16 @@ type MyDecksDictionary = {
   myDecks: {
     heading: string;
     description: string;
+    tabs: {
+      mine: string;
+      favorites: string;
+    };
     empty: string;
+    favoritesEmpty: string;
     loading: string;
     error: string;
     signInPrompt: string;
+    favoritesSignInPrompt: string;
     signInButton: string;
     publicTag: string;
     privateTag: string;

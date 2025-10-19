@@ -77,7 +77,7 @@
       "signInButton": "Sign in",
       "emptyDeckError": "Add at least one card before saving.",
       "genericError": "We couldn't save your deck. Please try again.",
-      "successMessage": "Deck saved. You can find it under My Decks.",
+      "successMessage": "Deck saved. You can find it under Decks.",
       "dismissNotice": "Dismiss",
       "publicLabel": "Make this deck public",
       "publicHelp": "Public decks may appear in Popular or Trending lists. Leave unchecked to keep it private."
@@ -86,10 +86,16 @@
   "myDecks": {
     "heading": "My decks",
     "description": "Manage the decks you've saved in the builder.",
+    "tabs": {
+      "mine": "My Decks",
+      "favorites": "Favourites"
+    },
     "empty": "You haven't saved any decks yet.",
+    "favoritesEmpty": "You haven't favourited any decks yet.",
     "loading": "Loading your decks...",
     "error": "We couldn't load your decks. Please try again.",
     "signInPrompt": "Sign in to view your saved decks.",
+    "favoritesSignInPrompt": "Sign in to view the decks you've favourited.",
     "signInButton": "Sign in",
     "publicTag": "Public",
     "privateTag": "Private",
