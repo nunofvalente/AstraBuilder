@@ -1,8 +1,10 @@
-import { notFound } from "next/navigation";
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 
-import { SignUpForm } from "@/components/auth/sign-up-form";
-import { getDictionary } from "@/i18n/get-dictionary";
-import { isLocale, type Locale } from "@/i18n/config";
+import { SignUpForm } from '@/components/auth/sign-up-form';
+import { getDictionary } from '@/i18n/get-dictionary';
+import { isLocale, type Locale } from '@/i18n/config';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 interface SignUpPageParams {
   locale: string;
@@ -10,6 +12,16 @@ interface SignUpPageParams {
 
 interface SignUpPageProps {
   params: Promise<SignUpPageParams>;
+}
+
+export async function generateMetadata({ params }: SignUpPageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['sign-up']);
 }
 
 export default async function SignUpPage({ params }: SignUpPageProps) {
@@ -30,11 +42,7 @@ export default async function SignUpPage({ params }: SignUpPageProps) {
           <h1 className="text-2xl font-semibold">{signUpCopy.title}</h1>
           <p className="text-sm text-[color:var(--text-secondary)]">{signUpCopy.description}</p>
         </div>
-        <SignUpForm
-          locale={locale as Locale}
-          dictionary={signUpCopy}
-          passwordStrengthDictionary={passwordStrengthCopy}
-        />
+        <SignUpForm locale={locale as Locale} dictionary={signUpCopy} passwordStrengthDictionary={passwordStrengthCopy} />
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 import { DeckBuilder } from './deck-builder-client';
 import { getStaticCards } from './deck-builder/data';
@@ -15,6 +17,16 @@ type LocaleParams = {
 type CreateDeckPageProps = {
   params: Promise<LocaleParams>;
 };
+
+export async function generateMetadata({ params }: CreateDeckPageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['create']);
+}
 
 export default async function CreateDeckPage({ params }: CreateDeckPageProps) {
   const { locale } = await params;

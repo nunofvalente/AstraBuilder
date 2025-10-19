@@ -1,7 +1,9 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 import { getPublicDeckSummaries } from '@/lib/supabase/decks';
 import { CommunityDecksClient } from './community-decks-client';
 
@@ -13,6 +15,16 @@ interface DecksPageParams {
 
 interface DecksPageProps {
   params: Promise<DecksPageParams>;
+}
+
+export async function generateMetadata({ params }: DecksPageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['decks']);
 }
 
 export default async function DecksPage({ params }: DecksPageProps) {
@@ -33,6 +45,11 @@ export default async function DecksPage({ params }: DecksPageProps) {
       deckFeedLabels={{
         empty: deckFeed.empty,
         cardsLabel: deckFeed.cardsLabel,
+        sortOptions: {
+          popular: deckFeed.sortOptions.popular,
+          trending: deckFeed.sortOptions.trending,
+          new: deckFeed.sortOptions.new,
+        },
       }}
       myDeckLabels={{
         untitled: myDecks.untitledLabel,

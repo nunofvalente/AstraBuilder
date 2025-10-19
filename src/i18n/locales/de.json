@@ -1,11 +1,17 @@
 {
   "home": {
     "title": "AstraBuilder",
-    "subtitle": "Echoes of Astra Deckbuilding-Website",
+    "tagline": {
+      "intro": "Deckbuilding-Website für",
+      "highlight": "Echoes of Astra"
+    },
     "sections": {
-      "popular": {
-        "title": "Beliebte Decks",
-        "placeholder": "Beliebte Decks erscheinen bald hier."
+      "affinityPairings": {
+        "title": "Decks nach Affinitätskombination",
+        "placeholder": "Affinitätskombinationen werden hier bald angezeigt.",
+        "deckLabel": "Deck",
+        "decksLabel": "Decks",
+        "unknownLabel": "Unbekannte Kombination"
       },
       "trending": {
         "title": "Trendende Decks",
@@ -16,6 +22,11 @@
       "browse": "Alle Decks durchsuchen",
       "create": "Ein Deck erstellen"
     }
+  },
+  "affinityPage": {
+    "resultsHeading": "Decks mit {pairing}",
+    "empty": "Keine Decks fuer diese Affinitaetskombination gefunden.",
+    "backLink": "Zurueck zu den Decks"
   },
   "builder": {
     "comingSoon": "Deck-Builder bald verfugbar. Schau bald wieder vorbei, um Decks zu erstellen.",
@@ -74,7 +85,7 @@
       "signInButton": "Anmelden",
       "emptyDeckError": "FÃ¼ge vor dem Speichern mindestens eine Karte hinzu.",
       "genericError": "Dein Deck konnte nicht gespeichert werden. Bitte versuche es erneut.",
-      "successMessage": "Deck gespeichert. Du findest es unter Meine Decks.",
+      "successMessage": "Deck gespeichert. Du findest es unter Decks.",
       "dismissNotice": "Schliessen",
       "publicLabel": "Dieses Deck Ã¶ffentlich machen",
       "publicHelp": "Ã–ffentliche Decks kÃ¶nnen in beliebten oder trendigen Listen erscheinen. Unmarkiert lassen, um es privat zu halten."
@@ -83,10 +94,16 @@
   "myDecks": {
     "heading": "Meine Decks",
     "description": "Verwalte die Decks, die du im Builder gespeichert hast.",
+    "tabs": {
+      "mine": "Meine Decks",
+      "favorites": "Favoriten"
+    },
     "empty": "Du hast noch keine Decks gespeichert.",
+    "favoritesEmpty": "Du hast noch keine Decks favorisiert.",
     "loading": "Deine Decks werden geladen...",
     "error": "Deine Decks konnten nicht geladen werden. Bitte versuche es erneut.",
     "signInPrompt": "Melde dich an, um deine gespeicherten Decks zu sehen.",
+    "favoritesSignInPrompt": "Melde dich an, um deine favorisierten Decks zu sehen.",
     "signInButton": "Anmelden",
     "publicTag": "Öffentlich",
     "privateTag": "Privat",
@@ -127,7 +144,11 @@
     "notesHeading": "Beschreibung",
     "privateNotice": "Dieses Deck ist derzeit privat.",
     "publicNotice": "Dieses Deck ist öffentlich und kann in Community-Listen erscheinen.",
-    "backButton": "Zurück zu den Decks"
+    "backButton": "Zurück zu den Decks",
+    "favoriteAdd": "Zu Favoriten hinzufügen",
+    "favoriteRemove": "Aus Favoriten entfernen",
+    "favoriteSignIn": "Melde dich an, um Decks zu favorisieren.",
+    "favoriteError": "Deine Favoriten konnten nicht aktualisiert werden. Bitte versuche es erneut."
   },
   "deckFeed": {
     "heading": "Community-Decks",
@@ -137,7 +158,12 @@
     "createdLabel": "Erstellt",
     "cardsLabel": "Karten",
     "favoritesLabel": "Favoriten",
-    "viewsLabel": "Aufrufe"
+    "viewsLabel": "Aufrufe",
+    "sortOptions": {
+      "popular": "Beliebt",
+      "trending": "Angesagt",
+      "new": "Neu"
+    }
   },
   "publicProfile": {
     "heading": "Community-Profil",

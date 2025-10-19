@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 import type { Locale } from '@/i18n/config';
 import type { Card, CardRow, DeckEntry } from '@/app/[locale]/create/deck-builder/types';
@@ -10,8 +12,7 @@ import { DeckCardChip } from '@/app/[locale]/create/deck-builder/components/deck
 import { ZoomOverlay } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import type { ZoomAnchor } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import { supabase } from '@/lib/supabase/supabaseClient';
-import Image from 'next/image';
-
+import type { PublicDeckSummary } from '@/lib/supabase/decks';
 import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 
 const CARD_TYPE_ORDER = ['Unit', 'Tactic', 'Territory'];
@@ -32,6 +33,7 @@ type DeckRecord = {
   title: string | null;
   description: string | null;
   is_public: boolean | null;
+  user_id?: string | null;
   created_at: string | null;
   deck_cards?: Array<{
     quantity: number | null;
@@ -52,7 +54,7 @@ type DeckRecord = {
       description: string | null;
       image_url: string | null;
     } | null;
-  }>;
+  }> | null;
   deck_stats?: Array<{
     favorites_total?: number | null;
     views_total?: number | null;
@@ -85,6 +87,10 @@ type DeckDetailsClientProps = {
       privateNotice: string;
       publicNotice: string;
       backButton: string;
+      favoriteAdd: string;
+      favoriteRemove: string;
+      favoriteSignIn: string;
+      favoriteError: string;
     };
     myDecks: {
       publicTag: string;
@@ -103,9 +109,11 @@ type DeckDetailsClientProps = {
       socialsEmpty: string;
       xLabel: string;
       youtubeLabel: string;
+      unknownUser: string;
     };
   };
   emptyDeckLabel: string;
+  initialSummary?: Pick<PublicDeckSummary, 'authorId' | 'authorName'>;
 };
 
 type Section = {
@@ -114,7 +122,44 @@ type Section = {
   total: number;
 };
 
-export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: DeckDetailsClientProps) {
+type DeckStatsOverride = {
+  viewsTotal?: number;
+  favoritesTotal?: number;
+};
+
+function readDeckStatsOverride(deckId: string): DeckStatsOverride | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const key = `deck-stats:${deckId}`;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw) as DeckStatsOverride;
+  } catch {
+    return null;
+  }
+}
+
+function persistDeckStatsOverride(deckId: string, updates: DeckStatsOverride) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const key = `deck-stats:${deckId}`;
+  try {
+    const existingRaw = window.sessionStorage.getItem(key);
+    const existing = existingRaw ? (JSON.parse(existingRaw) as DeckStatsOverride) : {};
+    const next = { ...existing, ...updates };
+    window.sessionStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    // Ignore storage errors (quota exceeded, invalid JSON, etc.).
+  }
+}
+
+export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initialSummary }: DeckDetailsClientProps) {
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
   const [zoomAnchor, setZoomAnchor] = useState<ZoomAnchor | null>(null);
@@ -134,6 +179,17 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     authorXLink: string | null;
     authorYoutubeLink: string | null;
   } | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null | undefined>(undefined);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavoriteLoaded, setIsFavoriteLoaded] = useState(false);
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [favoriteErrorMessage, setFavoriteErrorMessage] = useState<string | null>(null);
+  const hasLoggedViewRef = useRef(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const fallbackPath = `/${locale}/decks/${encodeURIComponent(deckId)}`;
+  const redirectPath = pathname ?? fallbackPath;
+  const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(redirectPath)}`;
 
   useEffect(() => {
     let isActive = true;
@@ -143,7 +199,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       setErrorMessage(null);
 
       const select =
-        'id,title,description,created_at,is_public,deck_cards(quantity,cards(*)),deck_stats(favorites_total,views_total),profiles:profiles!decks_user_id_profiles_fkey(id,username,x_link,youtube_link)';
+        'id,title,description,created_at,is_public,user_id,deck_cards(quantity,cards(*)),deck_stats(favorites_total,views_total),profiles:profiles!decks_user_id_profiles_fkey(id,username,x_link,youtube_link)';
 
       const { data, error } = await supabase
         .from('decks')
@@ -158,28 +214,54 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       if (error || !data) {
         console.error('Failed to load deck detail', error);
         const message =
-          error?.message ??
-          (data ? 'Deck not found' : 'Unable to fetch deck. Please check your permissions.');
+          error?.message ?? (data ? 'Deck not found' : 'Unable to fetch deck. Please check your permissions.');
         setErrorMessage(message);
         setStatus('error');
         return;
       }
 
-      const favoritesTotal = Array.isArray(data.deck_stats) && data.deck_stats.length > 0
-        ? Number(data.deck_stats[0]?.favorites_total ?? 0)
-        : 0;
-      const viewsTotal = Array.isArray(data.deck_stats) && data.deck_stats.length > 0
-        ? Number(data.deck_stats[0]?.views_total ?? 0)
-        : 0;
+      const deckIdValue = String(data.id);
+
+      let favoritesTotal =
+        Array.isArray(data.deck_stats) && data.deck_stats.length > 0
+          ? Number(data.deck_stats[0]?.favorites_total ?? 0)
+          : 0;
+      let viewsTotal =
+        Array.isArray(data.deck_stats) && data.deck_stats.length > 0
+          ? Number(data.deck_stats[0]?.views_total ?? 0)
+          : 0;
+
+      if (favoritesTotal === 0 && viewsTotal === 0) {
+        const { data: statsRow } = await supabase
+          .from('deck_stats')
+          .select('views_total,favorites_total')
+          .eq('deck_id', deckIdValue)
+          .maybeSingle();
+
+        if (statsRow) {
+          favoritesTotal = Math.max(favoritesTotal, Number(statsRow.favorites_total ?? 0));
+          viewsTotal = Math.max(viewsTotal, Number(statsRow.views_total ?? 0));
+        }
+      }
+
+      const override = readDeckStatsOverride(deckIdValue);
+      if (override) {
+        if (typeof override.favoritesTotal === 'number') {
+          favoritesTotal = Math.max(favoritesTotal, Number(override.favoritesTotal));
+        }
+        if (typeof override.viewsTotal === 'number') {
+          viewsTotal = Math.max(viewsTotal, Number(override.viewsTotal));
+        }
+      }
 
       let authorName: string | null = null;
-      let authorId: string | null = null;
+      let authorId: string | null = data.user_id ? String(data.user_id) : null;
       let authorXLink: string | null = null;
       let authorYoutubeLink: string | null = null;
       const profileRelation = data.profiles;
       if (Array.isArray(profileRelation) && profileRelation.length > 0) {
         authorName = profileRelation[0]?.username ?? null;
-        authorId = profileRelation[0]?.id ?? null;
+        authorId = profileRelation[0]?.id ?? authorId;
         authorXLink = profileRelation[0]?.x_link ?? null;
         authorYoutubeLink = profileRelation[0]?.youtube_link ?? null;
       } else if (profileRelation && profileRelation !== null && typeof profileRelation === 'object') {
@@ -190,7 +272,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
           youtube_link?: string | null;
         };
         authorName = profileObject.username ?? null;
-        authorId = profileObject.id ?? null;
+        authorId = profileObject.id ?? authorId;
         authorXLink = profileObject.x_link ?? null;
         authorYoutubeLink = profileObject.youtube_link ?? null;
       }
@@ -207,15 +289,15 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
         : [];
 
       setDeckMeta({
-        id: data.id,
+        id: deckIdValue,
         title: data.title ?? null,
         description: data.description ?? null,
         isPublic: Boolean(data.is_public),
         createdAt: data.created_at ?? null,
         favoritesTotal,
         viewsTotal,
-        authorName,
-        authorId,
+        authorName: authorName ?? initialSummary?.authorName ?? null,
+        authorId: authorId ?? initialSummary?.authorId ?? null,
         authorXLink,
         authorYoutubeLink,
       });
@@ -229,6 +311,160 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       isActive = false;
     };
   }, [deckId]);
+
+  useEffect(() => {
+    if (!deckMeta?.id) {
+      return;
+    }
+    persistDeckStatsOverride(deckMeta.id, {
+      favoritesTotal: deckMeta.favoritesTotal,
+      viewsTotal: deckMeta.viewsTotal,
+    });
+  }, [deckMeta?.favoritesTotal, deckMeta?.id, deckMeta?.viewsTotal]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchCurrentUser() {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (!isMounted) {
+          return;
+        }
+        if (error) {
+          console.error('Failed to fetch current user', error);
+          setCurrentUserId(null);
+          return;
+        }
+        setCurrentUserId(data?.user?.id ?? null);
+      } catch (error) {
+        console.error('Failed to fetch current user', error);
+        if (isMounted) {
+          setCurrentUserId(null);
+        }
+      }
+    }
+
+    void fetchCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (currentUserId === undefined) {
+      return;
+    }
+
+    if (!deckMeta?.id) {
+      setIsFavorite(false);
+      setIsFavoriteLoaded(true);
+      setFavoriteErrorMessage(null);
+      return;
+    }
+
+    if (!currentUserId) {
+      setIsFavorite(false);
+      setIsFavoriteLoaded(true);
+      setFavoriteErrorMessage(null);
+      return;
+    }
+
+    const deckIdValue = deckMeta.id;
+    if (!deckIdValue) {
+      setIsFavorite(false);
+      setIsFavoriteLoaded(true);
+      setFavoriteErrorMessage(null);
+      return;
+    }
+
+    let isActive = true;
+    setIsFavoriteLoaded(false);
+
+    async function loadFavoriteState() {
+      try {
+        const { data, error, status } = await supabase
+          .from('deck_favorite_events')
+          .select('deck_id')
+          .eq('deck_id', deckIdValue)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+
+        if (!isActive) {
+          return;
+        }
+
+        if (error && status !== 406) {
+          console.error('Failed to load favorite state', error);
+          setFavoriteErrorMessage(labels.deckDetails.favoriteError);
+          setIsFavorite(false);
+        } else {
+          setIsFavorite(Boolean(data));
+          setFavoriteErrorMessage(null);
+        }
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+        console.error('Failed to load favorite state', error);
+        setFavoriteErrorMessage(labels.deckDetails.favoriteError);
+        setIsFavorite(false);
+      } finally {
+        if (isActive) {
+          setIsFavoriteLoaded(true);
+        }
+      }
+    }
+
+    void loadFavoriteState();
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentUserId, deckMeta?.id, labels.deckDetails.favoriteError]);
+
+  useEffect(() => {
+    if (!deckMeta?.id || status !== 'ready' || currentUserId === undefined) {
+      return;
+    }
+
+    if (hasLoggedViewRef.current) {
+      return;
+    }
+
+    const deckIdValue = deckMeta.id;
+    if (!deckIdValue) {
+      return;
+    }
+
+    hasLoggedViewRef.current = true;
+    const payload: { deck_id: string; user_id?: string } = { deck_id: deckIdValue };
+    if (currentUserId) {
+      payload.user_id = currentUserId;
+    }
+
+    async function recordView() {
+      try {
+        const { error } = await supabase.from('deck_view_events').insert(payload);
+        if (error) {
+          console.error('Failed to record deck view', error);
+          hasLoggedViewRef.current = false;
+          return;
+        }
+
+        setDeckMeta((previous) =>
+          previous ? { ...previous, viewsTotal: previous.viewsTotal + 1 } : previous
+        );
+        persistDeckStatsOverride(deckIdValue, { viewsTotal: (deckMeta?.viewsTotal ?? 0) + 1 });
+      } catch (error) {
+        console.error('Failed to record deck view', error);
+        hasLoggedViewRef.current = false;
+      }
+    }
+
+    void recordView();
+  }, [currentUserId, deckMeta?.id, deckMeta?.viewsTotal, status]);
 
   const totalCards = useMemo(() => deckEntries.reduce((sum, entry) => sum + entry.count, 0), [deckEntries]);
 
@@ -295,7 +531,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     }
     try {
       return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date);
-    } catch (error) {
+    } catch {
       return date.toLocaleDateString();
     }
   }, [deckMeta?.createdAt, locale]);
@@ -311,10 +547,90 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
     return socials.filter((entry): entry is { label: string; href: string } => Boolean(entry.href));
   }, [deckMeta?.authorXLink, deckMeta?.authorYoutubeLink, labels.publicProfile.xLabel, labels.publicProfile.youtubeLabel]);
 
+  const effectiveAuthorName = deckMeta?.authorName ?? initialSummary?.authorName ?? null;
+  const effectiveAuthorId = deckMeta?.authorId ?? initialSummary?.authorId ?? null;
+
+  const authorDisplayName = useMemo(() => {
+    const trimmedName = effectiveAuthorName?.trim();
+    if (trimmedName && trimmedName.length > 0) {
+      return trimmedName;
+    }
+
+    return labels.publicProfile.unknownUser;
+  }, [effectiveAuthorName, labels.publicProfile.unknownUser]);
+
   function handleZoom(nextCard: Card | null, variant: 'default' | 'compact' = 'default', anchor: ZoomAnchor | null = null) {
     setZoomCard(nextCard);
     setZoomVariant(variant);
     setZoomAnchor(anchor);
+  }
+
+  async function handleFavoriteToggle() {
+    if (!deckMeta) {
+      return;
+    }
+
+    if (currentUserId === undefined) {
+      return;
+    }
+
+    if (!currentUserId) {
+      router.push(signInHref);
+      return;
+    }
+
+    if (isTogglingFavorite) {
+      return;
+    }
+
+    const deckIdValue = deckMeta.id;
+    if (!deckIdValue) {
+      return;
+    }
+
+    setIsTogglingFavorite(true);
+    setFavoriteErrorMessage(null);
+
+    try {
+      const favoriteKey = { deck_id: deckIdValue, user_id: currentUserId };
+
+      if (isFavorite) {
+        const { error } = await supabase.from('deck_favorite_events').delete().match(favoriteKey);
+
+        if (error) {
+          throw error;
+        }
+
+        setIsFavorite(false);
+        setDeckMeta((previous) =>
+          previous
+            ? { ...previous, favoritesTotal: Math.max(0, previous.favoritesTotal - 1) }
+            : previous
+        );
+        persistDeckStatsOverride(deckIdValue, {
+          favoritesTotal: Math.max(0, (deckMeta?.favoritesTotal ?? 0) - 1),
+        });
+      } else {
+        const { error } = await supabase.from('deck_favorite_events').insert(favoriteKey);
+
+        if (error) {
+          throw error;
+        }
+
+        setIsFavorite(true);
+        setDeckMeta((previous) =>
+          previous ? { ...previous, favoritesTotal: previous.favoritesTotal + 1 } : previous
+        );
+        persistDeckStatsOverride(deckIdValue, {
+          favoritesTotal: (deckMeta?.favoritesTotal ?? 0) + 1,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite', error);
+      setFavoriteErrorMessage(labels.deckDetails.favoriteError);
+    } finally {
+      setIsTogglingFavorite(false);
+    }
   }
 
   const backHref = `/${locale}/decks`;
@@ -322,12 +638,6 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
   if (status === 'loading' || status === 'idle') {
     return (
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-10 text-[color:var(--text-secondary)]">
-        <Link
-          href={backHref}
-          className="inline-flex w-fit items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
-        >
-          ← {labels.deckDetails.backButton}
-        </Link>
         <div className="flex h-64 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
           {labels.myDecks.loading}
         </div>
@@ -342,7 +652,20 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
           href={backHref}
           className="inline-flex w-fit items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
         >
-          ← {labels.deckDetails.backButton}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          <span>{labels.deckDetails.backButton}</span>
         </Link>
         <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-100">
           {errorMessage ?? labels.myDecks.error}
@@ -353,6 +676,22 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
 
   const title = deckMeta.title && deckMeta.title.trim().length > 0 ? deckMeta.title.trim() : labels.myDecks.untitledLabel;
   const description = deckMeta.description?.trim();
+  const favoriteButtonLabel = isFavorite ? labels.deckDetails.favoriteRemove : labels.deckDetails.favoriteAdd;
+  const isFavoriteButtonDisabled = !isFavoriteLoaded || isTogglingFavorite;
+  const favoriteButtonClassName = [
+    'inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]',
+    isFavorite
+      ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/15 text-[color:var(--accent)]'
+      : 'border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-secondary)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]',
+    isFavoriteButtonDisabled ? 'opacity-60' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const favoriteSupportMessage =
+    favoriteErrorMessage ?? (currentUserId === null ? labels.deckDetails.favoriteSignIn : null);
+  const favoriteSupportClassName = favoriteErrorMessage
+    ? 'text-xs text-red-400'
+    : 'text-xs text-[color:var(--text-secondary)]';
 
   const chips = sections.length === 0 ? (
     <p className="text-sm text-[color:var(--text-secondary)]">{emptyDeckLabel}</p>
@@ -378,33 +717,73 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 text-[color:var(--text-primary)]">
-      <div className="flex items-center justify-between">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
-        >
-          ← {labels.deckDetails.backButton}
-        </Link>
-        <Link
-          href={`/${locale}/create?deck=${encodeURIComponent(deckMeta.id)}`}
-          className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-        >
-          {labels.myDecks.openButton}
-        </Link>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <Link
+            href={backHref}
+            className="inline-flex items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            <span>{labels.deckDetails.backButton}</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleFavoriteToggle()}
+              aria-pressed={isFavorite}
+              disabled={isFavoriteButtonDisabled}
+              className={favoriteButtonClassName}
+              title={favoriteButtonLabel}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill={isFavorite ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className={`h-4 w-4 ${isFavorite ? 'text-[color:var(--accent)]' : 'text-[color:var(--text-secondary)]'}`}
+              >
+                <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+              <span className="sr-only">{favoriteButtonLabel}</span>
+            </button>
+            <Link
+              href={`/${locale}/create?deck=${encodeURIComponent(deckMeta.id)}`}
+              className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            >
+              {labels.myDecks.openButton}
+            </Link>
+          </div>
+        </div>
+        {favoriteSupportMessage ? (
+          <p className={`${favoriteSupportClassName} text-right`}>{favoriteSupportMessage}</p>
+        ) : null}
       </div>
 
-      {deckMeta?.authorName ? (
+      {authorDisplayName ? (
         <div className="flex flex-col items-center gap-3 text-center">
-          {deckMeta.authorId ? (
+          {effectiveAuthorId ? (
             <Link
-              href={`/${locale}/players/${encodeURIComponent(deckMeta.authorId)}`}
+              href={`/${locale}/players/${encodeURIComponent(effectiveAuthorId)}`}
               className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)] transition hover:text-[color:var(--accent)]"
             >
-              {deckMeta.authorName}
+              {authorDisplayName}
             </Link>
           ) : (
             <span className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)]">
-              {deckMeta.authorName}
+              {authorDisplayName}
             </span>
           )}
           <div className="flex flex-col items-center gap-2 text-xs text-[color:var(--text-secondary)]">
@@ -433,42 +812,42 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       <div
         className="relative space-y-3 rounded-2xl border border-[color:var(--border)] p-6 shadow-sm text-white"
         style={{
-          backgroundImage: `linear-gradient(rgba(12, 15, 21, 0.35), rgba(12, 15, 21, 0.35)), ${buildAffinityGradient(bannerAffinities)}`,
+          backgroundImage: `linear-gradient(rgba(12, 15, 21, 0.35), rgba(12, 15, 21, 0.35)), ${buildAffinityGradient(
+            bannerAffinities
+          )}`,
         }}
       >
         <div className="absolute right-6 top-6 flex flex-wrap justify-end gap-3 text-xs font-semibold uppercase tracking-wide text-white md:flex-nowrap">
-            <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
-              <span className="sr-only">{labels.myDecks.viewsLabel}</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-4 w-4"
-              >
-                <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              {deckMeta?.viewsTotal ?? 0}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
-              <span className="sr-only">{labels.myDecks.favoritesLabel}</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-4 w-4 text-[color:var(--accent)]"
-              >
-                <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
-              </svg>
-              {deckMeta?.favoritesTotal ?? 0}
-            </span>
+          <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
+            <span className="sr-only">{labels.myDecks.viewsLabel}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="h-4 w-4"
+            >
+              <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            {deckMeta?.viewsTotal ?? 0}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
+            <span className="sr-only">{labels.myDecks.favoritesLabel}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-4 w-4 text-[color:var(--accent)]"
+            >
+              <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+            {deckMeta?.favoritesTotal ?? 0}
+          </span>
         </div>
         {formattedCreatedAt ? (
-          <div className="absolute bottom-6 right-6 text-sm font-semibold text-white">
-            {formattedCreatedAt}
-          </div>
+          <div className="absolute bottom-6 right-6 text-sm font-semibold text-white">{formattedCreatedAt}</div>
         ) : null}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-3 pr-20 md:pr-0 md:max-w-[80%]">
@@ -500,9 +879,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-white/80">
                   {labels.deckDetails.notesHeading}
                 </h2>
-                <p className="break-words text-sm leading-6 text-white/80 whitespace-pre-line">
-                  {description}
-                </p>
+                <p className="break-words text-sm leading-6 text-white/80 whitespace-pre-line">{description}</p>
               </div>
             ) : null}
           </div>
@@ -519,7 +896,9 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel }: Dec
       <section className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm">
         <header className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{labels.deckDetails.sectionsHeading}</h2>
-          <span className="text-sm text-[color:var(--text-secondary)]">{labels.myDecks.cardsLabel}: {totalCards}</span>
+          <span className="text-sm text-[color:var(--text-secondary)]">
+            {labels.myDecks.cardsLabel}: {totalCards}
+          </span>
         </header>
         {chips}
       </section>

@@ -1,11 +1,17 @@
 {
   "home": {
     "title": "AstraBuilder",
-    "subtitle": "Laman deckbuilding Echoes of Astra",
+    "tagline": {
+      "intro": "Laman web deckbuilding untuk",
+      "highlight": "Echoes of Astra"
+    },
     "sections": {
-      "popular": {
-        "title": "Dek popular",
-        "placeholder": "Dek popular akan dipaparkan di sini tidak lama lagi."
+      "affinityPairings": {
+        "title": "Dek mengikut padanan afiniti",
+        "placeholder": "Data padanan afiniti akan dipaparkan di sini tidak lama lagi.",
+        "deckLabel": "dek",
+        "decksLabel": "dek",
+        "unknownLabel": "Padanan tidak diketahui"
       },
       "trending": {
         "title": "Dek tular",
@@ -16,6 +22,11 @@
       "browse": "Lihat semua dek",
       "create": "Cipta dek"
     }
+  },
+  "affinityPage": {
+    "resultsHeading": "Dek dengan {pairing}",
+    "empty": "Tiada dek sepadan dengan padanan afiniti ini lagi.",
+    "backLink": "Kembali ke dek"
   },
   "builder": {
     "comingSoon": "Pembina dek akan tiba tidak lama lagi. Datang kembali untuk mula membina dek.",
@@ -74,7 +85,7 @@
       "signInButton": "Log masuk",
       "emptyDeckError": "Tambah sekurang-kurangnya satu kad sebelum menyimpan.",
       "genericError": "Kami tidak dapat menyimpan dek anda. Sila cuba lagi.",
-      "successMessage": "Dek disimpan. Anda boleh menemuinya dalam Dek Saya.",
+      "successMessage": "Dek disimpan. Anda boleh menemuinya dalam Dek.",
       "dismissNotice": "Tutup",
       "publicLabel": "Jadikan dek ini awam",
       "publicHelp": "Dek awam mungkin muncul dalam senarai Popular atau Trending. Biarkan tidak ditanda untuk kekalkan sebagai peribadi."
@@ -83,10 +94,16 @@
   "myDecks": {
     "heading": "Dek saya",
     "description": "Urus dek yang anda simpan dalam pembina.",
+    "tabs": {
+      "mine": "Dek Saya",
+      "favorites": "Kegemaran"
+    },
     "empty": "Anda belum menyimpan sebarang dek.",
+    "favoritesEmpty": "Anda belum menanda sebarang dek sebagai kegemaran.",
     "loading": "Memuatkan dek anda...",
     "error": "Kami tidak dapat memuatkan dek anda. Sila cuba lagi.",
     "signInPrompt": "Log masuk untuk melihat dek yang disimpan.",
+    "favoritesSignInPrompt": "Log masuk untuk melihat dek kegemaran anda.",
     "signInButton": "Log masuk",
     "publicTag": "Awam",
     "privateTag": "Peribadi",
@@ -127,17 +144,30 @@
     "notesHeading": "Deskripsi",
     "privateNotice": "Dek ini buat masa ini adalah peribadi.",
     "publicNotice": "Dek ini adalah awam dan mungkin muncul dalam senarai komuniti.",
-    "backButton": "Kembali ke dek"
+    "backButton": "Kembali ke dek",
+    "favoriteAdd": "Tambah ke kegemaran",
+    "favoriteRemove": "Buang dari kegemaran",
+    "favoriteSignIn": "Log masuk untuk menanda dek sebagai kegemaran.",
+    "favoriteError": "Kami tidak dapat mengemas kini kegemaran anda. Sila cuba lagi."
   },
   "deckFeed": {
     "heading": "Dek komuniti",
     "description": "Lihat semua dek awam yang dikongsi oleh komuniti.",
+    "tabs": {
+      "mine": "Dek Saya",
+      "favorites": "Kegemaran"
+    },
     "empty": "Belum ada dek awam. Jadilah yang pertama menerbitkannya!",
     "authorLabel": "Pengarang",
     "createdLabel": "Dicipta",
     "cardsLabel": "Kad",
     "favoritesLabel": "Kegemaran",
-    "viewsLabel": "Paparan"
+    "viewsLabel": "Paparan",
+    "sortOptions": {
+      "popular": "Popular",
+      "trending": "Trending",
+      "new": "Baharu"
+    }
   },
   "publicProfile": {
     "heading": "Profil komuniti",
@@ -313,3 +343,6 @@
     }
   }
 }
+
+
+

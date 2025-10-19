@@ -3,11 +3,18 @@ import type { Locale } from "./config";
 type HomeDictionary = {
   home: {
     title: string;
-    subtitle: string;
+    subtitle?: string;
+    tagline?: {
+      intro?: string;
+      highlight?: string;
+    };
     sections: {
-      popular: {
+      affinityPairings: {
         title: string;
         placeholder: string;
+        deckLabel: string;
+        decksLabel: string;
+        unknownLabel: string;
       };
       trending: {
         title: string;
@@ -18,6 +25,14 @@ type HomeDictionary = {
       browse: string;
       create: string;
     };
+  };
+};
+
+type AffinityPageDictionary = {
+  affinityPage: {
+    resultsHeading: string;
+    empty: string;
+    backLink: string;
   };
 };
 
@@ -259,10 +274,16 @@ type MyDecksDictionary = {
   myDecks: {
     heading: string;
     description: string;
+    tabs: {
+      mine: string;
+      favorites: string;
+    };
     empty: string;
+    favoritesEmpty: string;
     loading: string;
     error: string;
     signInPrompt: string;
+    favoritesSignInPrompt: string;
     signInButton: string;
     publicTag: string;
     privateTag: string;
@@ -306,6 +327,10 @@ type DeckDetailsDictionary = {
     privateNotice: string;
     publicNotice: string;
     backButton: string;
+    favoriteAdd: string;
+    favoriteRemove: string;
+    favoriteSignIn: string;
+    favoriteError: string;
   };
 };
 
@@ -319,6 +344,11 @@ type DeckFeedDictionary = {
     cardsLabel: string;
     favoritesLabel: string;
     viewsLabel: string;
+    sortOptions: {
+      popular: string;
+      trending: string;
+      new: string;
+    };
   };
 };
 
@@ -344,6 +374,7 @@ type SettingsDictionaryShape = {
 
 type DictionaryModule = {
   default: HomeDictionary &
+    AffinityPageDictionary &
     BuilderDictionary &
     CardsDictionary &
     AuthDictionary &
@@ -365,6 +396,7 @@ const dictionaries: Record<Locale, ImportDictionary> = {
 };
 
 export type Dictionary = HomeDictionary &
+  AffinityPageDictionary &
   BuilderDictionary &
   CardsDictionary &
   AuthDictionary &

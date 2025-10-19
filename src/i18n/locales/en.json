@@ -2,10 +2,17 @@
   "home": {
     "title": "AstraBuilder",
     "subtitle": "Craft and share Echoes of Astra decks with a modern community builder.",
+    "tagline": {
+      "intro": "Deckbuilding website for",
+      "highlight": "Echoes of Astra"
+    },
     "sections": {
-      "popular": {
-        "title": "Popular Decks",
-        "placeholder": "Featured community builds appear here after players publish new decks."
+      "affinityPairings": {
+        "title": "Decks by Affinity Pairing",
+        "placeholder": "Affinity pairings will appear here soon.",
+        "deckLabel": "deck",
+        "decksLabel": "decks",
+        "unknownLabel": "Unknown pairing"
       },
       "trending": {
         "title": "Trending Decks",
@@ -16,6 +23,11 @@
       "browse": "Browse all decks",
       "create": "Create a deck"
     }
+  },
+  "affinityPage": {
+    "resultsHeading": "Decks using {pairing}",
+    "empty": "No decks match this affinity pairing yet.",
+    "backLink": "Back to decks"
   },
   "builder": {
     "comingSoon": "Deck builder coming soon. Check back soon to start building decks.",
@@ -74,7 +86,7 @@
       "signInButton": "Sign in",
       "emptyDeckError": "Add at least one card before saving.",
       "genericError": "We couldn't save your deck. Please try again.",
-      "successMessage": "Deck saved. You can find it under My Decks.",
+      "successMessage": "Deck saved. You can find it under Decks.",
       "dismissNotice": "Dismiss",
       "publicLabel": "Make this deck public",
       "publicHelp": "Public decks may appear in Popular or Trending lists. Leave unchecked to keep it private."
@@ -83,10 +95,16 @@
   "myDecks": {
     "heading": "My decks",
     "description": "Manage the decks you've saved in the builder.",
+    "tabs": {
+      "mine": "My Decks",
+      "favorites": "Favourites"
+    },
     "empty": "You haven't saved any decks yet.",
+    "favoritesEmpty": "You haven't favourited any decks yet.",
     "loading": "Loading your decks...",
     "error": "We couldn't load your decks. Please try again.",
     "signInPrompt": "Sign in to view your saved decks.",
+    "favoritesSignInPrompt": "Sign in to view the decks you've favourited.",
     "signInButton": "Sign in",
     "publicTag": "Public",
     "privateTag": "Private",
@@ -125,9 +143,13 @@
     "description": "Card breakdown and statistics for this deck.",
     "sectionsHeading": "Card sections",
     "notesHeading": "Description",
-    "privateNotice": "This deck is currently private.",
-    "publicNotice": "This deck is public and may appear in community listings.",
-    "backButton": "Back to Decks"
+   "privateNotice": "This deck is currently private.",
+   "publicNotice": "This deck is public and may appear in community listings.",
+    "backButton": "Back to Decks",
+    "favoriteAdd": "Add to favorites",
+    "favoriteRemove": "Remove from favorites",
+    "favoriteSignIn": "Sign in to favorite decks.",
+    "favoriteError": "We couldn't update your favorites. Please try again."
   },
   "deckFeed": {
     "heading": "Community decks",
@@ -137,7 +159,12 @@
     "createdLabel": "Created",
     "cardsLabel": "Cards",
     "favoritesLabel": "Favorites",
-    "viewsLabel": "Views"
+    "viewsLabel": "Views",
+    "sortOptions": {
+      "popular": "Popular",
+      "trending": "Trending",
+      "new": "New"
+    }
   },
   "publicProfile": {
     "heading": "Community profile",

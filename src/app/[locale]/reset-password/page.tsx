@@ -1,8 +1,10 @@
-﻿import { notFound } from "next/navigation";
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 
-import { ResetPasswordForm } from "@/components/auth/reset-password-form";
-import { getDictionary } from "@/i18n/get-dictionary";
-import { isLocale, type Locale } from "@/i18n/config";
+import { ResetPasswordForm } from '@/components/auth/reset-password-form';
+import { getDictionary } from '@/i18n/get-dictionary';
+import { isLocale, type Locale } from '@/i18n/config';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 interface ResetPasswordPageParams {
   locale: string;
@@ -10,6 +12,16 @@ interface ResetPasswordPageParams {
 
 interface ResetPasswordPageProps {
   params: Promise<ResetPasswordPageParams>;
+}
+
+export async function generateMetadata({ params }: ResetPasswordPageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['reset-password']);
 }
 
 export default async function ResetPasswordPage({ params }: ResetPasswordPageProps) {
@@ -30,11 +42,7 @@ export default async function ResetPasswordPage({ params }: ResetPasswordPagePro
           <h1 className="text-2xl font-semibold">{copy.title}</h1>
           <p className="text-sm text-[color:var(--text-secondary)]">{copy.description}</p>
         </div>
-        <ResetPasswordForm
-          locale={locale as Locale}
-          dictionary={copy}
-          passwordStrengthDictionary={strengthCopy}
-        />
+        <ResetPasswordForm locale={locale as Locale} dictionary={copy} passwordStrengthDictionary={strengthCopy} />
       </div>
     </div>
   );

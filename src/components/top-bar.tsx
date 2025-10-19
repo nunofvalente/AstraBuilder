@@ -38,10 +38,10 @@ const PROFILE_MENU_LABELS: Record<Locale, string> = {
 };
 
 const MY_DECKS_LABELS: Record<Locale, string> = {
-  de: 'Meine Decks',
-  en: 'My Decks',
-  fr: 'Mes decks',
-  ms: 'Dek Saya',
+  de: 'Decks',
+  en: 'Decks',
+  fr: 'Decks',
+  ms: 'Decks',
 };
 
 const RESET_FLAG_STORAGE_KEY = 'astrabuilder-auth-reset';
