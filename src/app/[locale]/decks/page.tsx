@@ -33,6 +33,11 @@ export default async function DecksPage({ params }: DecksPageProps) {
       deckFeedLabels={{
         empty: deckFeed.empty,
         cardsLabel: deckFeed.cardsLabel,
+        sortOptions: {
+          popular: deckFeed.sortOptions.popular,
+          trending: deckFeed.sortOptions.trending,
+          new: deckFeed.sortOptions.new,
+        },
       }}
       myDeckLabels={{
         untitled: myDecks.untitledLabel,

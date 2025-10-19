@@ -1,10 +1,13 @@
 import { notFound } from 'next/navigation';
 
-import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
 import { getPublicAssetUrl } from '@/lib/storage/public-asset-url';
+import { getDictionary } from '@/i18n/get-dictionary';
+import { getPublicDeckSummaries } from '@/lib/supabase/decks';
+import { splitDecksForHome } from '@/lib/decks/rankings';
+import { DeckSummaryCard } from '@/components/deck-summary-card';
 
 type LocaleParams = {
   locale: string;
@@ -22,13 +25,33 @@ export default async function HomePage({ params }: LocalePageProps) {
   }
 
   const dictionary = await getDictionary(locale);
-  const { home } = dictionary;
+  const { home, myDecks, deckFeed } = dictionary;
   const bannerImageUrl = getPublicAssetUrl('images', 'banner-cropped.png');
   const bannerStyle = bannerImageUrl
     ? {
         backgroundImage: `linear-gradient(0deg, var(--banner-overlay), var(--banner-overlay)), url('${bannerImageUrl}')`,
       }
     : undefined;
+  const deckCardLabels = {
+    cards: deckFeed.cardsLabel,
+    untitled: myDecks.untitledLabel,
+    publicTag: myDecks.publicTag,
+    privateTag: myDecks.privateTag,
+  };
+
+  let popularDecks: Awaited<ReturnType<typeof getPublicDeckSummaries>>;
+  let trendingDecks: Awaited<ReturnType<typeof getPublicDeckSummaries>>;
+
+  try {
+    const decks = await getPublicDeckSummaries(24);
+    const split = splitDecksForHome(decks);
+    popularDecks = split.popular;
+    trendingDecks = split.trending;
+  } catch (error) {
+    console.error('Failed to load decks for home page', error);
+    popularDecks = [];
+    trendingDecks = [];
+  }
 
   return (
     <main className="flex w-full flex-col items-center gap-12 pb-12 text-[color:var(--text-primary)]">
@@ -71,9 +94,24 @@ export default async function HomePage({ params }: LocalePageProps) {
               </h2>
               <div className="mt-2 h-px w-full bg-[color:var(--border)]" />
             </div>
-            <div className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
-              {home.sections.popular.placeholder}
-            </div>
+            {popularDecks.length > 0 ? (
+              <div className="grid gap-4">
+                {popularDecks.map((deck) => (
+                  <DeckSummaryCard
+                    key={deck.id}
+                    locale={locale}
+                    deck={deck}
+                    detailHref={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
+                    labels={deckCardLabels}
+                    mutedMetrics
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-[8rem] items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
+                {home.sections.popular.placeholder}
+              </div>
+            )}
           </div>
           <div className="space-y-4">
             <div>
@@ -82,9 +120,24 @@ export default async function HomePage({ params }: LocalePageProps) {
               </h2>
               <div className="mt-2 h-px w-full bg-[color:var(--border)]" />
             </div>
-            <div className="flex h-32 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
-              {home.sections.trending.placeholder}
-            </div>
+            {trendingDecks.length > 0 ? (
+              <div className="grid gap-4">
+                {trendingDecks.map((deck) => (
+                  <DeckSummaryCard
+                    key={deck.id}
+                    locale={locale}
+                    deck={deck}
+                    detailHref={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
+                    labels={deckCardLabels}
+                    mutedMetrics
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-[8rem] items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
+                {home.sections.trending.placeholder}
+              </div>
+            )}
           </div>
         </section>
       </div>

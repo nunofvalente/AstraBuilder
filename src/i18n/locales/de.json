@@ -144,7 +144,12 @@
     "createdLabel": "Erstellt",
     "cardsLabel": "Karten",
     "favoritesLabel": "Favoriten",
-    "viewsLabel": "Aufrufe"
+    "viewsLabel": "Aufrufe",
+    "sortOptions": {
+      "popular": "Beliebt",
+      "trending": "Angesagt",
+      "new": "Neu"
+    }
   },
   "publicProfile": {
     "heading": "Community-Profil",

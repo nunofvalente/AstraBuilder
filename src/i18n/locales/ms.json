@@ -144,7 +144,12 @@
     "createdLabel": "Dicipta",
     "cardsLabel": "Kad",
     "favoritesLabel": "Kegemaran",
-    "viewsLabel": "Paparan"
+    "viewsLabel": "Paparan",
+    "sortOptions": {
+      "popular": "Popular",
+      "trending": "Trending",
+      "new": "Baharu"
+    }
   },
   "publicProfile": {
     "heading": "Profil komuniti",

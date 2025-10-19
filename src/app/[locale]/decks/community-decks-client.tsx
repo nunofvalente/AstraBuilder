@@ -6,8 +6,9 @@ import Image from 'next/image';
 import type { Locale } from '@/i18n/config';
 import type { PublicDeckSummary } from '@/lib/supabase/decks';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
-import { AFFINITY_FILTERS } from '@/app/[locale]/create/deck-builder/constants';
 import { normalizeAffinity } from '@/lib/cards/affinity';
+import { AFFINITY_FILTERS } from '@/app/[locale]/create/deck-builder/constants';
+import { sortDecksByOption, type DeckSortOption } from '@/lib/decks/rankings';
 
 type CommunityDecksClientProps = {
   locale: Locale;
@@ -15,6 +16,11 @@ type CommunityDecksClientProps = {
   deckFeedLabels: {
     empty: string;
     cardsLabel: string;
+    sortOptions: {
+      popular: string;
+      trending: string;
+      new: string;
+    };
   };
   myDeckLabels: {
     untitled: string;
@@ -49,6 +55,7 @@ export function CommunityDecksClient({
 }: CommunityDecksClientProps) {
   const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(() => buildInitialAffinityState());
   const [resolvedDecks, setResolvedDecks] = useState<PublicDeckSummary[]>(decks);
+  const [sortOption, setSortOption] = useState<DeckSortOption>('popular');
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -133,28 +140,39 @@ export function CommunityDecksClient({
   }, [resolvedDecks, locale]);
 
   const filteredDecks = useMemo(() => {
-    if (!enabledAffinitySet) {
-      return decksWithAuthor;
-    }
+    const decksToFilter = enabledAffinitySet
+      ? decksWithAuthor.filter((deck) => {
+          if (!deck.affinities || deck.affinities.length === 0) {
+            return enabledAffinitySet.has('Neutral');
+          }
 
-    return decksWithAuthor.filter((deck) => {
-      if (!deck.affinities || deck.affinities.length === 0) {
-        return enabledAffinitySet.has('Neutral');
-      }
+          return deck.affinities.some((affinity) => {
+            const normalized = normalizeAffinity(affinity);
+            if (!normalized) {
+              return enabledAffinitySet.has('Neutral');
+            }
+            return enabledAffinitySet.has(normalized);
+          });
+        })
+      : decksWithAuthor;
 
-      return deck.affinities.some((affinity) => {
-        const normalized = normalizeAffinity(affinity);
-        if (!normalized) {
-          return enabledAffinitySet.has('Neutral');
-        }
-        return enabledAffinitySet.has(normalized);
-      });
-    });
-  }, [decksWithAuthor, enabledAffinitySet]);
+    return sortDecksByOption(decksToFilter, sortOption);
+  }, [decksWithAuthor, enabledAffinitySet, sortOption]);
+
+  const sortOptions = useMemo(
+    () => [
+      { value: 'popular' as DeckSortOption, label: deckFeedLabels.sortOptions.popular },
+      { value: 'trending' as DeckSortOption, label: deckFeedLabels.sortOptions.trending },
+      { value: 'new' as DeckSortOption, label: deckFeedLabels.sortOptions.new },
+    ],
+    [deckFeedLabels.sortOptions]
+  );
+  const activeSortIndex = sortOptions.findIndex((option) => option.value === sortOption);
+  const indicatorIndex = activeSortIndex >= 0 ? activeSortIndex : 0;
 
   return (
     <div className="flex w-full flex-col gap-8 px-4 py-10 text-[color:var(--text-primary)] sm:px-6 lg:px-10 xl:px-16">
-      <div className="flex items-center justify-start">
+      <div className="flex w-full flex-wrap items-center gap-4">
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 shadow-sm">
           {AFFINITY_FILTERS.map((filter) => {
             const isEnabled = activeAffinities[filter.value] ?? true;
@@ -179,6 +197,36 @@ export function CommunityDecksClient({
             );
           })}
         </div>
+        <div className="flex justify-center sm:ml-auto">
+          <div className="relative flex w-full min-w-[16rem] max-w-sm overflow-hidden rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 shadow-sm sm:min-w-[20rem] sm:max-w-md lg:min-w-[24rem] lg:max-w-lg">
+            <span
+              className="pointer-events-none absolute inset-y-1 left-1 rounded-full bg-[color:var(--accent)]/15 transition-transform duration-200 ease-out"
+              style={{
+                width: `${100 / sortOptions.length}%`,
+                transform: `translateX(${indicatorIndex * 100}%)`,
+              }}
+            />
+            {sortOptions.map((option) => {
+              const isActive = sortOption === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSortOption(option.value)}
+                  className={`relative z-10 flex-1 px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                    isActive
+                      ? 'text-[color:var(--accent)]'
+                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--accent)]'
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="hidden flex-1 sm:flex" aria-hidden="true" />
       </div>
 
       {filteredDecks.length === 0 ? (
