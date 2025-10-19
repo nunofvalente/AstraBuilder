@@ -27,6 +27,7 @@ type CommunityDecksClientProps = {
     publicTag: string;
     privateTag: string;
   };
+  showAffinityFilters?: boolean;
 };
 
 type DeckStatsOverride = {
@@ -52,6 +53,7 @@ export function CommunityDecksClient({
   decks,
   deckFeedLabels,
   myDeckLabels,
+  showAffinityFilters = true,
 }: CommunityDecksClientProps) {
   const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(() => buildInitialAffinityState());
   const [resolvedDecks, setResolvedDecks] = useState<PublicDeckSummary[]>(decks);
@@ -114,12 +116,15 @@ export function CommunityDecksClient({
   }, []);
 
   const enabledAffinitySet = useMemo(() => {
+    if (!showAffinityFilters) {
+      return null;
+    }
     const enabled = AFFINITY_FILTERS.filter((filter) => activeAffinities[filter.value] ?? true);
     if (enabled.length === AFFINITY_FILTERS.length) {
       return null;
     }
     return new Set(enabled.map((filter) => filter.value));
-  }, [activeAffinities]);
+  }, [activeAffinities, showAffinityFilters]);
 
   const decksWithAuthor = useMemo<DeckWithAuthor[]>(() => {
     return resolvedDecks.map((deck) => {
@@ -178,31 +183,33 @@ export function CommunityDecksClient({
   return (
     <div className="flex w-full flex-col gap-8 px-4 py-10 text-[color:var(--text-primary)] sm:px-6 lg:px-10 xl:px-16">
       <div className="flex w-full flex-wrap items-center gap-4">
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 shadow-sm">
-          {AFFINITY_FILTERS.map((filter) => {
-            const isEnabled = activeAffinities[filter.value] ?? true;
-            const iconSrc = isEnabled ? filter.filledIcon : filter.disabledIcon;
+        {showAffinityFilters ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 shadow-sm">
+            {AFFINITY_FILTERS.map((filter) => {
+              const isEnabled = activeAffinities[filter.value] ?? true;
+              const iconSrc = isEnabled ? filter.filledIcon : filter.disabledIcon;
 
-            return (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => toggleAffinity(filter.value)}
-                className={`flex h-12 w-12 items-center justify-center rounded-lg border transition-transform duration-150 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] hover:-translate-y-1 hover:shadow-lg ${
-                  isEnabled
-                    ? 'border-[color:var(--accent)]/50 bg-[color:var(--surface)]'
-                    : 'border-transparent bg-[color:var(--surface-muted)]/60'
-                }`}
-                aria-pressed={isEnabled}
-                title={filter.label}
-              >
-                <Image src={iconSrc} alt={`${filter.label} icon`} width={36} height={36} className="h-9 w-9 select-none" />
-                <span className="sr-only">{filter.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex justify-center sm:ml-auto">
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => toggleAffinity(filter.value)}
+                  className={`flex h-12 w-12 items-center justify-center rounded-lg border transition-transform duration-150 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] hover:-translate-y-1 hover:shadow-lg ${
+                    isEnabled
+                      ? 'border-[color:var(--accent)]/50 bg-[color:var(--surface)]'
+                      : 'border-transparent bg-[color:var(--surface-muted)]/60'
+                  }`}
+                  aria-pressed={isEnabled}
+                  title={filter.label}
+                >
+                  <Image src={iconSrc} alt={`${filter.label} icon`} width={36} height={36} className="h-9 w-9 select-none" />
+                  <span className="sr-only">{filter.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        <div className={`flex justify-center ${showAffinityFilters ? 'sm:ml-auto' : 'ml-auto'}`}>
           <div className="relative flex w-full min-w-[16rem] max-w-sm overflow-hidden rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 shadow-sm sm:min-w-[20rem] sm:max-w-md lg:min-w-[24rem] lg:max-w-lg">
             <span
               className="pointer-events-none absolute inset-y-1 rounded-full bg-[color:var(--accent)]/15 transition-all duration-200 ease-out"

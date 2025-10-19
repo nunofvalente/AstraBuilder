@@ -1,3 +1,5 @@
+import Image from 'next/image';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { isLocale } from '@/i18n/config';
@@ -6,8 +8,18 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { getPublicAssetUrl } from '@/lib/storage/public-asset-url';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { getPublicDeckSummaries } from '@/lib/supabase/decks';
-import { splitDecksForHome } from '@/lib/decks/rankings';
+import { sortDecksByTrending } from '@/lib/decks/rankings';
+import { getAffinityIconPath } from '@/lib/cards/affinity';
+import {
+  buildAffinityPairingStats,
+  isUnknownPairing,
+  type AffinityPairingStat,
+} from '@/lib/decks/affinity-pairings';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
+
+const HOME_DECK_SAMPLE_LIMIT = 24;
+const HOME_TRENDING_LIMIT = 4;
+const HOME_AFFINITY_PAIRING_LIMIT = 6;
 
 type LocaleParams = {
   locale: string;
@@ -39,19 +51,20 @@ export default async function HomePage({ params }: LocalePageProps) {
     privateTag: myDecks.privateTag,
   };
 
-  let popularDecks: Awaited<ReturnType<typeof getPublicDeckSummaries>>;
+  let affinityPairings: AffinityPairingStat[] = [];
   let trendingDecks: Awaited<ReturnType<typeof getPublicDeckSummaries>>;
 
   try {
-    const decks = await getPublicDeckSummaries(24);
-    const split = splitDecksForHome(decks);
-    popularDecks = split.popular;
-    trendingDecks = split.trending;
+    const decks = await getPublicDeckSummaries(HOME_DECK_SAMPLE_LIMIT);
+    affinityPairings = buildAffinityPairingStats(decks).slice(0, HOME_AFFINITY_PAIRING_LIMIT);
+    trendingDecks = sortDecksByTrending(decks).slice(0, HOME_TRENDING_LIMIT);
   } catch (error) {
     console.error('Failed to load decks for home page', error);
-    popularDecks = [];
     trendingDecks = [];
   }
+
+  const numberFormatter = new Intl.NumberFormat(locale);
+  const maxPairingCount = affinityPairings.reduce((max, entry) => (entry.count > max ? entry.count : max), 0);
 
   return (
     <main className="flex w-full flex-col items-center gap-12 pb-12 text-[color:var(--text-primary)]">
@@ -90,26 +103,86 @@ export default async function HomePage({ params }: LocalePageProps) {
           <div className="space-y-4">
             <div>
               <h2 className="text-xl font-semibold">
-                {home.sections.popular.title}
+                {home.sections.affinityPairings.title}
               </h2>
               <div className="mt-2 h-px w-full bg-[color:var(--border)]" />
             </div>
-            {popularDecks.length > 0 ? (
-              <div className="grid gap-4">
-                {popularDecks.map((deck) => (
-                  <DeckSummaryCard
-                    key={deck.id}
-                    locale={locale}
-                    deck={deck}
-                    detailHref={`/${locale}/decks/${encodeURIComponent(deck.id)}`}
-                    labels={deckCardLabels}
-                    mutedMetrics
-                  />
-                ))}
+            {affinityPairings.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {affinityPairings.map((pairing) => {
+                  const pairingLabel = pairing.isUnknown ? home.sections.affinityPairings.unknownLabel : pairing.label;
+                  const ratio = maxPairingCount > 0 ? (pairing.count / maxPairingCount) * 100 : 0;
+                  const progressWidth = ratio > 0 ? Math.max(8, Math.min(100, ratio)) : 0;
+                  const countLabel =
+                    pairing.count === 1 ? home.sections.affinityPairings.deckLabel : home.sections.affinityPairings.decksLabel;
+
+                  const card = (
+                    <div className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm transition hover:shadow-md">
+                      <div className="flex items-center justify-between gap-4 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {pairing.affinities.length > 0 ? (
+                            <span className="flex items-center gap-2">
+                              {pairing.affinities.map((affinity) => {
+                                const iconSrc = getAffinityIconPath(affinity);
+                                if (!iconSrc) {
+                                  return null;
+                                }
+                                return (
+                                  <Image
+                                    key={`${pairing.slug}-${affinity}`}
+                                    src={iconSrc}
+                                    alt={`${affinity} icon`}
+                                    width={24}
+                                    height={24}
+                                    className="h-6 w-6"
+                                  />
+                                );
+                              })}
+                            </span>
+                          ) : null}
+                          <span className="text-sm font-medium text-[color:var(--text-secondary)]">{pairingLabel}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="block text-xl font-semibold text-[color:var(--text-primary)]">
+                            {numberFormatter.format(pairing.count)}
+                          </span>
+                          <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                            {countLabel}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-1 w-full bg-[color:var(--surface-muted)]/50">
+                        <div className="h-full bg-[color:var(--accent)]" style={{ width: `${progressWidth.toFixed(2)}%` }} />
+                      </div>
+                    </div>
+                  );
+
+                  const slug = pairing.slug;
+                  const isUnknown = pairing.isUnknown || isUnknownPairing(slug);
+                  const href = !isUnknown && slug ? `/${locale}/affinity/${slug}` : null;
+
+                  if (!href) {
+                    return (
+                      <div key={slug} className="cursor-default">
+                        {card}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={slug}
+                      href={href}
+                      className="group focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface)]"
+                    >
+                      {card}
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="flex min-h-[8rem] items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-6 text-center text-sm text-[color:var(--text-secondary)]">
-                {home.sections.popular.placeholder}
+                {home.sections.affinityPairings.placeholder}
               </div>
             )}
           </div>

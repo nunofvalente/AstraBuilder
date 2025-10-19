@@ -6,9 +6,12 @@
       "highlight": "Echoes of Astra"
     },
     "sections": {
-      "popular": {
-        "title": "Popular Decks",
-        "placeholder": "Popular decks will appear here soon."
+      "affinityPairings": {
+        "title": "Decks by Affinity Pairing",
+        "placeholder": "Affinity pairings will appear here soon.",
+        "deckLabel": "deck",
+        "decksLabel": "decks",
+        "unknownLabel": "Unknown pairing"
       },
       "trending": {
         "title": "Trending Decks",
@@ -19,6 +22,11 @@
       "browse": "Browse all decks",
       "create": "Create a deck"
     }
+  },
+  "affinityPage": {
+    "resultsHeading": "Decks using {pairing}",
+    "empty": "No decks match this affinity pairing yet.",
+    "backLink": "Back to decks"
   },
   "builder": {
     "comingSoon": "Deck builder coming soon. Check back soon to start building decks.",
