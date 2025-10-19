@@ -28,7 +28,7 @@ function getTrendingScore(deck: PublicDeckSummary): number {
   return (favorites * FAVORITES_WEIGHT + views) / decay;
 }
 
-export function sortDecksByPopularity(decks: PublicDeckSummary[]): PublicDeckSummary[] {
+export function sortDecksByPopularity<T extends PublicDeckSummary>(decks: T[]): T[] {
   return [...decks].sort((a, b) => {
     const favoritesDiff = Number(b.favoritesTotal ?? 0) - Number(a.favoritesTotal ?? 0);
     if (favoritesDiff !== 0) {
@@ -46,7 +46,7 @@ export function sortDecksByPopularity(decks: PublicDeckSummary[]): PublicDeckSum
   });
 }
 
-export function sortDecksByTrending(decks: PublicDeckSummary[]): PublicDeckSummary[] {
+export function sortDecksByTrending<T extends PublicDeckSummary>(decks: T[]): T[] {
   return [...decks].sort((a, b) => {
     const scoreDiff = getTrendingScore(b) - getTrendingScore(a);
     if (scoreDiff !== 0) {
@@ -57,7 +57,7 @@ export function sortDecksByTrending(decks: PublicDeckSummary[]): PublicDeckSumma
   });
 }
 
-export function sortDecksByNewest(decks: PublicDeckSummary[]): PublicDeckSummary[] {
+export function sortDecksByNewest<T extends PublicDeckSummary>(decks: T[]): T[] {
   return [...decks].sort((a, b) => {
     const aCreated = a.createdAt ? Date.parse(a.createdAt) : 0;
     const bCreated = b.createdAt ? Date.parse(b.createdAt) : 0;
@@ -88,7 +88,7 @@ export function splitDecksForHome(
 
 export type DeckSortOption = 'popular' | 'trending' | 'new';
 
-export function sortDecksByOption(decks: PublicDeckSummary[], option: DeckSortOption): PublicDeckSummary[] {
+export function sortDecksByOption<T extends PublicDeckSummary>(decks: T[], option: DeckSortOption): T[] {
   switch (option) {
     case 'trending':
       return sortDecksByTrending(decks);
