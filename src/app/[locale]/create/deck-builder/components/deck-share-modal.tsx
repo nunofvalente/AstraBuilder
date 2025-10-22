@@ -357,24 +357,32 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
       <div className="pointer-events-none fixed -left-[9999px] top-0">
         <div
           ref={sharePreviewRef}
-          className="overflow-hidden rounded-[32px] border border-black/15 bg-[#020617] text-white shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
+          className="overflow-hidden rounded-[32px] border border-black/15 shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
           style={{
             width: `${shareLayout.width}px`,
             height: `${shareLayout.height}px`,
             fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            backgroundColor: '#111827',
           }}
         >
-          <div
-            className="h-full w-full"
-            style={{
-              padding: `${shareLayout.paddingY}px ${shareLayout.paddingX}px`,
-            }}
-          >
-            <ul
-              className="grid"
+          <div className="flex h-full w-full flex-col">
+            <header className="flex items-center justify-between px-8 py-5" style={{ color: '#e2e8f0' }}>
+              <span className="text-xs font-semibold uppercase tracking-[0.26em]">AstraBuilder</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em]">
+                {labels.totalCardsLabel}: {totalCards}
+              </span>
+            </header>
+            <div
+              className="flex-1"
               style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${shareLayout.columns}, ${shareLayout.cardWidth}px)`,
+                padding: `${shareLayout.paddingY}px ${shareLayout.paddingX}px`,
+              }}
+            >
+              <ul
+                className="grid"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${shareLayout.columns}, ${shareLayout.cardWidth}px)`,
                 gap: `${shareLayout.gap}px`,
                 justifyContent: 'center',
                 alignContent: 'start',
@@ -408,10 +416,12 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
                       </div>
                     )}
                     <span
-                      className="absolute right-2 top-2 rounded-full px-2.5 py-[2px] text-[11px] font-semibold leading-none text-white shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
+                      className="absolute left-1/2 flex -translate-x-1/2 items-center justify-center rounded-full px-2 py-[2px] text-[9px] font-semibold uppercase tracking-[0.16em] shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
                       style={{
-                        backgroundColor: scheme.chipBackground,
-                        color: scheme.chipTextColor,
+                        bottom: '4px',
+                        backgroundColor: 'var(--accent)',
+                        color: 'var(--text-on-accent)',
+                        border: '1px solid rgba(0,0,0,0.25)',
                       }}
                     >
                       x{count}
@@ -420,6 +430,7 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
                 );
               })}
             </ul>
+            </div>
           </div>
         </div>
       </div>
