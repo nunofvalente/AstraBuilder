@@ -10,6 +10,7 @@ type DeckShareModalProps = {
   onClose: () => void;
   deckEntries: DeckEntry[];
   totalCards: number;
+  deckTitle?: string | null;
   labels: {
     deckHeading: string;
     totalCardsLabel: string;
@@ -24,7 +25,14 @@ type DeckShareModalProps = {
   };
 };
 
-export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, labels }: DeckShareModalProps) {
+export function DeckShareModal({
+  isOpen,
+  onClose,
+  deckEntries,
+  totalCards,
+  deckTitle,
+  labels,
+}: DeckShareModalProps) {
   const sharePreviewRef = useRef<HTMLDivElement | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
@@ -38,7 +46,7 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
       return [];
     }
 
-    const order = ['Unit', 'Renowned Unit', 'Item', 'Territory'];
+    const order = ['Unit', 'Item', 'Tactic', 'Territory'];
 
     const getPriority = (type: string) => {
       const normalized = type.trim().toLowerCase();
@@ -48,13 +56,16 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
       }
 
       if (normalized.includes('renowned') && normalized.includes('unit')) {
-        return order.findIndex((value) => value === 'Renowned Unit');
+        return order.findIndex((value) => value === 'Unit');
       }
       if (normalized.includes('unit')) {
         return order.findIndex((value) => value === 'Unit');
       }
       if (normalized.includes('item')) {
         return order.findIndex((value) => value === 'Item');
+      }
+      if (normalized.includes('tactic')) {
+        return order.findIndex((value) => value === 'Tactic');
       }
       if (normalized.includes('territory')) {
         return order.findIndex((value) => value === 'Territory');
@@ -94,18 +105,23 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
     const total = shareCards.length;
     const CANVAS_WIDTH = 1200;
     const CANVAS_HEIGHT = 900;
+    const HEADER_HEIGHT = 72;
     const PADDING_X = 32;
     const PADDING_Y = 32;
     const GAP = 16;
     const CARD_HEIGHT_RATIO = 4 / 3;
 
     if (total === 0) {
+      const availableHeight = Math.max(
+        CANVAS_HEIGHT - HEADER_HEIGHT - PADDING_Y * 2,
+        CARD_HEIGHT_RATIO
+      );
       const cardWidth = CANVAS_WIDTH - PADDING_X * 2;
       return {
         columns: 1,
         rows: 0,
         cardWidth,
-        cardHeight: cardWidth * CARD_HEIGHT_RATIO,
+        cardHeight: Math.min(cardWidth * CARD_HEIGHT_RATIO, availableHeight),
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         paddingX: PADDING_X,
@@ -113,6 +129,11 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
         gap: GAP,
       };
     }
+
+    const contentHeight = Math.max(
+      CANVAS_HEIGHT - HEADER_HEIGHT - PADDING_Y * 2,
+      GAP + CARD_HEIGHT_RATIO
+    );
 
     const maxColumns = Math.min(total, 12);
     let bestWidth = 0;
@@ -122,7 +143,7 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
     for (let columns = 1; columns <= maxColumns; columns++) {
       const rows = Math.ceil(total / columns);
       const maxWidthPerCard = (CANVAS_WIDTH - PADDING_X * 2 - GAP * (columns - 1)) / columns;
-      const maxHeightPerCard = (CANVAS_HEIGHT - PADDING_Y * 2 - GAP * (rows - 1)) / rows;
+      const maxHeightPerCard = (contentHeight - GAP * (rows - 1)) / rows;
       if (maxWidthPerCard <= 0 || maxHeightPerCard <= 0) {
         continue;
       }
@@ -143,11 +164,17 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
       const fallbackRows = Math.ceil(total / fallbackColumns);
       const fallbackWidth =
         (CANVAS_WIDTH - PADDING_X * 2 - GAP * (fallbackColumns - 1)) / fallbackColumns;
+      const fallbackHeightPerCard =
+        (contentHeight - GAP * (fallbackRows - 1)) / fallbackRows;
+      const fallbackCardWidth = Math.max(
+        Math.min(fallbackWidth, fallbackHeightPerCard / CARD_HEIGHT_RATIO),
+        0
+      );
       return {
         columns: fallbackColumns,
         rows: fallbackRows,
-        cardWidth: fallbackWidth,
-        cardHeight: fallbackWidth * CARD_HEIGHT_RATIO,
+        cardWidth: fallbackCardWidth,
+        cardHeight: fallbackCardWidth * CARD_HEIGHT_RATIO,
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         paddingX: PADDING_X,
@@ -156,11 +183,12 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
       };
     }
 
+    const bestHeightPerCard = (contentHeight - GAP * (bestRows - 1)) / bestRows;
     return {
       columns: bestColumns,
       rows: bestRows,
       cardWidth: bestWidth,
-      cardHeight: bestWidth * CARD_HEIGHT_RATIO,
+      cardHeight: Math.min(bestWidth * CARD_HEIGHT_RATIO, bestHeightPerCard),
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
       paddingX: PADDING_X,
@@ -230,7 +258,6 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
           pixelRatio: 2,
           cacheBust: true,
           backgroundColor,
-          useCors: true,
         });
 
         if (!cancelled) {
@@ -366,8 +393,23 @@ export function DeckShareModal({ isOpen, onClose, deckEntries, totalCards, label
           }}
         >
           <div className="flex h-full w-full flex-col">
-            <header className="flex items-center justify-between px-8 py-5" style={{ color: '#e2e8f0' }}>
+            <header
+              className="flex items-center justify-between px-8 py-5"
+              style={{
+                color: '#e2e8f0',
+                backgroundColor: '#2b2927',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
               <span className="text-xs font-semibold uppercase tracking-[0.26em]">AstraBuilder</span>
+              {deckTitle ? (
+                <span
+                  className="mx-6 flex-1 truncate text-center text-xs font-semibold uppercase tracking-[0.18em]"
+                  style={{ color: '#f4f4f5' }}
+                >
+                  {deckTitle}
+                </span>
+              ) : null}
               <span className="text-xs font-semibold uppercase tracking-[0.18em]">
                 {labels.totalCardsLabel}: {totalCards}
               </span>
