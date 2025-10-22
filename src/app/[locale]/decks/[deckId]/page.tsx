@@ -49,6 +49,18 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
       deckId={deckId}
       labels={{ deckDetails: dictionary.deckDetails, myDecks: dictionary.myDecks, publicProfile: dictionary.publicProfile }}
       emptyDeckLabel={dictionary.builder.emptyDeck}
+      shareLabels={{
+        deckHeading: dictionary.builder.deckHeading,
+        totalCardsLabel: dictionary.builder.totalCardsLabel,
+        shareButton: dictionary.builder.shareButton,
+        shareGenerating: dictionary.builder.shareGenerating,
+        shareDownload: dictionary.builder.shareDownload,
+        shareCopy: dictionary.builder.shareCopy,
+        shareCopySuccess: dictionary.builder.shareCopySuccess,
+        shareCopyError: dictionary.builder.shareCopyError,
+        shareEmpty: dictionary.builder.shareEmpty,
+        shareError: dictionary.builder.shareError,
+      }}
       initialSummary={initialSummary ?? undefined}
     />
   );
