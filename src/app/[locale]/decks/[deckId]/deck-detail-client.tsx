@@ -9,13 +9,14 @@ import type { Locale } from '@/i18n/config';
 import type { Card, CardRow, DeckEntry } from '@/app/[locale]/create/deck-builder/types';
 import { normaliseCard } from '@/app/[locale]/create/deck-builder/utils';
 import { DeckCardChip } from '@/app/[locale]/create/deck-builder/components/deck-card-chip';
+import { DeckShareModal } from '@/app/[locale]/create/deck-builder/components/deck-share-modal';
 import { ZoomOverlay } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import type { ZoomAnchor } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import type { PublicDeckSummary } from '@/lib/supabase/decks';
 import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 
-const CARD_TYPE_ORDER = ['Unit', 'Tactic', 'Territory'];
+const CARD_TYPE_ORDER = ['Unit', 'Renowned Unit', 'Tactic', 'Territory'];
 const FALLBACK_SECTION_LABEL = 'Other';
 
 function ensureHttps(url: string | null | undefined): string | null {
@@ -114,6 +115,18 @@ type DeckDetailsClientProps = {
   };
   emptyDeckLabel: string;
   initialSummary?: Pick<PublicDeckSummary, 'authorId' | 'authorName'>;
+  shareLabels: {
+    deckHeading: string;
+    totalCardsLabel: string;
+    shareButton: string;
+    shareGenerating: string;
+    shareDownload: string;
+    shareCopy: string;
+    shareCopySuccess: string;
+    shareCopyError: string;
+    shareEmpty: string;
+    shareError: string;
+  };
 };
 
 type Section = {
@@ -159,7 +172,14 @@ function persistDeckStatsOverride(deckId: string, updates: DeckStatsOverride) {
   }
 }
 
-export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initialSummary }: DeckDetailsClientProps) {
+export function DeckDetailClient({
+  locale,
+  deckId,
+  labels,
+  emptyDeckLabel,
+  initialSummary,
+  shareLabels,
+}: DeckDetailsClientProps) {
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
   const [zoomAnchor, setZoomAnchor] = useState<ZoomAnchor | null>(null);
@@ -184,6 +204,7 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initi
   const [isFavoriteLoaded, setIsFavoriteLoaded] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [favoriteErrorMessage, setFavoriteErrorMessage] = useState<string | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const hasLoggedViewRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -477,7 +498,11 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initi
 
     for (const entry of deckEntries) {
       const rawType = entry.card.type?.trim();
-      const label = rawType && rawType.length > 0 ? rawType : FALLBACK_SECTION_LABEL;
+      let label = rawType && rawType.length > 0 ? rawType : FALLBACK_SECTION_LABEL;
+      const normalizedLabel = label.toLowerCase();
+      if (normalizedLabel.includes('renowned') && normalizedLabel.includes('unit')) {
+        label = 'Unit';
+      }
       const key = label.toLowerCase();
       const existing = groups.get(key);
       if (existing) {
@@ -493,11 +518,26 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initi
     };
 
     return Array.from(groups.values())
-      .map(({ label, entries }) => ({
-        label,
-        entries,
-        total: entries.reduce((sum, item) => sum + item.count, 0),
-      }))
+      .map(({ label, entries }) => {
+        const sortedEntries = [...entries].sort((a, b) => {
+          const aCost = Number.isFinite(a.card.cost) ? a.card.cost : Number.POSITIVE_INFINITY;
+          const bCost = Number.isFinite(b.card.cost) ? b.card.cost : Number.POSITIVE_INFINITY;
+          if (aCost !== bCost) {
+            return aCost - bCost;
+          }
+          const aNumber = a.card.number ?? Number.POSITIVE_INFINITY;
+          const bNumber = b.card.number ?? Number.POSITIVE_INFINITY;
+          if (aNumber !== bNumber) {
+            return aNumber - bNumber;
+          }
+          return a.card.name.localeCompare(b.card.name);
+        });
+        return {
+          label,
+          entries: sortedEntries,
+          total: sortedEntries.reduce((sum, item) => sum + item.count, 0),
+        };
+      })
       .sort((a, b) => {
         const priorityDiff = getPriority(a.label) - getPriority(b.label);
         if (priorityDiff !== 0) {
@@ -741,6 +781,32 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initi
           <div className="flex items-center gap-3">
             <button
               type="button"
+              onClick={() => setIsShareModalOpen(true)}
+              disabled={deckEntries.length === 0}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-secondary)] shadow-sm transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+              title={shareLabels.shareButton}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M6 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                <path d="M18 20a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                <path d="M18 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                <path d="M7.5 9.5 16.5 6.5" />
+                <path d="M7.5 12.5 16.5 15.5" />
+              </svg>
+              <span className="sr-only">{shareLabels.shareButton}</span>
+            </button>
+            <button
+              type="button"
               onClick={() => void handleFavoriteToggle()}
               aria-pressed={isFavorite}
               disabled={isFavoriteButtonDisabled}
@@ -765,8 +831,28 @@ export function DeckDetailClient({ locale, deckId, labels, emptyDeckLabel, initi
             >
               {labels.myDecks.openButton}
             </Link>
-          </div>
         </div>
+      </div>
+
+      <DeckShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        deckEntries={deckEntries}
+        totalCards={totalCards}
+        deckTitle={title}
+        labels={{
+          deckHeading: shareLabels.deckHeading,
+          totalCardsLabel: shareLabels.totalCardsLabel,
+          shareButton: shareLabels.shareButton,
+          shareGenerating: shareLabels.shareGenerating,
+          shareDownload: shareLabels.shareDownload,
+          shareCopy: shareLabels.shareCopy,
+          shareCopySuccess: shareLabels.shareCopySuccess,
+          shareCopyError: shareLabels.shareCopyError,
+          shareEmpty: shareLabels.shareEmpty,
+          shareError: shareLabels.shareError,
+        }}
+      />
         {favoriteSupportMessage ? (
           <p className={`${favoriteSupportClassName} text-right`}>{favoriteSupportMessage}</p>
         ) : null}
