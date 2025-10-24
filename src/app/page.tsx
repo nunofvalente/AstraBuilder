@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 import { DEFAULT_LOCALE } from "@/i18n/config";
 
 export default function IndexPage() {
-  redirect(`/${DEFAULT_LOCALE}`);
+  permanentRedirect(`/${DEFAULT_LOCALE}`);
 }
