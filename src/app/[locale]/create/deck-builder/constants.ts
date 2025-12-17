@@ -160,5 +160,6 @@ export const AFFINITY_SORT_ORDER = [
   'Terra',
 ];
 
+// Keep sizes close to the real grid column widths so Next.js picks sharp assets, especially on portrait/vertical screens.
 export const CARD_IMAGE_SIZES =
-  '(min-width: 1600px) 12vw, (min-width: 1280px) 14vw, (min-width: 1024px) 20vw, (min-width: 640px) 40vw, 90vw';
+  '(min-width: 2200px) 14vw, (min-width: 1536px) 16vw, (min-width: 1280px) 20vw, (min-width: 1024px) 32vw, (min-width: 640px) 32vw, 48vw';

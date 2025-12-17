@@ -345,6 +345,38 @@ export async function getFavoriteDeckSummariesForUser(userId: string): Promise<D
   });
 }
 
+export async function getAllPublicDeckSummaries(batchSize = 200, maxPages = 10): Promise<PublicDeckSummary[]> {
+  const results: PublicDeckSummary[] = [];
+
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * batchSize;
+    const to = from + batchSize - 1;
+
+    const { data, error } = await supabase
+      .from('decks')
+      .select(PUBLIC_DECK_SELECT)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    results.push(...data.map((row) => mapPublicDeckRow(row as PublicDeckRow)));
+
+    if (data.length < batchSize) {
+      break;
+    }
+  }
+
+  return results;
+}
+
 export async function getPublicDeckSummaryById(deckId: string): Promise<PublicDeckSummary | null> {
   const { data, error } = await supabase
     .from('decks')

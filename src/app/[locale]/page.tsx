@@ -10,7 +10,7 @@ import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
 import { getPublicAssetUrl } from '@/lib/storage/public-asset-url';
 import { getDictionary } from '@/i18n/get-dictionary';
-import { getPublicDeckSummaries } from '@/lib/supabase/decks';
+import { getAllPublicDeckSummaries } from '@/lib/supabase/decks';
 import { sortDecksByTrending } from '@/lib/decks/rankings';
 import { getAffinityIconPath } from '@/lib/cards/affinity';
 import {
@@ -21,7 +21,6 @@ import {
 import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
 
-const HOME_DECK_SAMPLE_LIMIT = 24;
 const HOME_TRENDING_LIMIT = 4;
 const HOME_AFFINITY_PAIRING_LIMIT = 6;
 
@@ -69,10 +68,11 @@ export default async function HomePage({ params }: LocalePageProps) {
   };
 
   let affinityPairings: AffinityPairingStat[] = [];
-  let trendingDecks: Awaited<ReturnType<typeof getPublicDeckSummaries>>;
+  let trendingDecks: Awaited<ReturnType<typeof getAllPublicDeckSummaries>>;
 
   try {
-    const decks = await getPublicDeckSummaries(HOME_DECK_SAMPLE_LIMIT);
+    // Fetch enough public decks to keep affinity pairing stats accurate; paginate in the helper to avoid stale counts.
+    const decks = await getAllPublicDeckSummaries();
     affinityPairings = buildAffinityPairingStats(decks).slice(0, HOME_AFFINITY_PAIRING_LIMIT);
     trendingDecks = sortDecksByTrending(decks).slice(0, HOME_TRENDING_LIMIT);
   } catch (error) {
@@ -81,7 +81,6 @@ export default async function HomePage({ params }: LocalePageProps) {
   }
 
   const numberFormatter = new Intl.NumberFormat(locale);
-  const maxPairingCount = affinityPairings.reduce((max, entry) => (entry.count > max ? entry.count : max), 0);
 
   return (
     <main className="flex w-full flex-col items-center gap-12 pb-12 text-[color:var(--text-primary)]">
@@ -131,8 +130,6 @@ export default async function HomePage({ params }: LocalePageProps) {
               <div className="flex flex-col gap-3">
                 {affinityPairings.map((pairing) => {
                   const pairingLabel = pairing.isUnknown ? home.sections.affinityPairings.unknownLabel : pairing.label;
-                  const ratio = maxPairingCount > 0 ? (pairing.count / maxPairingCount) * 100 : 0;
-                  const progressWidth = ratio > 0 ? Math.max(8, Math.min(100, ratio)) : 0;
                   const countLabel =
                     pairing.count === 1 ? home.sections.affinityPairings.deckLabel : home.sections.affinityPairings.decksLabel;
 
@@ -170,9 +167,6 @@ export default async function HomePage({ params }: LocalePageProps) {
                             {countLabel}
                           </span>
                         </div>
-                      </div>
-                      <div className="h-1 w-full bg-[color:var(--surface-muted)]/50">
-                        <div className="h-full bg-[color:var(--accent)]" style={{ width: `${progressWidth.toFixed(2)}%` }} />
                       </div>
                     </div>
                   );
