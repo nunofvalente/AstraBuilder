@@ -32,6 +32,8 @@ export function CardSearchBar({
   children,
 }: CardSearchBarProps) {
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number>(-1);
+  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const suggestionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const suggestionListId = 'card-search-suggestions';
   const hasSuggestions = suggestions.length > 0;
@@ -47,6 +49,30 @@ export function CardSearchBar({
   }, [suggestions]);
 
   useEffect(() => {
+    if (!hasSuggestions) {
+      setIsSuggestionOpen(false);
+    }
+  }, [hasSuggestions]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent | TouchEvent | PointerEvent) {
+      const root = rootRef.current;
+      if (!root) {
+        return;
+      }
+      const target = event.target as Node | null;
+      if (target && !root.contains(target)) {
+        setIsSuggestionOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, []);
+
+  useEffect(() => {
     if (activeSuggestionIndex < 0 || activeSuggestionIndex >= suggestionRefs.current.length) {
       return;
     }
@@ -59,11 +85,13 @@ export function CardSearchBar({
 
   function handleInputChange(value: string) {
     setActiveSuggestionIndex(-1);
+    setIsSuggestionOpen(true);
     onSearchTermChange(value);
   }
 
   function handleSuggestionPick(value: string) {
     setActiveSuggestionIndex(-1);
+    setIsSuggestionOpen(false);
     onSuggestionSelect(value);
   }
 
@@ -92,9 +120,10 @@ export function CardSearchBar({
     }
 
     if (event.key === 'Escape') {
-      if (activeSuggestionIndex !== -1) {
+      if (activeSuggestionIndex !== -1 || isSuggestionOpen) {
         event.preventDefault();
         setActiveSuggestionIndex(-1);
+        setIsSuggestionOpen(false);
       }
       return;
     }
@@ -112,7 +141,7 @@ export function CardSearchBar({
   }
 
   return (
-    <div className="border-b border-[color:var(--border)] px-4 py-4">
+    <div className="border-b border-[color:var(--border)] px-4 py-4" ref={rootRef}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="relative flex min-w-0 flex-1">
           <input
@@ -120,17 +149,18 @@ export function CardSearchBar({
             type="search"
             value={searchTerm}
             onChange={(event) => handleInputChange(event.target.value)}
+            onFocus={() => hasSuggestions && setIsSuggestionOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             aria-label={ariaLabel}
             role="combobox"
             aria-autocomplete="list"
-            aria-expanded={hasSuggestions}
-            aria-controls={hasSuggestions ? suggestionListId : undefined}
+            aria-expanded={hasSuggestions && isSuggestionOpen}
+            aria-controls={hasSuggestions && isSuggestionOpen ? suggestionListId : undefined}
             aria-activedescendant={activeSuggestionId}
             className="w-full border border-[color:var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
           />
-          {hasSuggestions ? (
+          {hasSuggestions && isSuggestionOpen ? (
             <ul
               id={suggestionListId}
               role="listbox"
