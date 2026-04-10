@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getAffinityColorScheme } from '../constants';
 import type { DeckEntry } from '../types';
+import { getShareRenderableImageUrl } from '@/lib/images/card-image-proxy';
 
 type DeckShareModalProps = {
   isOpen: boolean;
@@ -258,6 +259,7 @@ export function DeckShareModal({
           pixelRatio: 2,
           cacheBust: true,
           backgroundColor,
+          skipFonts: true,
         });
 
         if (!cancelled) {
@@ -388,7 +390,7 @@ export function DeckShareModal({
           style={{
             width: `${shareLayout.width}px`,
             height: `${shareLayout.height}px`,
-            fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             backgroundColor: '#111827',
           }}
         >
@@ -446,7 +448,7 @@ export function DeckShareModal({
                   >
                     {card.imageSrc ? (
                       <img
-                        src={card.imageSrc}
+                        src={getShareRenderableImageUrl(card.imageSrc)}
                         alt={card.name}
                         className="block h-full w-full object-cover"
                         crossOrigin="anonymous"

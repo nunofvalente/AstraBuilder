@@ -6,14 +6,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 import type { Locale } from '@/i18n/config';
-import type { Card, CardRow, DeckEntry } from '@/app/[locale]/create/deck-builder/types';
-import { normaliseCard } from '@/app/[locale]/create/deck-builder/utils';
+import type { Card, DeckEntry } from '@/app/[locale]/create/deck-builder/types';
 import { DeckCardChip } from '@/app/[locale]/create/deck-builder/components/deck-card-chip';
 import { DeckShareModal } from '@/app/[locale]/create/deck-builder/components/deck-share-modal';
 import { ZoomOverlay } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import type { ZoomAnchor } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import { supabase } from '@/lib/supabase/supabaseClient';
-import type { PublicDeckSummary } from '@/lib/supabase/decks';
+import type { DeckDetailData } from '@/lib/supabase/decks';
 import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 
 const CARD_TYPE_ORDER = ['Unit', 'Renowned Unit', 'Tactic', 'Territory'];
@@ -29,56 +28,10 @@ function ensureHttps(url: string | null | undefined): string | null {
   return `https://${url}`;
 }
 
-type DeckRecord = {
-  id: string;
-  title: string | null;
-  description: string | null;
-  is_public: boolean | null;
-  user_id?: string | null;
-  created_at: string | null;
-  deck_cards?: Array<{
-    quantity: number | null;
-    cards: {
-      id: string;
-      name: string | null;
-      affinity: string | null;
-      artist: string | null;
-      rarity: string | null;
-      number: number | null;
-      type: string | null;
-      subtype: string | null;
-      cost: number | null;
-      attack: number | null;
-      health: number | null;
-      influence: number | null;
-      rules_text: string | null;
-      description: string | null;
-      image_url: string | null;
-    } | null;
-  }> | null;
-  deck_stats?: Array<{
-    favorites_total?: number | null;
-    views_total?: number | null;
-  }> | null;
-  profiles?:
-    | Array<{
-        id?: string | null;
-        username?: string | null;
-        x_link?: string | null;
-        youtube_link?: string | null;
-      } | null>
-    | {
-        id?: string | null;
-        username?: string | null;
-        x_link?: string | null;
-        youtube_link?: string | null;
-      }
-    | null;
-};
-
 type DeckDetailsClientProps = {
   locale: Locale;
   deckId: string;
+  deck: DeckDetailData;
   labels: {
     deckDetails: {
       heading: string;
@@ -114,7 +67,6 @@ type DeckDetailsClientProps = {
     };
   };
   emptyDeckLabel: string;
-  initialSummary?: Pick<PublicDeckSummary, 'authorId' | 'authorName'>;
   shareLabels: {
     deckHeading: string;
     totalCardsLabel: string;
@@ -172,20 +124,34 @@ function persistDeckStatsOverride(deckId: string, updates: DeckStatsOverride) {
   }
 }
 
+function resolveDatabaseDeckId(value: string | null | undefined): string | number | null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^\d+$/.test(trimmed)) {
+    const parsed = Number(trimmed);
+    if (Number.isSafeInteger(parsed)) {
+      return parsed;
+    }
+  }
+
+  return trimmed;
+}
+
 export function DeckDetailClient({
   locale,
   deckId,
+  deck,
   labels,
   emptyDeckLabel,
-  initialSummary,
   shareLabels,
 }: DeckDetailsClientProps) {
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
   const [zoomAnchor, setZoomAnchor] = useState<ZoomAnchor | null>(null);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [deckEntries, setDeckEntries] = useState<DeckEntry[]>([]);
+  const [deckEntries, setDeckEntries] = useState<DeckEntry[]>(deck.entries);
   const [deckMeta, setDeckMeta] = useState<{
     id: string;
     title: string | null;
@@ -198,7 +164,19 @@ export function DeckDetailClient({
     authorId: string | null;
     authorXLink: string | null;
     authorYoutubeLink: string | null;
-  } | null>(null);
+  }>(() => ({
+    id: deck.id,
+    title: deck.title,
+    description: deck.description,
+    isPublic: deck.isPublic,
+    createdAt: deck.createdAt,
+    favoritesTotal: deck.favoritesTotal,
+    viewsTotal: deck.viewsTotal,
+    authorName: deck.authorName,
+    authorId: deck.authorId,
+    authorXLink: deck.authorXLink,
+    authorYoutubeLink: deck.authorYoutubeLink,
+  }));
   const [currentUserId, setCurrentUserId] = useState<string | null | undefined>(undefined);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteLoaded, setIsFavoriteLoaded] = useState(false);
@@ -213,125 +191,34 @@ export function DeckDetailClient({
   const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(redirectPath)}`;
 
   useEffect(() => {
-    let isActive = true;
+    let favoritesTotal = deck.favoritesTotal;
+    let viewsTotal = deck.viewsTotal;
 
-    async function loadDeck() {
-      setStatus('loading');
-      setErrorMessage(null);
-
-      const select =
-        'id,title,description,created_at,is_public,user_id,deck_cards(quantity,cards(*)),deck_stats(favorites_total,views_total),profiles:profiles!decks_user_id_profiles_fkey(id,username,x_link,youtube_link)';
-
-      const { data, error } = await supabase
-        .from('decks')
-        .select(select)
-        .eq('id', deckId)
-        .maybeSingle<DeckRecord>();
-
-      if (!isActive) {
-        return;
+    const override = readDeckStatsOverride(deck.id);
+    if (override) {
+      if (typeof override.favoritesTotal === 'number') {
+        favoritesTotal = Math.max(favoritesTotal, Number(override.favoritesTotal));
       }
-
-      if (error || !data) {
-        console.error('Failed to load deck detail', error);
-        const message =
-          error?.message ?? (data ? 'Deck not found' : 'Unable to fetch deck. Please check your permissions.');
-        setErrorMessage(message);
-        setStatus('error');
-        return;
+      if (typeof override.viewsTotal === 'number') {
+        viewsTotal = Math.max(viewsTotal, Number(override.viewsTotal));
       }
-
-      const deckIdValue = String(data.id);
-
-      let favoritesTotal =
-        Array.isArray(data.deck_stats) && data.deck_stats.length > 0
-          ? Number(data.deck_stats[0]?.favorites_total ?? 0)
-          : 0;
-      let viewsTotal =
-        Array.isArray(data.deck_stats) && data.deck_stats.length > 0
-          ? Number(data.deck_stats[0]?.views_total ?? 0)
-          : 0;
-
-      if (favoritesTotal === 0 && viewsTotal === 0) {
-        const { data: statsRow } = await supabase
-          .from('deck_stats')
-          .select('views_total,favorites_total')
-          .eq('deck_id', deckIdValue)
-          .maybeSingle();
-
-        if (statsRow) {
-          favoritesTotal = Math.max(favoritesTotal, Number(statsRow.favorites_total ?? 0));
-          viewsTotal = Math.max(viewsTotal, Number(statsRow.views_total ?? 0));
-        }
-      }
-
-      const override = readDeckStatsOverride(deckIdValue);
-      if (override) {
-        if (typeof override.favoritesTotal === 'number') {
-          favoritesTotal = Math.max(favoritesTotal, Number(override.favoritesTotal));
-        }
-        if (typeof override.viewsTotal === 'number') {
-          viewsTotal = Math.max(viewsTotal, Number(override.viewsTotal));
-        }
-      }
-
-      let authorName: string | null = null;
-      let authorId: string | null = data.user_id ? String(data.user_id) : null;
-      let authorXLink: string | null = null;
-      let authorYoutubeLink: string | null = null;
-      const profileRelation = data.profiles;
-      if (Array.isArray(profileRelation) && profileRelation.length > 0) {
-        authorName = profileRelation[0]?.username ?? null;
-        authorId = profileRelation[0]?.id ?? authorId;
-        authorXLink = profileRelation[0]?.x_link ?? null;
-        authorYoutubeLink = profileRelation[0]?.youtube_link ?? null;
-      } else if (profileRelation && profileRelation !== null && typeof profileRelation === 'object') {
-        const profileObject = profileRelation as {
-          id?: string | null;
-          username?: string | null;
-          x_link?: string | null;
-          youtube_link?: string | null;
-        };
-        authorName = profileObject.username ?? null;
-        authorId = profileObject.id ?? authorId;
-        authorXLink = profileObject.x_link ?? null;
-        authorYoutubeLink = profileObject.youtube_link ?? null;
-      }
-
-      const entries: DeckEntry[] = Array.isArray(data.deck_cards)
-        ? data.deck_cards
-            .filter((entry): entry is { quantity: number | null; cards: NonNullable<typeof entry.cards> } =>
-              Boolean(entry.cards)
-            )
-            .map((entry, index) => ({
-              card: normaliseCard(entry.cards as CardRow, index),
-              count: Math.max(0, Number(entry.quantity ?? 0)),
-            }))
-        : [];
-
-      setDeckMeta({
-        id: deckIdValue,
-        title: data.title ?? null,
-        description: data.description ?? null,
-        isPublic: Boolean(data.is_public),
-        createdAt: data.created_at ?? null,
-        favoritesTotal,
-        viewsTotal,
-        authorName: authorName ?? initialSummary?.authorName ?? null,
-        authorId: authorId ?? initialSummary?.authorId ?? null,
-        authorXLink,
-        authorYoutubeLink,
-      });
-      setDeckEntries(entries);
-      setStatus('ready');
     }
 
-    void loadDeck();
-
-    return () => {
-      isActive = false;
-    };
-  }, [deckId]);
+    setDeckEntries(deck.entries);
+    setDeckMeta({
+      id: deck.id,
+      title: deck.title,
+      description: deck.description,
+      isPublic: deck.isPublic,
+      createdAt: deck.createdAt,
+      favoritesTotal,
+      viewsTotal,
+      authorName: deck.authorName,
+      authorId: deck.authorId,
+      authorXLink: deck.authorXLink,
+      authorYoutubeLink: deck.authorYoutubeLink,
+    });
+  }, [deck]);
 
   useEffect(() => {
     if (!deckMeta?.id) {
@@ -400,6 +287,14 @@ export function DeckDetailClient({
       return;
     }
 
+    const databaseDeckId = resolveDatabaseDeckId(deckIdValue);
+    if (databaseDeckId === null) {
+      setIsFavorite(false);
+      setIsFavoriteLoaded(true);
+      setFavoriteErrorMessage(labels.deckDetails.favoriteError);
+      return;
+    }
+
     let isActive = true;
     setIsFavoriteLoaded(false);
 
@@ -408,7 +303,7 @@ export function DeckDetailClient({
         const { data, error, status } = await supabase
           .from('deck_favorite_events')
           .select('deck_id')
-          .eq('deck_id', deckIdValue)
+          .eq('deck_id', databaseDeckId)
           .eq('user_id', currentUserId)
           .maybeSingle();
 
@@ -446,7 +341,7 @@ export function DeckDetailClient({
   }, [currentUserId, deckMeta?.id, labels.deckDetails.favoriteError]);
 
   useEffect(() => {
-    if (!deckMeta?.id || status !== 'ready' || currentUserId === undefined) {
+    if (!deckMeta?.id || currentUserId === undefined) {
       return;
     }
 
@@ -459,25 +354,55 @@ export function DeckDetailClient({
       return;
     }
 
-    hasLoggedViewRef.current = true;
-    const payload: { deck_id: string; user_id?: string } = { deck_id: deckIdValue };
-    if (currentUserId) {
-      payload.user_id = currentUserId;
+    const databaseDeckId = resolveDatabaseDeckId(deckIdValue);
+    if (databaseDeckId === null) {
+      return;
     }
+
+    hasLoggedViewRef.current = true;
 
     async function recordView() {
       try {
-        const { error } = await supabase.from('deck_view_events').insert(payload);
-        if (error) {
-          console.error('Failed to record deck view', error);
+        const headers: HeadersInit = {};
+        const { data: sessionResult } = await supabase.auth.getSession();
+        const accessToken = sessionResult.session?.access_token?.trim();
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+
+        const response = await fetch(`/api/decks/${encodeURIComponent(String(databaseDeckId))}/view`, {
+          method: 'POST',
+          headers,
+        });
+
+        const result = (await response.json().catch(() => null)) as
+          | { message?: string; counted?: boolean; viewsTotal?: number }
+          | null;
+
+        if (!response.ok) {
+          console.error('Failed to record deck view', result ?? {});
           hasLoggedViewRef.current = false;
           return;
         }
 
         setDeckMeta((previous) =>
-          previous ? { ...previous, viewsTotal: previous.viewsTotal + 1 } : previous
+          previous
+            ? {
+                ...previous,
+                viewsTotal:
+                  typeof result?.viewsTotal === 'number'
+                    ? Math.max(previous.viewsTotal, Number(result.viewsTotal))
+                    : result?.counted
+                      ? previous.viewsTotal + 1
+                      : previous.viewsTotal,
+              }
+            : previous
         );
-        persistDeckStatsOverride(deckIdValue, { viewsTotal: (deckMeta?.viewsTotal ?? 0) + 1 });
+        if (typeof result?.viewsTotal === 'number') {
+          persistDeckStatsOverride(deckIdValue, { viewsTotal: Number(result.viewsTotal) });
+        } else if (result?.counted) {
+          persistDeckStatsOverride(deckIdValue, { viewsTotal: (deckMeta?.viewsTotal ?? 0) + 1 });
+        }
       } catch (error) {
         console.error('Failed to record deck view', error);
         hasLoggedViewRef.current = false;
@@ -485,7 +410,7 @@ export function DeckDetailClient({
     }
 
     void recordView();
-  }, [currentUserId, deckMeta?.id, deckMeta?.viewsTotal, status]);
+  }, [currentUserId, deckMeta?.id, deckMeta?.viewsTotal]);
 
   const totalCards = useMemo(() => deckEntries.reduce((sum, entry) => sum + entry.count, 0), [deckEntries]);
 
@@ -587,8 +512,8 @@ export function DeckDetailClient({
     return socials.filter((entry): entry is { label: string; href: string } => Boolean(entry.href));
   }, [deckMeta?.authorXLink, deckMeta?.authorYoutubeLink, labels.publicProfile.xLabel, labels.publicProfile.youtubeLabel]);
 
-  const effectiveAuthorName = deckMeta?.authorName ?? initialSummary?.authorName ?? null;
-  const effectiveAuthorId = deckMeta?.authorId ?? initialSummary?.authorId ?? null;
+  const effectiveAuthorName = deckMeta?.authorName ?? null;
+  const effectiveAuthorId = deckMeta?.authorId ?? null;
 
   const authorDisplayName = useMemo(() => {
     const trimmedName = effectiveAuthorName?.trim();
@@ -628,11 +553,17 @@ export function DeckDetailClient({
       return;
     }
 
+    const databaseDeckId = resolveDatabaseDeckId(deckIdValue);
+    if (databaseDeckId === null) {
+      setFavoriteErrorMessage(labels.deckDetails.favoriteError);
+      return;
+    }
+
     setIsTogglingFavorite(true);
     setFavoriteErrorMessage(null);
 
     try {
-      const favoriteKey = { deck_id: deckIdValue, user_id: currentUserId };
+      const favoriteKey = { deck_id: databaseDeckId, user_id: currentUserId };
 
       if (isFavorite) {
         const { error } = await supabase.from('deck_favorite_events').delete().match(favoriteKey);
@@ -675,43 +606,8 @@ export function DeckDetailClient({
 
   const backHref = `/${locale}/decks`;
 
-  if (status === 'loading' || status === 'idle') {
-    return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-10 text-[color:var(--text-secondary)]">
-        <div className="flex h-64 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)]">
-          {labels.myDecks.loading}
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'error' || !deckMeta) {
-    return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-10 text-[color:var(--text-secondary)]">
-        <Link
-          href={backHref}
-          className="inline-flex w-fit items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4"
-            aria-hidden="true"
-          >
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-          <span>{labels.deckDetails.backButton}</span>
-        </Link>
-        <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-100">
-          {errorMessage ?? labels.myDecks.error}
-        </div>
-      </div>
-    );
+  if (!deckMeta) {
+    return null;
   }
 
   const title = deckMeta.title && deckMeta.title.trim().length > 0 ? deckMeta.title.trim() : labels.myDecks.untitledLabel;

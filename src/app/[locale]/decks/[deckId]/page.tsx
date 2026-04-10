@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
-import { getPublicDeckSummaryById } from '@/lib/supabase/decks';
+import { getDeckDetailById } from '@/lib/supabase/decks';
 import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 import { DeckDetailClient } from './deck-detail-client';
@@ -41,11 +43,19 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
   }
 
   const dictionary = await getDictionary(locale);
-  const initialSummary = await getPublicDeckSummaryById(deckId);
+  const cookieStore = await cookies();
+  const supabaseServerClient = createServerComponentClient({
+    cookies: (() => cookieStore) as unknown as typeof cookies,
+  });
+  const deck = await getDeckDetailById(deckId, supabaseServerClient);
+  if (!deck) {
+    notFound();
+  }
 
   return (
     <DeckDetailClient
       locale={locale}
+      deck={deck}
       deckId={deckId}
       labels={{ deckDetails: dictionary.deckDetails, myDecks: dictionary.myDecks, publicProfile: dictionary.publicProfile }}
       emptyDeckLabel={dictionary.builder.emptyDeck}
@@ -61,7 +71,6 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
         shareEmpty: dictionary.builder.shareEmpty,
         shareError: dictionary.builder.shareError,
       }}
-      initialSummary={initialSummary ?? undefined}
     />
   );
 }
