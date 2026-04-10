@@ -48,9 +48,6 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
     cookies: (() => cookieStore) as unknown as typeof cookies,
   });
   const deck = await getDeckDetailById(deckId, supabaseServerClient);
-  if (!deck) {
-    notFound();
-  }
 
   return (
     <DeckDetailClient

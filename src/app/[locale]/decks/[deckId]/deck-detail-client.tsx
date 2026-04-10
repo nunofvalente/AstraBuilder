@@ -31,7 +31,7 @@ function ensureHttps(url: string | null | undefined): string | null {
 type DeckDetailsClientProps = {
   locale: Locale;
   deckId: string;
-  deck: DeckDetailData;
+  deck: DeckDetailData | null;
   labels: {
     deckDetails: {
       heading: string;
@@ -92,6 +92,20 @@ type DeckStatsOverride = {
   favoritesTotal?: number;
 };
 
+type DeckMetaState = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  isPublic: boolean;
+  createdAt: string | null;
+  favoritesTotal: number;
+  viewsTotal: number;
+  authorName: string | null;
+  authorId: string | null;
+  authorXLink: string | null;
+  authorYoutubeLink: string | null;
+};
+
 function readDeckStatsOverride(deckId: string): DeckStatsOverride | null {
   if (typeof window === 'undefined') {
     return null;
@@ -124,6 +138,35 @@ function persistDeckStatsOverride(deckId: string, updates: DeckStatsOverride) {
   }
 }
 
+function buildDeckMetaState(deck: DeckDetailData): DeckMetaState {
+  let favoritesTotal = deck.favoritesTotal;
+  let viewsTotal = deck.viewsTotal;
+
+  const override = readDeckStatsOverride(deck.id);
+  if (override) {
+    if (typeof override.favoritesTotal === 'number') {
+      favoritesTotal = Math.max(favoritesTotal, Number(override.favoritesTotal));
+    }
+    if (typeof override.viewsTotal === 'number') {
+      viewsTotal = Math.max(viewsTotal, Number(override.viewsTotal));
+    }
+  }
+
+  return {
+    id: deck.id,
+    title: deck.title,
+    description: deck.description,
+    isPublic: deck.isPublic,
+    createdAt: deck.createdAt,
+    favoritesTotal,
+    viewsTotal,
+    authorName: deck.authorName,
+    authorId: deck.authorId,
+    authorXLink: deck.authorXLink,
+    authorYoutubeLink: deck.authorYoutubeLink,
+  };
+}
+
 function resolveDatabaseDeckId(value: string | null | undefined): string | number | null {
   const trimmed = value?.trim();
   if (!trimmed) {
@@ -151,32 +194,10 @@ export function DeckDetailClient({
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
   const [zoomAnchor, setZoomAnchor] = useState<ZoomAnchor | null>(null);
-  const [deckEntries, setDeckEntries] = useState<DeckEntry[]>(deck.entries);
-  const [deckMeta, setDeckMeta] = useState<{
-    id: string;
-    title: string | null;
-    description: string | null;
-    isPublic: boolean;
-    createdAt: string | null;
-    favoritesTotal: number;
-    viewsTotal: number;
-    authorName: string | null;
-    authorId: string | null;
-    authorXLink: string | null;
-    authorYoutubeLink: string | null;
-  }>(() => ({
-    id: deck.id,
-    title: deck.title,
-    description: deck.description,
-    isPublic: deck.isPublic,
-    createdAt: deck.createdAt,
-    favoritesTotal: deck.favoritesTotal,
-    viewsTotal: deck.viewsTotal,
-    authorName: deck.authorName,
-    authorId: deck.authorId,
-    authorXLink: deck.authorXLink,
-    authorYoutubeLink: deck.authorYoutubeLink,
-  }));
+  const [deckEntries, setDeckEntries] = useState<DeckEntry[]>(deck?.entries ?? []);
+  const [deckMeta, setDeckMeta] = useState<DeckMetaState | null>(() => (deck ? buildDeckMetaState(deck) : null));
+  const [isDeckLoading, setIsDeckLoading] = useState(!deck);
+  const [deckLoadError, setDeckLoadError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null | undefined>(undefined);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteLoaded, setIsFavoriteLoaded] = useState(false);
@@ -191,34 +212,80 @@ export function DeckDetailClient({
   const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(redirectPath)}`;
 
   useEffect(() => {
-    let favoritesTotal = deck.favoritesTotal;
-    let viewsTotal = deck.viewsTotal;
+    let isActive = true;
 
-    const override = readDeckStatsOverride(deck.id);
-    if (override) {
-      if (typeof override.favoritesTotal === 'number') {
-        favoritesTotal = Math.max(favoritesTotal, Number(override.favoritesTotal));
+    async function loadDeck() {
+      if (deck) {
+        if (!isActive) {
+          return;
+        }
+
+        setDeckEntries(deck.entries);
+        setDeckMeta(buildDeckMetaState(deck));
+        setDeckLoadError(null);
+        setIsDeckLoading(false);
+        return;
       }
-      if (typeof override.viewsTotal === 'number') {
-        viewsTotal = Math.max(viewsTotal, Number(override.viewsTotal));
+
+      setIsDeckLoading(true);
+      setDeckLoadError(null);
+
+      try {
+        const headers: HeadersInit = {};
+        const { data: sessionResult } = await supabase.auth.getSession();
+        const accessToken = sessionResult.session?.access_token?.trim();
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+
+        const response = await fetch(`/api/decks/${encodeURIComponent(deckId)}`, {
+          headers,
+          cache: 'no-store',
+        });
+
+        const result = (await response.json().catch(() => null)) as
+          | { deck?: DeckDetailData; message?: string }
+          | null;
+
+        if (!response.ok || !result?.deck) {
+          throw new Error(result?.message ?? labels.myDecks.error);
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        setDeckEntries(result.deck.entries);
+        setDeckMeta(buildDeckMetaState(result.deck));
+        setDeckLoadError(null);
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
+        console.error('Failed to load deck details', error);
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error !== null && 'message' in error
+              ? String((error as { message?: unknown }).message)
+              : null;
+        setDeckEntries([]);
+        setDeckMeta(null);
+        setDeckLoadError(message ?? labels.myDecks.error);
+      } finally {
+        if (isActive) {
+          setIsDeckLoading(false);
+        }
       }
     }
 
-    setDeckEntries(deck.entries);
-    setDeckMeta({
-      id: deck.id,
-      title: deck.title,
-      description: deck.description,
-      isPublic: deck.isPublic,
-      createdAt: deck.createdAt,
-      favoritesTotal,
-      viewsTotal,
-      authorName: deck.authorName,
-      authorId: deck.authorId,
-      authorXLink: deck.authorXLink,
-      authorYoutubeLink: deck.authorYoutubeLink,
-    });
-  }, [deck]);
+    void loadDeck();
+
+    return () => {
+      isActive = false;
+    };
+  }, [deck, deckId, labels.myDecks.error]);
 
   useEffect(() => {
     if (!deckMeta?.id) {
@@ -606,8 +673,62 @@ export function DeckDetailClient({
 
   const backHref = `/${locale}/decks`;
 
-  if (!deckMeta) {
-    return null;
+  if (isDeckLoading) {
+    return (
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 text-[color:var(--text-primary)]">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          <span>{labels.deckDetails.backButton}</span>
+        </Link>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm">
+          <p className="text-sm text-[color:var(--text-secondary)]">{labels.myDecks.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (deckLoadError || !deckMeta) {
+    return (
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 text-[color:var(--text-primary)]">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-2 text-sm font-medium text-[color:var(--accent)] transition hover:text-[color:var(--accent)]/80"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          <span>{labels.deckDetails.backButton}</span>
+        </Link>
+        <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-6 shadow-sm">
+          <p className="text-sm text-red-200">{deckLoadError ?? labels.myDecks.error}</p>
+        </div>
+      </div>
+    );
   }
 
   const title = deckMeta.title && deckMeta.title.trim().length > 0 ? deckMeta.title.trim() : labels.myDecks.untitledLabel;
