@@ -1,0 +1,22 @@
+export type AstraCardRecord = {
+  cardId: string;
+  setId?: string | null;
+  cardName?: string | null;
+  cardAffinity?: string | null;
+  cardType?: string | null;
+  cardSubTypes?: Array<string | null> | null;
+  renowned?: boolean | null;
+  statSupplyCost?: number | null;
+  statInfluence?: number | null;
+  statAttack?: number | null;
+  statHealth?: number | null;
+  abilityText?: string | null;
+  flavorText?: string | null;
+  artistName?: string | null;
+  keywords?: Array<string | null> | null;
+  abilityPhases?: Array<string | null> | null;
+  additionalCosts?: Array<string | null> | null;
+  cardImageUrl?: string | null;
+  cardImageLargeUrl?: string | null;
+  rarity?: string | null;
+};

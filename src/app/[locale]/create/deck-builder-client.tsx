@@ -221,7 +221,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
       try {
         const { data, error } = await supabase
           .from('deck_cards')
-          .select('card_id, quantity')
+          .select('*')
           .eq('deck_id', deckId);
 
         if (!isActive) {
@@ -238,7 +238,12 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         const nextDeck: Record<string, number> = {};
 
         for (const row of rows) {
-          const cardId = typeof row.card_id === 'string' ? row.card_id : null;
+          const cardId =
+            typeof row.card_id_astra === 'string' && row.card_id_astra.trim().length > 0
+              ? row.card_id_astra.trim()
+              : typeof row.card_id === 'string'
+                ? row.card_id
+                : null;
           const quantity = Number(row.quantity ?? 0);
           if (!cardId || quantity <= 0) {
             continue;

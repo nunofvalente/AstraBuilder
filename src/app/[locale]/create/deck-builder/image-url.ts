@@ -12,6 +12,7 @@ const SUPABASE_HOST = (() => {
 })();
 
 const SUPABASE_PUBLIC_PREFIX = '/storage/v1/object/public/';
+const ASTRA_ASSET_HOST = 'assets.echoesofastra.com';
 
 export type CardImageVariant = 'small' | 'medium' | 'large';
 
@@ -24,6 +25,19 @@ function isSupabaseObjectUrl(value: string): boolean {
     const url = new URL(value);
     const hostMatches = SUPABASE_HOST ? url.host === SUPABASE_HOST : url.host.includes('.supabase.co');
     return hostMatches && url.pathname.includes(SUPABASE_PUBLIC_PREFIX);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isAstraAssetUrl(value: string): boolean {
+  if (!value || value.startsWith('data:')) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.host === ASTRA_ASSET_HOST;
   } catch (_error) {
     return false;
   }
@@ -60,6 +74,10 @@ function extractSupabaseObjectParts(
 
 export function getCardImageVariantUrl(value: string, variant: CardImageVariant): string {
   if (!isSupabaseObjectUrl(value)) {
+    if (isAstraAssetUrl(value)) {
+      return getAstraCardImageVariantUrl(value, variant);
+    }
+
     return value;
   }
 
@@ -75,6 +93,14 @@ export function getCardImageVariantUrl(value: string, variant: CardImageVariant)
 
   const encodedVariantPath = encodePath(variantPath);
   return `${parts.origin}${SUPABASE_PUBLIC_PREFIX}${parts.bucket}/${encodedVariantPath}`;
+}
+
+function getAstraCardImageVariantUrl(value: string, variant: CardImageVariant): string {
+  if (variant !== 'large') {
+    return value;
+  }
+
+  return value.replace(/_web(\.[a-z0-9]+)$/i, '$1');
 }
 
 function buildVariantPath(objectPath: string, variant: CardImageVariant): string | null {
