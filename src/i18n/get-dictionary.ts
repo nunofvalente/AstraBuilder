@@ -55,7 +55,9 @@ type BuilderDictionary = {
     menuSave: string;
     importHeading: string;
     importInstructions: string;
+    importInstructionsText: string;
     importPlaceholder: string;
+    importPlaceholderText: string;
     importUploadLabel: string;
     importButton: string;
     importCancel: string;
