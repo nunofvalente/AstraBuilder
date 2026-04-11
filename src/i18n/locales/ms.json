@@ -344,6 +344,19 @@
         "dark": "Gelap"
       }
     }
+  },
+  "topBar": {
+    "signIn": "Log masuk",
+    "accountFallback": "Akaun",
+    "profile": "Profil",
+    "myDecks": "Dek Saya",
+    "builder": "Pembina",
+    "decks": "Dek",
+    "collection": "Koleksi",
+    "settings": "Tetapan",
+    "signOut": "Log keluar",
+    "signingOut": "Sedang log keluar...",
+    "toggleSettingsMenu": "Togol menu tetapan"
   }
 }
 

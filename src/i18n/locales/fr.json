@@ -41,23 +41,23 @@
     "noResults": "Aucune carte ne correspond a votre recherche.",
     "cardsHeading": "Bibliotheque de cartes",
     "costCurveHeading": "Courbe de cout",
-    "showCostCurve": "Afficher la courbe de coÃ»t",
-    "hideCostCurve": "Masquer la courbe de coÃ»t",
+    "showCostCurve": "Afficher la courbe de cout",
+    "hideCostCurve": "Masquer la courbe de cout",
     "menuImport": "Importer",
     "menuExport": "Exporter",
     "menuShare": "Partager l'image",
     "menuSave": "Enregistrer le deck",
     "importHeading": "Importer le deck",
-    "importInstructions": "Collez le JSON exportÃ© ci-dessous ou tÃ©lÃ©versez un fichier pour importer un deck.",
-    "importInstructionsText": "Collez une carte par ligne au format \"<nombre> <nom de carte>\" ou tÃ©lÃ©versez un fichier texte pour importer un deck.",
+    "importInstructions": "Collez le JSON exporte ci-dessous ou televersez un fichier pour importer un deck.",
+    "importInstructionsText": "Collez une carte par ligne au format \"<nombre> <nom de carte>\" ou televersez un fichier texte pour importer un deck.",
     "importPlaceholder": "[\n  {\n    \"name\": \"Nom de carte\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
-    "importUploadLabel": "TÃ©lÃ©charger un fichier JSON",
+    "importUploadLabel": "Telecharger un fichier JSON",
     "importButton": "Importer le deck",
     "importCancel": "Annuler",
-    "importErrorInvalid": "Le JSON fourni n'a pas pu Ãªtre analysÃ©. VÃ©rifiez le format et rÃ©essayez.",
+    "importErrorInvalid": "Le JSON fourni n'a pas pu etre analyse. Verifiez le format et reessayez.",
     "importErrorUnknown": "Ces cartes sont introuvables dans le catalogue :",
-    "importErrorEmpty": "Aucune carte valide trouvÃ©e dans les donnÃ©es importÃ©es.",
+    "importErrorEmpty": "Aucune carte valide trouvee dans les donnees importees.",
     "addButton": "Ajouter",
     "searchPlaceholder": "Recherche par nom ou mot cle",
     "filtersHeading": "Filtres",
@@ -65,16 +65,16 @@
     "exportOptionTTS": "TTS",
     "exportOptionText": "Texte",
     "exportCopy": "Copier l'export",
-    "exportCopySuccess": "Export copiÃ© dans le presse-papiers.",
+    "exportCopySuccess": "Export copie dans le presse-papiers.",
     "exportCopyError": "Impossible de copier automatiquement. Veuillez copier manuellement.",
     "shareButton": "Partager l'image",
-    "shareGenerating": "GÃ©nÃ©ration de l'image...",
-    "shareDownload": "TÃ©lÃ©charger l'image",
+    "shareGenerating": "Generation de l'image...",
+    "shareDownload": "Telecharger l'image",
     "shareCopy": "Copier l'image",
-    "shareCopySuccess": "Image copiÃ©e dans le presse-papiers.",
-    "shareCopyError": "Impossible de copier l'image. Veuillez tÃ©lÃ©charger Ã  la place.",
-    "shareEmpty": "Ajoutez des cartes pour gÃ©nÃ©rer une image Ã  partager.",
-    "shareError": "Impossible de gÃ©nÃ©rer l'image. Veuillez rÃ©essayer.",
+    "shareCopySuccess": "Image copiee dans le presse-papiers.",
+    "shareCopyError": "Impossible de copier l'image. Veuillez telecharger a la place.",
+    "shareEmpty": "Ajoutez des cartes pour generer une image a partager.",
+    "shareError": "Impossible de generer l'image. Veuillez reessayer.",
     "save": {
       "heading": "Enregistrer le deck",
       "titleLabel": "Titre du deck",
@@ -87,37 +87,37 @@
       "signInPrompt": "Connectez-vous pour enregistrer des decks.",
       "signInButton": "Se connecter",
       "emptyDeckError": "Ajoutez au moins une carte avant d'enregistrer.",
-      "genericError": "Impossible d'enregistrer votre deck. RÃ©essayez.",
+      "genericError": "Impossible d'enregistrer votre deck. Reessayez.",
       "successMessage": "Deck enregistre. Retrouvez-le dans Decks.",
       "dismissNotice": "Fermer",
       "publicLabel": "Rendre ce deck public",
-      "publicHelp": "Les decks publics peuvent apparaÃ®tre dans les listes Populaire ou Tendance. Laissez dÃ©cochÃ© pour le garder privÃ©."
+      "publicHelp": "Les decks publics peuvent apparaitre dans les listes Populaire ou Tendance. Laissez decoche pour le garder prive."
     }
   },
   "myDecks": {
     "heading": "Mes decks",
-    "description": "Gérez les decks que vous avez enregistrés dans le builder.",
+    "description": "Gerez les decks que vous avez enregistres dans le builder.",
     "tabs": {
       "mine": "Mes decks",
       "favorites": "Favoris"
     },
-    "empty": "Vous n'avez pas encore enregistré de deck.",
+    "empty": "Vous n'avez pas encore enregistre de deck.",
     "favoritesEmpty": "Vous n'avez pas encore ajoute de decks aux favoris.",
     "loading": "Chargement de vos decks...",
-    "error": "Impossible de charger vos decks. Veuillez réessayer.",
-    "signInPrompt": "Connectez-vous pour voir vos decks enregistrés.",
+    "error": "Impossible de charger vos decks. Veuillez reessayer.",
+    "signInPrompt": "Connectez-vous pour voir vos decks enregistres.",
     "favoritesSignInPrompt": "Connectez-vous pour voir vos decks favoris.",
     "signInButton": "Se connecter",
     "publicTag": "Public",
-    "privateTag": "Privé",
-    "createdLabel": "Créé",
+    "privateTag": "Prive",
+    "createdLabel": "Cree",
     "cardsLabel": "Cartes",
-    "emptyStateCta": "Créer un deck",
+    "emptyStateCta": "Creer un deck",
     "untitledLabel": "Deck sans titre",
     "openButton": "Ouvrir dans le builder",
     "favoritesLabel": "Favoris",
     "viewsLabel": "Vues",
-    "retryButton": "Réessayer",
+    "retryButton": "Reessayer",
     "editLabel": "Edit deck",
     "editHeading": "Edit deck",
     "editTitleLabel": "Title",
@@ -141,24 +141,24 @@
     "editDeleteConfirmButton": "Delete"
   },
   "deckDetails": {
-    "heading": "Détails du deck",
-    "description": "Répartition des cartes et statistiques de ce deck.",
+    "heading": "Details du deck",
+    "description": "Repartition des cartes et statistiques de ce deck.",
     "sectionsHeading": "Sections de cartes",
     "notesHeading": "Description",
     "privateNotice": "Ce deck est actuellement privé.",
-    "publicNotice": "Ce deck est public et peut apparaître dans les listes de la communauté.",
+    "publicNotice": "Ce deck est public et peut apparaître dans les listes de la communaute.",
     "backButton": "Retour aux decks",
     "favoriteAdd": "Ajouter aux favoris",
     "favoriteRemove": "Retirer des favoris",
     "favoriteSignIn": "Connectez-vous pour ajouter des decks aux favoris.",
-    "favoriteError": "Impossible de mettre à jour vos favoris. Veuillez réessayer."
+    "favoriteError": "Impossible de mettre a jour vos favoris. Veuillez reessayer."
   },
   "deckFeed": {
-    "heading": "Decks de la communauté",
-    "description": "Découvrez tous les decks publics partagés par la communauté.",
+    "heading": "Decks de la communaute",
+    "description": "Decouvrez tous les decks publics partagés par la communaute.",
     "empty": "Aucun deck public pour le moment. Soyez le premier à en publier un !",
     "authorLabel": "Auteur",
-    "createdLabel": "Créé",
+    "createdLabel": "Cree",
     "cardsLabel": "Cartes",
     "favoritesLabel": "Favoris",
     "viewsLabel": "Vues",
@@ -169,13 +169,13 @@
     }
   },
   "publicProfile": {
-    "heading": "Profil de la communauté",
-    "subtitle": "Découvrez les decks publics et les liens sociaux de ce créateur.",
+    "heading": "Profil de la communaute",
+    "subtitle": "Decouvrez les decks publics et les liens sociaux de ce créateur.",
     "socialsHeading": "Liens sociaux",
     "socialsEmpty": "Aucun lien social partagé.",
     "decksHeading": "Decks",
     "noDecks": "Aucun deck public disponible.",
-    "backButton": "Retour aux decks de la communauté",
+    "backButton": "Retour aux decks de la communaute",
     "xLabel": "X",
     "youtubeLabel": "YouTube",
     "unknownUser": "Joueur anonyme"
@@ -232,10 +232,10 @@
       },
       "messages": {
         "invalidCredentials": "L'adresse e-mail ou le mot de passe est incorrect.",
-        "genericError": "Nous n'avons pas pu vous connecter. Veuillez réessayer.",
-        "passwordResetSuccess": "Mot de passe mis à jour. Veuillez vous reconnecter avec votre nouveau mot de passe.",
-        "passwordResetExpired": "Ce lien de réinitialisation a expiré. Veuillez en demander un nouveau.",
-        "accountDeleted": "Votre compte a �t� supprim�. Nous sommes d�sol�s de vous voir partir."
+        "genericError": "Nous n'avons pas pu vous connecter. Veuillez reessayer.",
+        "passwordResetSuccess": "Mot de passe mis a jour. Veuillez vous reconnecter avec votre nouveau mot de passe.",
+        "passwordResetExpired": "Ce lien de reinitialisation a expire. Veuillez en demander un nouveau.",
+        "accountDeleted": "Votre compte a ete supprime. Nous sommes desoles de vous voir partir."
       },
       "footer": {
         "noAccount": "Vous n'avez pas encore de compte ?",
@@ -244,56 +244,56 @@
       "forgotPasswordLink": "Mot de passe oublié ?"
     },
     "forgotPassword": {
-      "title": "Réinitialiser votre mot de passe",
-      "description": "Entrez l'adresse e-mail de votre compte et nous vous enverrons un lien de réinitialisation.",
+      "title": "Reinitialiser votre mot de passe",
+      "description": "Entrez l'adresse e-mail de votre compte et nous vous enverrons un lien de reinitialisation.",
       "form": {
         "emailLabel": "E-mail",
-        "submit": "Envoyer le lien de réinitialisation"
+        "submit": "Envoyer le lien de reinitialisation"
       },
       "messages": {
-        "success": "Consultez votre boîte de réception pour le lien de réinitialisation.",
-        "genericError": "Impossible d'envoyer l'e-mail. Veuillez réessayer."
+        "success": "Consultez votre boite de reception pour le lien de reinitialisation.",
+        "genericError": "Impossible d'envoyer l'e-mail. Veuillez reessayer."
       },
       "footer": {
-        "backToSignIn": "Retour à la connexion"
+        "backToSignIn": "Retour a la connexion"
       }
     },
     "resetPassword": {
-      "title": "Créer un nouveau mot de passe",
+      "title": "Creer un nouveau mot de passe",
       "description": "Saisissez un nouveau mot de passe pour votre compte.",
       "form": {
         "passwordLabel": "Nouveau mot de passe",
         "confirmPasswordLabel": "Confirmer le mot de passe",
-        "submit": "Mettre à jour le mot de passe"
+        "submit": "Mettre a jour le mot de passe"
       },
       "messages": {
         "mismatch": "Les mots de passe ne correspondent pas.",
-        "genericError": "Impossible de mettre à jour le mot de passe. Veuillez réessayer.",
-        "success": "Mot de passe mis à jour. Vous pouvez continuer."
+        "genericError": "Impossible de mettre a jour le mot de passe. Veuillez reessayer.",
+        "success": "Mot de passe mis a jour. Vous pouvez continuer."
       },
       "footer": {
-        "backToHome": "Retour à l’accueil"
+        "backToHome": "Retour a l'accueil"
       }
     },
     "passwordStrength": {
-      "label": "Solidité du mot de passe",
+      "label": "Solidite du mot de passe",
       "values": {
-        "tooWeak": "Très faible",
+        "tooWeak": "Tres faible",
         "weak": "Faible",
         "medium": "Correct",
         "strong": "Bon",
-        "veryStrong": "Très bon"
+        "veryStrong": "Tres bon"
       }
     }
   },
   "profile": {
     "heading": "Profil",
-    "description": "Mettez à jour la façon dont les autres joueurs vous voient sur AstraBuilder.",
+    "description": "Mettez a jour la façon dont les autres joueurs vous voient sur AstraBuilder.",
     "fields": {
       "username": "Nom d'affichage",
-      "usernameHint": "Affiché à côté des decks que vous partagez.",
+      "usernameHint": "Affiche a cote des decks que vous partagez.",
       "bio": "Bio",
-      "bioHint": "Facultatif. Jusqu'à 280 caractères.",
+      "bioHint": "Facultatif. Jusqu'a 280 caractères.",
       "xLink": "Lien X (Twitter)",
       "xPlaceholder": "https://x.com/votreprofil",
       "youtubeLink": "Lien YouTube",
@@ -305,46 +305,53 @@
     },
     "messages": {
       "loading": "Chargement du profil...",
-      "success": "Profil mis à jour avec succès.",
-      "error": "Nous n'avons pas pu mettre à jour votre profil. Veuillez réessayer.",
+      "success": "Profil mis a jour avec succes.",
+      "error": "Nous n'avons pas pu mettre a jour votre profil. Veuillez reessayer.",
       "usernameRequired": "Le nom d'affichage est obligatoire."
     },
     "deleteAccount": {
       "title": "Supprimer le compte",
-      "description": "Supprime d�finitivement votre compte AstraBuilder et toutes les donn�es associ�es. Cette action est irr�versible.",
+      "description": "Supprime definitivement votre compte AstraBuilder et toutes les donnees associees. Cette action est irreversible.",
       "trigger": "Supprimer le compte",
       "confirmationLabel": "Confirmation",
-      "confirmationDescription": "Tapez \"delete\" pour confirmer. Cette action est irr�versible.",
+      "confirmationDescription": "Tapez \"delete\" pour confirmer. Cette action est irreversible.",
       "confirmationPlaceholder": "delete",
       "confirmationKeyword": "delete",
       "confirmButton": "Confirmer la suppression",
       "cancelButton": "Annuler",
-      "success": "Votre compte a �t� supprim�.",
-      "error": "Impossible de supprimer votre compte. Veuillez r�essayer.",
-    "keywordMismatch": "Saisissez delete pour confirmer."
+      "success": "Votre compte a ete supprime.",
+      "error": "Impossible de supprimer votre compte. Veuillez reessayer.",
+      "keywordMismatch": "Saisissez delete pour confirmer."
     }
   },
   "settings": {
-    "heading": "Paramètres",
-    "description": "Gérez vos préférences de langue et d'apparence.",
+    "heading": "Parametres",
+    "description": "Gerez vos préférences de langue et d'apparence.",
     "language": {
       "title": "Langue",
       "description": "Choisissez la langue utilisée dans AstraBuilder.",
       "active": "Langue active"
     },
     "theme": {
-      "title": "Thème",
+      "title": "Theme",
       "description": "Basculez entre les thèmes clair et sombre.",
       "options": {
         "light": "Clair",
         "dark": "Sombre"
       }
     }
+  },
+  "topBar": {
+    "signIn": "Se connecter",
+    "accountFallback": "Compte",
+    "profile": "Profil",
+    "myDecks": "Mes decks",
+    "builder": "Constructeur",
+    "decks": "Decks",
+    "collection": "Collection",
+    "settings": "Parametres",
+    "signOut": "Se deconnecter",
+    "signingOut": "Deconnexion...",
+    "toggleSettingsMenu": "Basculer le menu des parametres"
   }
 }
-
-
-
-
-
-

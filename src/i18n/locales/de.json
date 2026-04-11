@@ -2,13 +2,13 @@
   "home": {
     "title": "AstraBuilder",
     "tagline": {
-      "intro": "Deckbuilding-Website für",
+      "intro": "Deckbuilding-Website fuer",
       "highlight": "Echoes of Astra"
     },
     "sections": {
       "affinityPairings": {
-        "title": "Decks nach Affinitätskombination",
-        "placeholder": "Affinitätskombinationen werden hier bald angezeigt.",
+        "title": "Decks nach Affinitaetskombination",
+        "placeholder": "Affinitaetskombinationen werden hier bald angezeigt.",
         "deckLabel": "Deck",
         "decksLabel": "Decks",
         "unknownLabel": "Unbekannte Kombination"
@@ -48,20 +48,20 @@
     "menuShare": "Bild teilen",
     "menuSave": "Deck speichern",
     "importHeading": "Deck importieren",
-    "importInstructions": "FÃ¼ge das exportierte JSON unten ein oder lade eine Datei hoch, um ein Deck zu importieren.",
-    "importInstructionsText": "FÃ¼ge pro Zeile eine Karte im Format \"<Anzahl> <Kartenname>\" ein oder lade eine Textdatei hoch, um ein Deck zu importieren.",
+    "importInstructions": "Fuege das exportierte JSON unten ein oder lade eine Datei hoch, um ein Deck zu importieren.",
+    "importInstructionsText": "Fuege pro Zeile eine Karte im Format \"<Anzahl> <Kartenname>\" ein oder lade eine Textdatei hoch, um ein Deck zu importieren.",
     "importPlaceholder": "[\n  {\n    \"name\": \"Kartenname\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
     "importUploadLabel": "JSON-Datei hochladen",
     "importButton": "Deck importieren",
     "importCancel": "Abbrechen",
-    "importErrorInvalid": "Die JSON-Daten konnten nicht verarbeitet werden. Bitte Format prÃ¼fen und erneut versuchen.",
+    "importErrorInvalid": "Die JSON-Daten konnten nicht verarbeitet werden. Bitte Format pruefen und erneut versuchen.",
     "importErrorUnknown": "Diese Karten konnten nicht im Katalog gefunden werden:",
-    "importErrorEmpty": "In den Importdaten wurden keine gÃ¼ltigen Karten gefunden.",
+    "importErrorEmpty": "In den Importdaten wurden keine gueltigen Karten gefunden.",
     "addButton": "Hinzufugen",
     "searchPlaceholder": "Nach Name oder Stichwort suchen",
     "filtersHeading": "Filter",
-    "menuButton": "MenÃ¼",
+    "menuButton": "Menue",
     "exportOptionTTS": "TTS",
     "exportOptionText": "Text",
     "exportCopy": "Export kopieren",
@@ -73,25 +73,25 @@
     "shareCopy": "Bild kopieren",
     "shareCopySuccess": "Bild in die Zwischenablage kopiert.",
     "shareCopyError": "Bild konnte nicht kopiert werden. Bitte herunterladen.",
-    "shareEmpty": "FÃ¼ge Karten hinzu, um ein Bild zum Teilen zu erzeugen.",
+    "shareEmpty": "Fuege Karten hinzu, um ein Bild zum Teilen zu erzeugen.",
     "shareError": "Das Bild konnte nicht erstellt werden. Bitte versuche es erneut.",
     "save": {
       "heading": "Deck speichern",
       "titleLabel": "Deckname",
       "titlePlaceholder": "Unbenanntes Deck",
       "descriptionLabel": "Beschreibung (optional)",
-      "descriptionPlaceholder": "FÃ¼ge eine kurze Notiz zu diesem Deck hinzu.",
+      "descriptionPlaceholder": "Fuege eine kurze Notiz zu diesem Deck hinzu.",
       "cancel": "Abbrechen",
       "submit": "Deck speichern",
       "saving": "Speichern...",
       "signInPrompt": "Melde dich an, um Decks zu speichern.",
       "signInButton": "Anmelden",
-      "emptyDeckError": "FÃ¼ge vor dem Speichern mindestens eine Karte hinzu.",
+      "emptyDeckError": "Fuege vor dem Speichern mindestens eine Karte hinzu.",
       "genericError": "Dein Deck konnte nicht gespeichert werden. Bitte versuche es erneut.",
       "successMessage": "Deck gespeichert. Du findest es unter Decks.",
       "dismissNotice": "Schliessen",
-      "publicLabel": "Dieses Deck Ã¶ffentlich machen",
-      "publicHelp": "Ã–ffentliche Decks kÃ¶nnen in beliebten oder trendigen Listen erscheinen. Unmarkiert lassen, um es privat zu halten."
+      "publicLabel": "Dieses Deck oeffentlich machen",
+      "publicHelp": "Oeffentliche Decks koennen in beliebten oder trendigen Listen erscheinen. Unmarkiert lassen, um es privat zu halten."
     }
   },
   "myDecks": {
@@ -108,13 +108,13 @@
     "signInPrompt": "Melde dich an, um deine gespeicherten Decks zu sehen.",
     "favoritesSignInPrompt": "Melde dich an, um deine favorisierten Decks zu sehen.",
     "signInButton": "Anmelden",
-    "publicTag": "Öffentlich",
+    "publicTag": "Oeffentlich",
     "privateTag": "Privat",
     "createdLabel": "Erstellt",
     "cardsLabel": "Karten",
     "emptyStateCta": "Deck erstellen",
     "untitledLabel": "Unbenanntes Deck",
-    "openButton": "Im Builder öffnen",
+    "openButton": "Im Builder oeffnen",
     "favoritesLabel": "Favoriten",
     "viewsLabel": "Aufrufe",
     "retryButton": "Erneut versuchen",
@@ -142,12 +142,12 @@
   },
   "deckDetails": {
     "heading": "Deck-Details",
-    "description": "Kartenübersicht und Statistiken für dieses Deck.",
+    "description": "Kartenuebersicht und Statistiken fuer dieses Deck.",
     "sectionsHeading": "Kartensektionen",
     "notesHeading": "Beschreibung",
     "privateNotice": "Dieses Deck ist derzeit privat.",
-    "publicNotice": "Dieses Deck ist öffentlich und kann in Community-Listen erscheinen.",
-    "backButton": "Zurück zu den Decks",
+    "publicNotice": "Dieses Deck ist oeffentlich und kann in Community-Listen erscheinen.",
+    "backButton": "Zurueck zu den Decks",
     "favoriteAdd": "Zu Favoriten hinzufügen",
     "favoriteRemove": "Aus Favoriten entfernen",
     "favoriteSignIn": "Melde dich an, um Decks zu favorisieren.",
@@ -155,8 +155,8 @@
   },
   "deckFeed": {
     "heading": "Community-Decks",
-    "description": "Durchstöbere alle öffentlichen Decks der Community.",
-    "empty": "Noch keine öffentlichen Decks. Sei der Erste, der eines veröffentlicht!",
+    "description": "Durchstoebere alle oeffentlichen Decks der Community.",
+    "empty": "Noch keine oeffentlichen Decks. Sei der Erste, der eines veroeffentlicht!",
     "authorLabel": "Autor",
     "createdLabel": "Erstellt",
     "cardsLabel": "Karten",
@@ -170,12 +170,12 @@
   },
   "publicProfile": {
     "heading": "Community-Profil",
-    "subtitle": "Entdecke öffentliche Decks und Social Links dieses Creators.",
+    "subtitle": "Entdecke oeffentliche Decks und Social Links dieses Creators.",
     "socialsHeading": "Social Links",
     "socialsEmpty": "Keine Social Links vorhanden.",
     "decksHeading": "Decks",
-    "noDecks": "Keine öffentlichen Decks verfügbar.",
-    "backButton": "Zurück zu den Community-Decks",
+    "noDecks": "Keine oeffentlichen Decks verfuegbar.",
+    "backButton": "Zurueck zu den Community-Decks",
     "xLabel": "X",
     "youtubeLabel": "YouTube",
     "unknownUser": "Anonymer Spieler"
@@ -219,7 +219,7 @@
       }
     },
     "signIn": {
-      "title": "Willkommen zurück",
+      "title": "Willkommen zurueck",
       "description": "Melde dich an, um weiter Decks zu erstellen und zu teilen.",
       "dividerLabel": "Oder fortfahren mit",
       "form": {
@@ -234,8 +234,8 @@
         "invalidCredentials": "E-Mail oder Passwort ist falsch.",
         "genericError": "Wir konnten dich nicht anmelden. Bitte versuche es erneut.",
         "passwordResetSuccess": "Passwort aktualisiert. Bitte melde dich mit deinem neuen Passwort an.",
-        "passwordResetExpired": "Dieser Zurücksetzungslink ist abgelaufen. Bitte fordere einen neuen Link an.",
-        "accountDeleted": "Dein Konto wurde gel�scht. Schade, dass du gehst."
+        "passwordResetExpired": "Dieser Zuruecksetzungslink ist abgelaufen. Bitte fordere einen neuen Link an.",
+        "accountDeleted": "Dein Konto wurde geloescht. Schade, dass du gehst."
       },
       "footer": {
         "noAccount": "Noch kein Konto?",
@@ -244,14 +244,14 @@
       "forgotPasswordLink": "Passwort vergessen?"
     },
     "forgotPassword": {
-      "title": "Passwort zurücksetzen",
+      "title": "Passwort zuruecksetzen",
       "description": "Gib die E-Mail-Adresse deines Kontos ein und wir senden dir einen Link zum Zurücksetzen.",
       "form": {
         "emailLabel": "E-Mail",
-        "submit": "Link zum Zurücksetzen senden"
+        "submit": "Link zum Zuruecksetzen senden"
       },
       "messages": {
-        "success": "Prüfe dein Postfach auf den Link zum Zurücksetzen.",
+        "success": "Pruefe dein Postfach auf den Link zum Zuruecksetzen.",
         "genericError": "E-Mail konnte nicht gesendet werden. Bitte versuche es erneut."
       },
       "footer": {
@@ -260,14 +260,14 @@
     },
     "resetPassword": {
       "title": "Neues Passwort erstellen",
-      "description": "Gib ein neues Passwort für dein Konto ein.",
+      "description": "Gib ein neues Passwort fuer dein Konto ein.",
       "form": {
         "passwordLabel": "Neues Passwort",
-        "confirmPasswordLabel": "Neues Passwort bestätigen",
+        "confirmPasswordLabel": "Neues Passwort bestaetigen",
         "submit": "Passwort aktualisieren"
       },
       "messages": {
-        "mismatch": "Die Passwörter stimmen nicht überein.",
+        "mismatch": "Die Passwoerter stimmen nicht ueberein.",
         "genericError": "Passwort konnte nicht aktualisiert werden. Bitte versuche es erneut.",
         "success": "Passwort aktualisiert. Du kannst fortfahren."
       },
@@ -276,7 +276,7 @@
       }
     },
     "passwordStrength": {
-      "label": "Passwortstärke",
+      "label": "Passwortstaerke",
       "values": {
         "tooWeak": "Sehr schwach",
         "weak": "Schwach",
@@ -300,7 +300,7 @@
       "youtubePlaceholder": "https://youtube.com/@deinkanal"
     },
     "actions": {
-      "save": "Änderungen speichern",
+      "save": "Aenderungen speichern",
       "saving": "Speichere..."
     },
     "messages": {
@@ -310,26 +310,26 @@
       "usernameRequired": "Ein Anzeigename ist erforderlich."
     },
     "deleteAccount": {
-      "title": "Konto l�schen",
-      "description": "L�sche dein AstraBuilder-Konto und alle zugeh�rigen Daten dauerhaft. Dies kann nicht r�ckg�ngig gemacht werden.",
-      "trigger": "Konto l�schen",
-      "confirmationLabel": "Best�tigung",
-      "confirmationDescription": "Gib \"delete\" ein, um zu best�tigen. Dies kann nicht r�ckg�ngig gemacht werden.",
+      "title": "Konto loeschen",
+      "description": "Loesche dein AstraBuilder-Konto und alle zugehoerigen Daten dauerhaft. Dies kann nicht rueckgaengig gemacht werden.",
+      "trigger": "Konto loeschen",
+      "confirmationLabel": "Bestaetigung",
+      "confirmationDescription": "Gib \"delete\" ein, um zu bestaetigen. Dies kann nicht rueckgaengig gemacht werden.",
       "confirmationPlaceholder": "delete",
       "confirmationKeyword": "delete",
-      "confirmButton": "L�schen best�tigen",
+      "confirmButton": "Loeschen bestaetigen",
       "cancelButton": "Abbrechen",
-      "success": "Dein Konto wurde gel�scht.",
-      "error": "Dein Konto konnte nicht gel�scht werden. Bitte versuche es erneut.",
-    "keywordMismatch": "Bitte gib delete ein, um zu best�tigen."
+      "success": "Dein Konto wurde geloescht.",
+      "error": "Dein Konto konnte nicht geloescht werden. Bitte versuche es erneut.",
+      "keywordMismatch": "Bitte gib delete ein, um zu bestaetigen."
     }
   },
   "settings": {
     "heading": "Einstellungen",
-    "description": "Verwalte deine Sprach- und Darstellungspräferenzen.",
+    "description": "Verwalte deine Sprach- und Darstellungspraeferenzen.",
     "language": {
       "title": "Sprache",
-      "description": "Wähle die Sprache für AstraBuilder.",
+      "description": "Waehle die Sprache fuer AstraBuilder.",
       "active": "Aktive Sprache"
     },
     "theme": {
@@ -340,5 +340,18 @@
         "dark": "Dunkel"
       }
     }
+  },
+  "topBar": {
+    "signIn": "Anmelden",
+    "accountFallback": "Konto",
+    "profile": "Profil",
+    "myDecks": "Meine Decks",
+    "builder": "Deck-Builder",
+    "decks": "Decks",
+    "collection": "Sammlung",
+    "settings": "Einstellungen",
+    "signOut": "Abmelden",
+    "signingOut": "Wird abgemeldet...",
+    "toggleSettingsMenu": "Einstellungsmenue umschalten"
   }
 }
