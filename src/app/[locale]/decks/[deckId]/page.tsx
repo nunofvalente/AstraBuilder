@@ -5,7 +5,8 @@ import { cookies } from 'next/headers';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
-import { getDeckDetailById } from '@/lib/supabase/decks';
+import { createSupabaseAdminClient } from '@/lib/supabase/admin';
+import { getAccessibleDeckDetailById } from '@/lib/supabase/decks';
 import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 
 import { DeckDetailClient } from './deck-detail-client';
@@ -47,7 +48,13 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
   const supabaseServerClient = createServerComponentClient({
     cookies: (() => cookieStore) as unknown as typeof cookies,
   });
-  const deck = await getDeckDetailById(deckId, supabaseServerClient);
+  const {
+    data: { user },
+  } = await supabaseServerClient.auth.getUser();
+  const supabaseAdmin = createSupabaseAdminClient();
+  const deck = supabaseAdmin
+    ? await getAccessibleDeckDetailById(deckId, user?.id ?? null, supabaseAdmin)
+    : null;
 
   return (
     <DeckDetailClient
