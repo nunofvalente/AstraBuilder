@@ -2,16 +2,16 @@
 
 :root {
   color-scheme: light;
-  --background: #fafaf7;
-  --foreground: #292826;
-  --surface: #ffffff;
-  --surface-muted: #f0efe9;
+  --background: #f3efe6;
+  --foreground: #2b2722;
+  --surface: #fbf7ef;
+  --surface-muted: #e8dfd1;
   --surface-overlay: #363432;
-  --border: #d9d6d0;
-  --text-primary: #292826;
-  --text-secondary: #5f5c58;
+  --border: #cfc4b2;
+  --text-primary: #2b2722;
+  --text-secondary: #655f56;
   --accent: #9c3f1d;
-  --text-on-accent: #fafaf7;
+  --text-on-accent: #f7f2e8;
   --banner-background: #2e2d2a;
   --banner-text-gradient: linear-gradient(90deg, rgba(167, 170, 164, 1) 0%, rgba(248, 247, 244, 1) 50%, rgba(54, 51, 48, 1) 75%, rgba(140, 140, 135, 1) 100%);
   --banner-overlay: rgba(46, 45, 42, 0.78);

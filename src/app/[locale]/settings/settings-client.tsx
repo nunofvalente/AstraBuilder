@@ -89,19 +89,11 @@ export function SettingsClient({ locale, dictionary }: SettingsClientProps) {
         <p className="text-sm text-[color:var(--text-secondary)]">{dictionary.description}</p>
       </header>
 
-      <section aria-labelledby="language-settings" className="flex flex-col gap-4">
-        <div className="space-y-1">
-          <h2 id="language-settings" className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {dictionary.language.title}
-          </h2>
-          <p className="text-sm text-[color:var(--text-secondary)]">
-            {dictionary.language.description}
-          </p>
-        </div>
+      <section className="flex flex-col gap-4">
         <div className="flex max-w-xs flex-col gap-2">
           <label
             htmlFor="locale-select"
-            className="text-sm font-medium text-[color:var(--text-primary)]"
+            className="text-lg font-semibold text-[color:var(--text-primary)]"
           >
             {dictionary.language.title}
           </label>
@@ -121,21 +113,13 @@ export function SettingsClient({ locale, dictionary }: SettingsClientProps) {
               );
             })}
           </select>
-          <span className="text-xs text-[color:var(--text-secondary)]">
-            {dictionary.language.active}: {LANGUAGE_LABELS[locale][locale]}
-          </span>
         </div>
       </section>
 
-      <section aria-labelledby="theme-settings" className="flex flex-col gap-4">
-        <div className="space-y-1">
-          <h2 id="theme-settings" className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {dictionary.theme.title}
-          </h2>
-          <p className="text-sm text-[color:var(--text-secondary)]">
-            {dictionary.theme.description}
-          </p>
-        </div>
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
+          {dictionary.theme.title}
+        </h2>
         <div
           className="grid gap-3 sm:grid-cols-2"
           role="radiogroup"
@@ -157,10 +141,7 @@ export function SettingsClient({ locale, dictionary }: SettingsClientProps) {
                 role="radio"
                 aria-checked={isActive}
               >
-                <span className="text-base font-semibold capitalize">{label}</span>
-                <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                  {option}
-                </span>
+                <span className="text-base font-semibold">{label}</span>
               </button>
             );
           })}
