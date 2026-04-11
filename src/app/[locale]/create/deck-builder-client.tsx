@@ -771,7 +771,9 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         onClose={() => setIsExportModalOpen(false)}
         deckEntries={deckEntries}
         labels={{
+          exportHeading: builder.menuExport,
           exportOptionTTS: builder.exportOptionTTS,
+          exportOptionText: builder.exportOptionText,
           emptyDeck: builder.emptyDeck,
           exportCopy: builder.exportCopy,
           exportCopySuccess: builder.exportCopySuccess,

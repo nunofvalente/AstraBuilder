@@ -69,7 +69,9 @@ type BuilderDictionary = {
     removeButton: string;
     noResults: string;
     menuButton: string;
+    exportHeading?: string;
     exportOptionTTS: string;
+    exportOptionText: string;
     exportCopy: string;
     exportCopySuccess: string;
     exportCopyError: string;

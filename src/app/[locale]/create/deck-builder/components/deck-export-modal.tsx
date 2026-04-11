@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { buildDeckExportContent, type DeckExportFormat } from '../export-formats';
 import type { DeckEntry } from '../types';
 
 type DeckExportModalProps = {
@@ -9,7 +10,9 @@ type DeckExportModalProps = {
   onClose: () => void;
   deckEntries: DeckEntry[];
   labels: {
+    exportHeading: string;
     exportOptionTTS: string;
+    exportOptionText: string;
     emptyDeck: string;
     exportCopy: string;
     exportCopySuccess: string;
@@ -18,11 +21,13 @@ type DeckExportModalProps = {
 };
 
 export function DeckExportModal({ isOpen, onClose, deckEntries, labels }: DeckExportModalProps) {
+  const [selectedFormat, setSelectedFormat] = useState<DeckExportFormat>('tts');
   const [exportContent, setExportContent] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     if (!isOpen) {
+      setSelectedFormat('tts');
       setExportContent(null);
       setCopyStatus('idle');
       return;
@@ -33,10 +38,9 @@ export function DeckExportModal({ isOpen, onClose, deckEntries, labels }: DeckEx
       return;
     }
 
-    const payload = deckEntries.map(({ card, count }) => ({ count, name: card.name }));
-    setExportContent(JSON.stringify(payload, null, 2));
+    setExportContent(buildDeckExportContent(deckEntries, selectedFormat));
     setCopyStatus('idle');
-  }, [isOpen, deckEntries]);
+  }, [isOpen, deckEntries, selectedFormat]);
 
   if (!isOpen) {
     return null;
@@ -65,7 +69,7 @@ export function DeckExportModal({ isOpen, onClose, deckEntries, labels }: DeckEx
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-xl rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{labels.exportOptionTTS}</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{labels.exportHeading}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -80,6 +84,30 @@ export function DeckExportModal({ isOpen, onClose, deckEntries, labels }: DeckEx
 
         {exportContent ? (
           <div className="mt-4 flex flex-col gap-3">
+            <div className="inline-flex w-fit rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 p-1">
+              <button
+                type="button"
+                onClick={() => setSelectedFormat('tts')}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+                  selectedFormat === 'tts'
+                    ? 'bg-[color:var(--accent)] text-white'
+                    : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-muted)]'
+                }`}
+              >
+                {labels.exportOptionTTS}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFormat('text')}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+                  selectedFormat === 'text'
+                    ? 'bg-[color:var(--accent)] text-white'
+                    : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-muted)]'
+                }`}
+              >
+                {labels.exportOptionText}
+              </button>
+            </div>
             <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/60 p-3 text-xs text-[color:var(--text-primary)]">
               {exportContent}
             </pre>
