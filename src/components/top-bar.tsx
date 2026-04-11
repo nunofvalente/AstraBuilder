@@ -318,30 +318,30 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href={builderHref}
-              className={`border-b-2 px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+              className={`border-b-[3px] px-3 py-2 text-base font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
                 isBuilderRoute
-                  ? 'border-[color:var(--accent)] text-[color:var(--accent)]'
-                  : `border-transparent ${toolbarTextClass} hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]`
+                  ? 'border-[color:var(--accent)] text-white'
+                  : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
               }`}
             >
               {builderLabel}
             </Link>
             <Link
               href={decksHref}
-              className={`border-b-2 px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+              className={`border-b-[3px] px-3 py-2 text-base font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
                 isDecksRoute
-                  ? 'border-[color:var(--accent)] text-[color:var(--accent)]'
-                  : `border-transparent ${toolbarTextClass} hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]`
+                  ? 'border-[color:var(--accent)] text-white'
+                  : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
               }`}
             >
               {myDecksLabel}
             </Link>
             <Link
               href={collectionHref}
-              className={`border-b-2 px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+              className={`border-b-[3px] px-3 py-2 text-base font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
                 isCollectionRoute
-                  ? 'border-[color:var(--accent)] text-[color:var(--accent)]'
-                  : `border-transparent ${toolbarTextClass} hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]`
+                  ? 'border-[color:var(--accent)] text-white'
+                  : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
               }`}
             >
               {collectionLabel}

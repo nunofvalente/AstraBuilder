@@ -17,16 +17,16 @@ export type DesignTokens = Record<DesignTokenName, string>;
 
 export const DESIGN_TOKENS: Record<'light' | 'dark', DesignTokens> = {
   light: {
-    background: '#fafaf7',
-    foreground: '#292826',
-    surface: '#ffffff',
-    surfaceMuted: '#f0efe9',
+    background: '#f3efe6',
+    foreground: '#2b2722',
+    surface: '#fbf7ef',
+    surfaceMuted: '#e8dfd1',
     surfaceOverlay: '#363432',
-    border: '#d9d6d0',
-    textPrimary: '#292826',
-    textSecondary: '#5f5c58',
+    border: '#cfc4b2',
+    textPrimary: '#2b2722',
+    textSecondary: '#655f56',
     accent: '#9c3f1d',
-    textOnAccent: '#fafaf7',
+    textOnAccent: '#f7f2e8',
     bannerBackground: '#2e2d2a',
     bannerTextGradient:
       'linear-gradient(90deg, rgba(167, 170, 164, 1) 0%, rgba(248, 247, 244, 1) 50%, rgba(54, 51, 48, 1) 75%, rgba(140, 140, 135, 1) 100%)',
