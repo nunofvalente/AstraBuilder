@@ -36,6 +36,13 @@ export type DeckDetailData = {
   entries: DeckEntry[];
 };
 
+export type DeckAccessMetadata = {
+  deckId: string;
+  ownerId: string | null;
+  isPublic: boolean;
+  isOwner: boolean;
+};
+
 const PUBLIC_DECK_SELECT =
   'id,title,description,created_at,is_public,user_id,deck_cards(*),deck_stats(views_total,favorites_total),profiles:profiles!decks_user_id_profiles_fkey(id,username)';
 
@@ -312,6 +319,40 @@ async function resolveDeckStatsWithFallback(
   };
 }
 
+export async function getDeckAccessMetadata(
+  deckId: string,
+  viewerId: string | null,
+  client: DeckDataClient = supabase
+): Promise<DeckAccessMetadata | null> {
+  const normalizedDeckId = deckId.trim();
+  if (!normalizedDeckId) {
+    return null;
+  }
+
+  const { data, error } = await client
+    .from('decks')
+    .select('id,user_id,is_public')
+    .eq('id', normalizedDeckId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const ownerId = typeof data.user_id === 'string' ? data.user_id : null;
+
+  return {
+    deckId: String(data.id),
+    ownerId,
+    isPublic: Boolean(data.is_public),
+    isOwner: Boolean(viewerId) && ownerId === viewerId,
+  };
+}
+
 export async function getDeckSummariesForUser(userId: string): Promise<DeckSummary[]> {
   const { data, error } = await supabase
     .from('decks')
@@ -515,4 +556,21 @@ export async function getDeckDetailById(
     authorYoutubeLink: profile.authorYoutubeLink ?? null,
     entries: buildDeckEntries(row.deck_cards, astraCardLookup),
   };
+}
+
+export async function getAccessibleDeckDetailById(
+  deckId: string,
+  viewerId: string | null,
+  client: DeckDataClient = supabase
+): Promise<DeckDetailData | null> {
+  const access = await getDeckAccessMetadata(deckId, viewerId, client);
+  if (!access) {
+    return null;
+  }
+
+  if (!access.isPublic && !access.isOwner) {
+    return null;
+  }
+
+  return getDeckDetailById(access.deckId, client);
 }
