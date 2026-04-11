@@ -755,8 +755,12 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         onImport={handleImportDeck}
         labels={{
           heading: builder.importHeading,
-          instructions: builder.importInstructions,
-          placeholder: builder.importPlaceholder,
+          importOptionTTS: builder.exportOptionTTS,
+          importOptionText: builder.exportOptionText,
+          instructionsTTS: builder.importInstructions,
+          instructionsText: builder.importInstructionsText,
+          placeholderTTS: builder.importPlaceholder,
+          placeholderText: builder.importPlaceholderText,
           uploadLabel: builder.importUploadLabel,
           importButton: builder.importButton,
           cancelButton: builder.importCancel,

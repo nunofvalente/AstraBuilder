@@ -2,14 +2,11 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 
+import type { DeckExportFormat } from '../export-formats';
+import { parseDeckImport } from '../import-formats';
 import type { Card } from '../types';
 
 const MAX_COPIES_PER_CARD = 3;
-
-type ImportEntry = {
-  name: string;
-  count: number;
-};
 
 type DeckImportModalProps = {
   isOpen: boolean;
@@ -18,8 +15,12 @@ type DeckImportModalProps = {
   onImport: (deck: Record<string, number>) => void;
   labels: {
     heading: string;
-    instructions: string;
-    placeholder: string;
+    importOptionTTS: string;
+    importOptionText: string;
+    instructionsTTS: string;
+    instructionsText: string;
+    placeholderTTS: string;
+    placeholderText: string;
     uploadLabel: string;
     importButton: string;
     cancelButton: string;
@@ -30,6 +31,7 @@ type DeckImportModalProps = {
 };
 
 export function DeckImportModal({ isOpen, onClose, cards, onImport, labels }: DeckImportModalProps) {
+  const [selectedFormat, setSelectedFormat] = useState<DeckExportFormat>('tts');
   const [inputValue, setInputValue] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [unknownCards, setUnknownCards] = useState<string[]>([]);
@@ -44,6 +46,7 @@ export function DeckImportModal({ isOpen, onClose, cards, onImport, labels }: De
 
   useEffect(() => {
     if (!isOpen) {
+      setSelectedFormat('tts');
       setInputValue('');
       setErrorMessage(null);
       setUnknownCards([]);
@@ -73,31 +76,6 @@ export function DeckImportModal({ isOpen, onClose, cards, onImport, labels }: De
       });
   }
 
-  function parseEntries(raw: unknown): ImportEntry[] {
-    if (!Array.isArray(raw)) {
-      throw new Error('invalid');
-    }
-
-    const entries: ImportEntry[] = [];
-    for (const item of raw) {
-      if (!item || typeof item !== 'object') {
-        throw new Error('invalid');
-      }
-
-      const name = typeof (item as any).name === 'string' ? (item as any).name.trim() : '';
-      const countValue = (item as any).count;
-      const count = typeof countValue === 'number' ? Math.floor(countValue) : 0;
-
-      if (!name || count <= 0) {
-        continue;
-      }
-
-      entries.push({ name, count });
-    }
-
-    return entries;
-  }
-
   function handleImport() {
     if (!inputValue.trim()) {
       setErrorMessage(labels.errorEmpty);
@@ -105,60 +83,49 @@ export function DeckImportModal({ isOpen, onClose, cards, onImport, labels }: De
       return;
     }
 
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(inputValue);
-    } catch (error) {
-      setErrorMessage(labels.errorInvalid);
-      setUnknownCards([]);
-      return;
-    }
-
-    let entries: ImportEntry[];
-    try {
-      entries = parseEntries(parsed);
-    } catch (error) {
-      setErrorMessage(labels.errorInvalid);
-      setUnknownCards([]);
-      return;
-    }
-
-    if (entries.length === 0) {
-      setErrorMessage(labels.errorEmpty);
-      setUnknownCards([]);
-      return;
-    }
-
-    const deck: Record<string, number> = {};
-    const missing: string[] = [];
-
-    for (const entry of entries) {
-      const card = cardNameMap.get(entry.name.toLowerCase());
-      if (!card) {
-        if (!missing.includes(entry.name)) {
-          missing.push(entry.name);
-        }
-        continue;
+      const entries = parseDeckImport(inputValue, selectedFormat);
+      if (entries.length === 0) {
+        setErrorMessage(labels.errorEmpty);
+        setUnknownCards([]);
+        return;
       }
 
-      const nextCount = Math.min(MAX_COPIES_PER_CARD, Math.max(1, entry.count));
-      deck[card.id] = Math.min(MAX_COPIES_PER_CARD, (deck[card.id] ?? 0) + nextCount);
-    }
+      const deck: Record<string, number> = {};
+      const missing: string[] = [];
 
-    if (Object.keys(deck).length === 0) {
-      setErrorMessage(labels.errorEmpty);
-      setUnknownCards(missing);
+      for (const entry of entries) {
+        const card = cardNameMap.get(entry.name.toLowerCase());
+        if (!card) {
+          if (!missing.includes(entry.name)) {
+            missing.push(entry.name);
+          }
+          continue;
+        }
+
+        const nextCount = Math.min(MAX_COPIES_PER_CARD, Math.max(1, entry.count));
+        deck[card.id] = Math.min(MAX_COPIES_PER_CARD, (deck[card.id] ?? 0) + nextCount);
+      }
+
+      if (Object.keys(deck).length === 0) {
+        setErrorMessage(labels.errorEmpty);
+        setUnknownCards(missing);
+        return;
+      }
+
+      if (missing.length > 0) {
+        setErrorMessage(labels.errorUnknown);
+        setUnknownCards(missing);
+        return;
+      }
+
+      onImport(deck);
+      onClose();
+    } catch {
+      setErrorMessage(labels.errorInvalid);
+      setUnknownCards([]);
       return;
     }
-
-    if (missing.length > 0) {
-      setErrorMessage(labels.errorUnknown);
-      setUnknownCards(missing);
-      return;
-    }
-
-    onImport(deck);
-    onClose();
   }
 
   return (
@@ -178,7 +145,34 @@ export function DeckImportModal({ isOpen, onClose, cards, onImport, labels }: De
           </button>
         </div>
 
-        <p className="mt-4 text-sm text-[color:var(--text-secondary)]">{labels.instructions}</p>
+        <div className="mt-4 inline-flex w-fit rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 p-1">
+          <button
+            type="button"
+            onClick={() => setSelectedFormat('tts')}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+              selectedFormat === 'tts'
+                ? 'bg-[color:var(--accent)] text-white'
+                : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-muted)]'
+            }`}
+          >
+            {labels.importOptionTTS}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedFormat('text')}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+              selectedFormat === 'text'
+                ? 'bg-[color:var(--accent)] text-white'
+                : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-muted)]'
+            }`}
+          >
+            {labels.importOptionText}
+          </button>
+        </div>
+
+        <p className="mt-4 text-sm text-[color:var(--text-secondary)]">
+          {selectedFormat === 'tts' ? labels.instructionsTTS : labels.instructionsText}
+        </p>
 
         <label className="mt-4 flex w-fit cursor-pointer flex-col items-start gap-2 text-xs font-medium text-[color:var(--text-secondary)]">
           {labels.uploadLabel}
@@ -197,7 +191,7 @@ export function DeckImportModal({ isOpen, onClose, cards, onImport, labels }: De
             setErrorMessage(null);
             setUnknownCards([]);
           }}
-          placeholder={labels.placeholder}
+          placeholder={selectedFormat === 'tts' ? labels.placeholderTTS : labels.placeholderText}
           rows={12}
           className="mt-4 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/60 p-3 text-sm text-[color:var(--text-primary)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
         />
