@@ -44,6 +44,20 @@ const MY_DECKS_LABELS: Record<Locale, string> = {
   ms: 'Decks',
 };
 
+const COLLECTION_LABELS: Record<Locale, string> = {
+  de: 'Sammlung',
+  en: 'Collection',
+  fr: 'Collection',
+  ms: 'Collection',
+};
+
+const BUILDER_LABELS: Record<Locale, string> = {
+  de: 'Builder',
+  en: 'Builder',
+  fr: 'Builder',
+  ms: 'Builder',
+};
+
 const RESET_FLAG_STORAGE_KEY = 'astrabuilder-auth-reset';
 
 export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
@@ -266,6 +280,14 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const accountFallbackLabel = ACCOUNT_FALLBACK_LABELS[locale];
   const profileMenuLabel = PROFILE_MENU_LABELS[locale];
   const myDecksLabel = MY_DECKS_LABELS[locale];
+  const collectionLabel = COLLECTION_LABELS[locale];
+  const builderLabel = BUILDER_LABELS[locale];
+  const builderHref = `/${locale}/create`;
+  const decksHref = `/${locale}/decks`;
+  const collectionHref = `/${locale}/collection`;
+  const isBuilderRoute = pathname === builderHref || pathname?.startsWith(`${builderHref}/`);
+  const isDecksRoute = pathname === decksHref || pathname?.startsWith(`${decksHref}/`);
+  const isCollectionRoute = pathname === collectionHref || pathname?.startsWith(`${collectionHref}/`);
 
   const shouldShowSignInButton = isAuthReady && !user;
   const shouldShowProfileButton = isAuthReady && !!user;
@@ -280,8 +302,8 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <span className={`text-lg font-semibold ${toolbarTextClass}`}>
+      <div className="flex h-16 w-full items-center gap-4 px-4 sm:px-6">
+        <span className={`shrink-0 text-lg font-semibold ${toolbarTextClass}`}>
           <Link href={`/${locale}`} className="flex items-center">
             <Image
               src="/images/astrabuilder_logo.png"
@@ -292,7 +314,41 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
             />
           </Link>
         </span>
-        <div className="flex items-center gap-4">
+        <nav className="flex min-w-0 flex-1 items-center justify-center overflow-x-auto px-2 [scrollbar-width:none]">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href={builderHref}
+              className={`border-b-2 px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                isBuilderRoute
+                  ? 'border-[color:var(--accent)] text-[color:var(--accent)]'
+                  : `border-transparent ${toolbarTextClass} hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]`
+              }`}
+            >
+              {builderLabel}
+            </Link>
+            <Link
+              href={decksHref}
+              className={`border-b-2 px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                isDecksRoute
+                  ? 'border-[color:var(--accent)] text-[color:var(--accent)]'
+                  : `border-transparent ${toolbarTextClass} hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]`
+              }`}
+            >
+              {myDecksLabel}
+            </Link>
+            <Link
+              href={collectionHref}
+              className={`border-b-2 px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                isCollectionRoute
+                  ? 'border-[color:var(--accent)] text-[color:var(--accent)]'
+                  : `border-transparent ${toolbarTextClass} hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]`
+              }`}
+            >
+              {collectionLabel}
+            </Link>
+          </div>
+        </nav>
+        <div className="ml-auto flex shrink-0 items-center gap-4">
           {shouldShowSignInButton ? (
             <PrimaryButton className="px-4" type="button" href={`/${locale}/sign-in`}>
               {signInLabel}
