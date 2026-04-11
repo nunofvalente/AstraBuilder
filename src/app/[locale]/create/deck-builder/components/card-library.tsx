@@ -11,11 +11,16 @@ export type CardLibraryProps = {
   errorMessage: string | null;
   noResultsLabel: string;
   skeletonCount: number;
-  addButtonLabel: string;
+  addButtonLabel?: string;
   zoomButtonLabel: string;
-  onAdd: (cardId: string) => void;
+  onAdd?: (cardId: string) => void;
   onZoom: (card: Card | null, variant?: 'default' | 'compact', anchor?: ZoomAnchor | null) => void;
+  readOnly?: boolean;
+  gridClassName?: string;
 };
+
+const DEFAULT_GRID_CLASS_NAME =
+  'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7';
 
 export function CardLibrary({
   cards,
@@ -28,10 +33,12 @@ export function CardLibrary({
   zoomButtonLabel,
   onAdd,
   onZoom,
+  readOnly = false,
+  gridClassName = DEFAULT_GRID_CLASS_NAME,
 }: CardLibraryProps) {
   if (isLoading) {
     return (
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
+      <ul className={gridClassName}>
         {Array.from({ length: skeletonCount }).map((_, index) => (
           <li key={index}>
             <div className="aspect-[5/7] w-full animate-pulse rounded-none bg-[color:var(--surface-muted)]" />
@@ -50,55 +57,66 @@ export function CardLibrary({
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7">
+    <ul className={gridClassName}>
       {cards.map((card) => {
         const copies = deck[card.id] ?? 0;
         const isSelected = copies > 0;
         const isMaxed = copies >= 3;
+        const isAddDisabled = readOnly || isMaxed || !onAdd;
 
         const thumbnailSrc = getCardImageVariantUrl(card.imageSrc, 'small');
+        const cardFrame = (
+          <div
+            className={`relative overflow-hidden rounded-none shadow-md transition-transform duration-150 group-hover:-translate-y-1 group-hover:shadow-2xl ${
+              isSelected ? 'ring-2 ring-[color:var(--accent)]' : ''
+            }`}
+          >
+            <Image
+              src={thumbnailSrc}
+              alt={card.name}
+              width={220}
+              height={308}
+              className="h-auto w-full select-none"
+              sizes={CARD_IMAGE_SIZES}
+              loading="lazy"
+              fetchPriority="low"
+            />
+            {copies > 0 ? (
+              <span className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-[color:var(--accent)] px-2 py-0.5 text-xs font-semibold text-[color:var(--text-on-accent)] shadow-md">
+                x{copies}
+              </span>
+            ) : null}
+          </div>
+        );
 
         return (
           <li key={card.id}>
             <div className="group relative h-full">
-              <button
-                type="button"
-                onClick={() => {
-                  if (isMaxed) {
-                    return;
-                  }
-                  onAdd(card.id);
-                }}
-                aria-label={`${addButtonLabel} ${card.name}`}
-                aria-disabled={isMaxed}
-                disabled={isMaxed}
-                className={`relative block h-full w-full focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
-                  isMaxed ? 'cursor-not-allowed opacity-90' : ''
-                }`}
-              >
-                <span className="sr-only">{card.detailLabel}</span>
-                <div
-                  className={`relative overflow-hidden rounded-none shadow-md transition-transform duration-150 group-hover:-translate-y-1 group-hover:shadow-2xl ${
-                    isSelected ? 'ring-2 ring-[color:var(--accent)]' : ''
+              {readOnly ? (
+                <div className="relative block h-full w-full">
+                  <span className="sr-only">{card.detailLabel}</span>
+                  {cardFrame}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAddDisabled) {
+                      return;
+                    }
+                    onAdd(card.id);
+                  }}
+                  aria-label={`${addButtonLabel ?? 'Add'} ${card.name}`}
+                  aria-disabled={isAddDisabled}
+                  disabled={isAddDisabled}
+                  className={`relative block h-full w-full focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                    isAddDisabled ? 'cursor-not-allowed opacity-90' : ''
                   }`}
                 >
-                  <Image
-                    src={thumbnailSrc}
-                    alt={card.name}
-                    width={220}
-                    height={308}
-                    className="h-auto w-full select-none"
-                    sizes={CARD_IMAGE_SIZES}
-                    loading="lazy"
-                    fetchPriority="low"
-                  />
-                  {copies > 0 ? (
-                    <span className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-[color:var(--accent)] px-2 py-0.5 text-xs font-semibold text-[color:var(--text-on-accent)] shadow-md">
-                      x{copies}
-                    </span>
-                  ) : null}
-                </div>
-              </button>
+                  <span className="sr-only">{card.detailLabel}</span>
+                  {cardFrame}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(event) => {
