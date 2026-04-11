@@ -15,27 +15,27 @@ import { SortMenu } from './deck-builder/components/sort-menu';
 import { ZoomOverlay } from './deck-builder/components/zoom-overlay';
 import type { ZoomAnchor } from './deck-builder/components/zoom-overlay';
 import {
+  appendUniqueFilters,
+  buildActiveAffinitySet,
+  buildCombinedQueries,
+  CARD_SORT_OPTIONS,
+  createInitialActiveAffinities,
+  filterAndSortCards,
+  parseCatalogSearch,
+  toggleAffinitySelection,
+  type CardSortOption,
+} from './deck-builder/catalog-controls';
+import {
   AFFINITY_FILTERS,
-  AFFINITY_SORT_ORDER,
   CARD_SKELETON_COUNT,
 } from './deck-builder/constants';
 import type { Card, CostBucket, DeckBuilderProps, DeckEntry } from './deck-builder/types';
 import {
   buildSearchSuggestions,
-  doesCardMatchQuery,
-  parseSearchInput,
   type SearchQuery,
   type SearchSuggestion,
 } from './deck-builder/search';
 import { supabase } from '@/lib/supabase/supabaseClient';
-
-const SORT_OPTIONS = [
-  { value: 'affinity', label: 'Affinity' },
-  { value: 'number', label: 'Card number' },
-  { value: 'cost', label: 'Cost' },
-] as const;
-
-type SortOption = (typeof SORT_OPTIONS)[number]['value'];
 
 const DEFAULT_ZOOM_LABEL = 'Zoom';
 
@@ -58,14 +58,10 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   const [activeFilters, setActiveFilters] = useState<SearchQuery[]>([]);
   const [deck, setDeck] = useState<Record<string, number>>({});
   const cards = useMemo(() => initialCards, [initialCards]);
-  const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    for (const filter of AFFINITY_FILTERS) {
-      initial[filter.value] = true;
-    }
-    return initial;
-  });
-  const [sortOption, setSortOption] = useState<SortOption>('affinity');
+  const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(
+    createInitialActiveAffinities
+  );
+  const [sortOption, setSortOption] = useState<CardSortOption>('affinity');
   const cardsError = initialError;
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
   const [zoomVariant, setZoomVariant] = useState<'default' | 'compact'>('default');
@@ -114,88 +110,31 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [zoomCard]);
 
-  const getAffinityIndex = (value: string) => {
-    const index = AFFINITY_SORT_ORDER.indexOf(value);
-    return index === -1 ? AFFINITY_SORT_ORDER.length : index;
-  };
+  const activeAffinitySet = useMemo(() => buildActiveAffinitySet(activeAffinities), [activeAffinities]);
 
-  const activeAffinitySet = useMemo(() => {
-    const enabled = AFFINITY_FILTERS.filter((filter) => activeAffinities[filter.value]);
-    if (enabled.length === AFFINITY_FILTERS.length) {
-      return null;
-    }
+  const { queries: searchQueries, terms: searchTerms } = useMemo(
+    () => parseCatalogSearch(searchTerm),
+    [searchTerm]
+  );
 
-    return new Set(enabled.map((filter) => filter.value));
-  }, [activeAffinities]);
-
-  const { queries: searchQueries, terms: searchTerms } = useMemo(() => parseSearchInput(searchTerm), [searchTerm]);
-
-  const combinedQueries = useMemo(() => [...activeFilters, ...searchQueries], [activeFilters, searchQueries]);
+  const combinedQueries = useMemo(
+    () => buildCombinedQueries(activeFilters, searchQueries),
+    [activeFilters, searchQueries]
+  );
 
   const searchSuggestions = useMemo(() => buildSearchSuggestions(searchTerm), [searchTerm]);
 
-  const filteredCards = useMemo(() => {
-    const filtered = cards.filter((card) => {
-      const matchesAffinity = !activeAffinitySet || activeAffinitySet.has(card.affinity);
-      if (!matchesAffinity) {
-        return false;
-      }
-
-      if (combinedQueries.length === 0 && searchTerms.length === 0) {
-        return true;
-      }
-
-      const matchesStructured = combinedQueries.every((query) => doesCardMatchQuery(card, query));
-      if (!matchesStructured) {
-        return false;
-      }
-
-      if (searchTerms.length === 0) {
-        return true;
-      }
-
-      const lowerContent = card.searchContent;
-      return searchTerms.every((term) => lowerContent.includes(term));
-    });
-
-    const sorted = [...filtered].sort((a, b) => {
-      if (sortOption === 'number') {
-        const aNumber = a.number ?? Number.POSITIVE_INFINITY;
-        const bNumber = b.number ?? Number.POSITIVE_INFINITY;
-        if (aNumber !== bNumber) {
-          return aNumber - bNumber;
-        }
-      } else if (sortOption === 'cost') {
-        if (a.cost !== b.cost) {
-          return a.cost - b.cost;
-        }
-
-        const aNumber = a.number ?? Number.POSITIVE_INFINITY;
-        const bNumber = b.number ?? Number.POSITIVE_INFINITY;
-        if (aNumber !== bNumber) {
-          return aNumber - bNumber;
-        }
-
-        return a.name.localeCompare(b.name);
-      }
-
-      const affinityDiff = getAffinityIndex(a.affinity) - getAffinityIndex(b.affinity);
-      if (affinityDiff !== 0) {
-        return affinityDiff;
-      }
-
-      const nameDiff = a.name.localeCompare(b.name);
-      if (nameDiff !== 0) {
-        return nameDiff;
-      }
-
-      const aNumber = a.number ?? Number.POSITIVE_INFINITY;
-      const bNumber = b.number ?? Number.POSITIVE_INFINITY;
-      return aNumber - bNumber;
-    });
-
-    return sorted;
-  }, [cards, combinedQueries, searchTerms, activeAffinitySet, sortOption]);
+  const filteredCards = useMemo(
+    () =>
+      filterAndSortCards({
+        cards,
+        activeAffinitySet,
+        combinedQueries,
+        searchTerms,
+        sortOption,
+      }),
+    [cards, combinedQueries, searchTerms, activeAffinitySet, sortOption]
+  );
 
   const cardMap = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const prefilledDeckIdRef = useRef<string | null>(null);
@@ -388,8 +327,8 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   }
 
   function handleSortChange(nextOption: string) {
-    if (SORT_OPTIONS.some((option) => option.value === nextOption)) {
-      setSortOption(nextOption as SortOption);
+    if (CARD_SORT_OPTIONS.some((option) => option.value === nextOption)) {
+      setSortOption(nextOption as CardSortOption);
     }
   }
 
@@ -516,37 +455,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   }
 
   function toggleAffinity(value: string) {
-    setActiveAffinities((previous) => {
-      const next: Record<string, boolean> = { ...previous };
-      const totalFilters = AFFINITY_FILTERS.length;
-      const enabledBefore = AFFINITY_FILTERS.reduce((count, filter) => (next[filter.value] ? count + 1 : count), 0);
-      const current = next[value] ?? true;
-
-      if (enabledBefore === totalFilters && current) {
-        for (const filter of AFFINITY_FILTERS) {
-          next[filter.value] = filter.value === value;
-        }
-        return next;
-      }
-
-      if (current && enabledBefore === 1) {
-        for (const filter of AFFINITY_FILTERS) {
-          next[filter.value] = true;
-        }
-        return next;
-      }
-
-      next[value] = !current;
-
-      const enabledAfter = AFFINITY_FILTERS.reduce((count, filter) => (next[filter.value] ? count + 1 : count), 0);
-      if (enabledAfter === 0) {
-        for (const filter of AFFINITY_FILTERS) {
-          next[filter.value] = true;
-        }
-      }
-
-      return next;
-    });
+    setActiveAffinities((previous) => toggleAffinitySelection(previous, value));
   }
 
   function handleSuggestionSelect(suggestionValue: string) {
@@ -562,27 +471,12 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   }
 
   function commitSearchQueries() {
-    const { queries } = parseSearchInput(searchTerm);
+    const { queries } = parseCatalogSearch(searchTerm);
     if (queries.length === 0) {
       return;
     }
 
-    setActiveFilters((previous) => {
-      const existingKeys = new Set(previous.map((query) => `${query.field.key}:${query.value.toLowerCase()}`));
-      const appended: SearchQuery[] = [];
-      for (const query of queries) {
-        const key = `${query.field.key}:${query.value.toLowerCase()}`;
-        if (!existingKeys.has(key)) {
-          appended.push(query);
-        }
-      }
-
-      if (appended.length === 0) {
-        return previous;
-      }
-
-      return [...previous, ...appended];
-    });
+    setActiveFilters((previous) => appendUniqueFilters(previous, queries));
 
     setSearchTerm('');
   }
@@ -615,7 +509,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
             onRemoveFilter={removeFilter}
           >
             <AffinityFilterBar activeAffinities={activeAffinities} onToggle={toggleAffinity} />
-            <SortMenu options={SORT_OPTIONS} value={sortOption} onChange={handleSortChange} />
+            <SortMenu options={CARD_SORT_OPTIONS} value={sortOption} onChange={handleSortChange} />
           </CardSearchBar>
 
           <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
