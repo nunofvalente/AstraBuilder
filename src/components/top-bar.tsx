@@ -8,59 +8,19 @@ import { usePathname, useRouter } from 'next/navigation';
 
 import { PrimaryButton } from '@/components/primary-button';
 import { DEFAULT_LOCALE, type Locale } from '@/i18n/config';
+import type { Dictionary } from '@/i18n/get-dictionary';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { ensureProfileForUser, type Profile } from '@/lib/supabase/profiles';
 
 type TopBarProps = {
   locale?: Locale;
+  labels: Dictionary['topBar'];
   onSettings?: () => void;
-};
-
-const SIGN_IN_LABELS: Record<Locale, string> = {
-  de: 'Anmelden',
-  en: 'Sign in',
-  fr: 'Se connecter',
-  ms: 'Log masuk',
-};
-
-const ACCOUNT_FALLBACK_LABELS: Record<Locale, string> = {
-  de: 'Konto',
-  en: 'Account',
-  fr: 'Compte',
-  ms: 'Akaun',
-};
-
-const PROFILE_MENU_LABELS: Record<Locale, string> = {
-  de: 'Profil',
-  en: 'Profile',
-  fr: 'Profil',
-  ms: 'Profil',
-};
-
-const MY_DECKS_LABELS: Record<Locale, string> = {
-  de: 'Decks',
-  en: 'Decks',
-  fr: 'Decks',
-  ms: 'Decks',
-};
-
-const COLLECTION_LABELS: Record<Locale, string> = {
-  de: 'Sammlung',
-  en: 'Collection',
-  fr: 'Collection',
-  ms: 'Collection',
-};
-
-const BUILDER_LABELS: Record<Locale, string> = {
-  de: 'Builder',
-  en: 'Builder',
-  fr: 'Builder',
-  ms: 'Builder',
 };
 
 const RESET_FLAG_STORAGE_KEY = 'astrabuilder-auth-reset';
 
-export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
+export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarProps) {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -276,12 +236,6 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
   const toolbarTextClass = 'text-white';
   const menuTextClass = 'text-[color:var(--text-primary)]';
   const barColorClass = 'bg-white';
-  const signInLabel = SIGN_IN_LABELS[locale];
-  const accountFallbackLabel = ACCOUNT_FALLBACK_LABELS[locale];
-  const profileMenuLabel = PROFILE_MENU_LABELS[locale];
-  const myDecksLabel = MY_DECKS_LABELS[locale];
-  const collectionLabel = COLLECTION_LABELS[locale];
-  const builderLabel = BUILDER_LABELS[locale];
   const builderHref = `/${locale}/create`;
   const decksHref = `/${locale}/decks`;
   const collectionHref = `/${locale}/collection`;
@@ -291,14 +245,14 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
 
   const shouldShowSignInButton = isAuthReady && !user;
   const shouldShowProfileButton = isAuthReady && !!user;
-  const profileFallbackLabel = user?.email ?? accountFallbackLabel;
+  const profileFallbackLabel = user?.email ?? labels.accountFallback;
   const profileName =
     profile?.username && profile.username.trim().length > 0
       ? profile.username.trim()
       : profileFallbackLabel;
   const profileDisplayLabel = isProfileLoading ? '...' : profileName;
   const profileButtonTitle = profileName;
-  const signOutLabel = isSigningOut ? 'Signing out...' : 'Sign out';
+  const signOutLabel = isSigningOut ? labels.signingOut : labels.signOut;
 
   return (
     <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
@@ -324,7 +278,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                   : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
               }`}
             >
-              {builderLabel}
+              {labels.builder}
             </Link>
             <Link
               href={decksHref}
@@ -334,7 +288,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                   : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
               }`}
             >
-              {myDecksLabel}
+              {labels.decks}
             </Link>
             <Link
               href={collectionHref}
@@ -344,14 +298,14 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                   : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
               }`}
             >
-              {collectionLabel}
+              {labels.collection}
             </Link>
           </div>
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-4">
           {shouldShowSignInButton ? (
             <PrimaryButton className="px-4" type="button" href={`/${locale}/sign-in`}>
-              {signInLabel}
+              {labels.signIn}
             </PrimaryButton>
           ) : null}
           {shouldShowProfileButton ? (
@@ -361,7 +315,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                 aria-haspopup="menu"
                 aria-expanded={isUserMenuOpen}
                 aria-busy={isProfileLoading}
-                aria-label={profileMenuLabel}
+                aria-label={labels.profile}
                 title={profileButtonTitle}
                 onClick={toggleUserMenu}
                 className={`max-w-[200px] truncate rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]/60 ${isUserMenuOpen ? 'opacity-90' : ''}`}
@@ -379,7 +333,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                     className={`block w-full px-4 py-2 text-left text-sm font-semibold transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${menuTextClass}`}
                     role="menuitem"
                   >
-                    {myDecksLabel}
+                    {labels.myDecks}
                   </button>
                   <div className="border-t border-[color:var(--border)]" />
                   <button
@@ -388,7 +342,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                     className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
                     role="menuitem"
                   >
-                    {profileMenuLabel}
+                    {labels.profile}
                   </button>
                   <div className="border-t border-[color:var(--border)]" />
                   <button
@@ -412,7 +366,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
               onClick={toggleSettingsMenu}
               className="flex h-10 w-10 items-center justify-center rounded-md border border-[color:var(--border)] transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
             >
-              <span className="sr-only">Toggle settings menu</span>
+              <span className="sr-only">{labels.toggleSettingsMenu}</span>
               <span className="flex flex-col items-center justify-center gap-1">
                 <span className={`block h-0.5 w-5 ${barColorClass}`}></span>
                 <span className={`block h-0.5 w-5 ${barColorClass}`}></span>
@@ -430,7 +384,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, onSettings }: TopBarProps) {
                   className={`block w-full px-4 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${menuTextClass}`}
                   role="menuitem"
                 >
-                  Settings
+                  {labels.settings}
                 </button>
               </div>
             ) : null}

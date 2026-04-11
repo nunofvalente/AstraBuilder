@@ -376,6 +376,22 @@ type SettingsDictionaryShape = {
   };
 };
 
+type TopBarDictionary = {
+  topBar: {
+    signIn: string;
+    accountFallback: string;
+    profile: string;
+    myDecks: string;
+    builder: string;
+    decks: string;
+    collection: string;
+    settings: string;
+    signOut: string;
+    signingOut: string;
+    toggleSettingsMenu: string;
+  };
+};
+
 type DictionaryModule = {
   default: HomeDictionary &
     AffinityPageDictionary &
@@ -387,7 +403,8 @@ type DictionaryModule = {
     MyDecksDictionary &
     DeckDetailsDictionary &
     DeckFeedDictionary &
-    SettingsDictionaryShape;
+    SettingsDictionaryShape &
+    TopBarDictionary;
 };
 
 type ImportDictionary = () => Promise<DictionaryModule>;
@@ -409,7 +426,8 @@ export type Dictionary = HomeDictionary &
   MyDecksDictionary &
   DeckDetailsDictionary &
   DeckFeedDictionary &
-  SettingsDictionaryShape;
+  SettingsDictionaryShape &
+  TopBarDictionary;
 export type SignUpDictionary = AuthDictionary["auth"]["signUp"];
 export type SignInDictionary = AuthDictionary["auth"]["signIn"];
 export type ForgotPasswordDictionary = AuthDictionary["auth"]["forgotPassword"];

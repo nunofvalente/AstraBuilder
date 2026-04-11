@@ -340,5 +340,18 @@
         "dark": "Dark"
       }
     }
+  },
+  "topBar": {
+    "signIn": "Sign in",
+    "accountFallback": "Account",
+    "profile": "Profile",
+    "myDecks": "My Decks",
+    "builder": "Builder",
+    "decks": "Decks",
+    "collection": "Collection",
+    "settings": "Settings",
+    "signOut": "Sign out",
+    "signingOut": "Signing out...",
+    "toggleSettingsMenu": "Toggle settings menu"
   }
 }
