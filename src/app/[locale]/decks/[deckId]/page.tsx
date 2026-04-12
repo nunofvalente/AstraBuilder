@@ -56,6 +56,15 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
       deckId={deckId}
       labels={{ deckDetails: dictionary.deckDetails, myDecks: dictionary.myDecks, publicProfile: dictionary.publicProfile }}
       emptyDeckLabel={dictionary.builder.emptyDeck}
+      exportLabels={{
+        exportHeading: dictionary.builder.menuExport,
+        exportOptionTTS: dictionary.builder.exportOptionTTS,
+        exportOptionText: dictionary.builder.exportOptionText,
+        emptyDeck: dictionary.builder.emptyDeck,
+        exportCopy: dictionary.builder.exportCopy,
+        exportCopySuccess: dictionary.builder.exportCopySuccess,
+        exportCopyError: dictionary.builder.exportCopyError,
+      }}
       shareLabels={{
         deckHeading: dictionary.builder.deckHeading,
         totalCardsLabel: dictionary.builder.totalCardsLabel,

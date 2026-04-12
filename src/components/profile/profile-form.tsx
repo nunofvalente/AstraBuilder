@@ -234,7 +234,7 @@ export function ProfileForm({ locale, dictionary }: ProfileFormProps) {
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-        <label htmlFor="profile-username" className="block text-sm font-medium text-[color:var(--text-primary)]">
+        <label htmlFor="profile-username" className="block text-sm font-bold text-[color:var(--text-primary)]">
           {dictionary.fields.username}
         </label>
         <input
@@ -248,11 +248,10 @@ export function ProfileForm({ locale, dictionary }: ProfileFormProps) {
           autoComplete="nickname"
           required
         />
-        <p className="text-xs text-[color:var(--text-secondary)]">{dictionary.fields.usernameHint}</p>
         </div>
 
         <div className="space-y-2">
-        <label htmlFor="profile-bio" className="block text-sm font-medium text-[color:var(--text-primary)]">
+        <label htmlFor="profile-bio" className="block text-sm font-bold text-[color:var(--text-primary)]">
           {dictionary.fields.bio}
         </label>
         <textarea
@@ -268,7 +267,7 @@ export function ProfileForm({ locale, dictionary }: ProfileFormProps) {
         </div>
 
         <div className="space-y-2">
-        <label htmlFor="profile-x" className="block text-sm font-medium text-[color:var(--text-primary)]">
+        <label htmlFor="profile-x" className="block text-sm font-bold text-[color:var(--text-primary)]">
           {dictionary.fields.xLink}
         </label>
         <input
@@ -283,7 +282,7 @@ export function ProfileForm({ locale, dictionary }: ProfileFormProps) {
         </div>
 
         <div className="space-y-2">
-        <label htmlFor="profile-youtube" className="block text-sm font-medium text-[color:var(--text-primary)]">
+        <label htmlFor="profile-youtube" className="block text-sm font-bold text-[color:var(--text-primary)]">
           {dictionary.fields.youtubeLink}
         </label>
         <input
