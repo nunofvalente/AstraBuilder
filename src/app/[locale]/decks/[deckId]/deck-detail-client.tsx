@@ -1,19 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 import type { Locale } from '@/i18n/config';
 import type { Card, DeckEntry } from '@/app/[locale]/create/deck-builder/types';
-import { DeckCardChip } from '@/app/[locale]/create/deck-builder/components/deck-card-chip';
+import { DeckExportModal } from '@/app/[locale]/create/deck-builder/components/deck-export-modal';
 import { DeckShareModal } from '@/app/[locale]/create/deck-builder/components/deck-share-modal';
 import { ZoomOverlay } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import type { ZoomAnchor } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import type { DeckDetailData } from '@/lib/supabase/decks';
 import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
+import { getAffinityColorScheme } from '@/app/[locale]/create/deck-builder/constants';
+import { getShareRenderableImageUrl } from '@/lib/images/card-image-proxy';
 
 const CARD_TYPE_ORDER = ['Unit', 'Renowned Unit', 'Tactic', 'Territory'];
 const FALLBACK_SECTION_LABEL = 'Other';
@@ -67,6 +69,15 @@ type DeckDetailsClientProps = {
     };
   };
   emptyDeckLabel: string;
+  exportLabels: {
+    exportHeading: string;
+    exportOptionTTS: string;
+    exportOptionText: string;
+    emptyDeck: string;
+    exportCopy: string;
+    exportCopySuccess: string;
+    exportCopyError: string;
+  };
   shareLabels: {
     deckHeading: string;
     totalCardsLabel: string;
@@ -91,6 +102,8 @@ type DeckStatsOverride = {
   viewsTotal?: number;
   favoritesTotal?: number;
 };
+
+type PreviewEvent = ReactMouseEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>;
 
 type DeckMetaState = {
   id: string;
@@ -189,6 +202,7 @@ export function DeckDetailClient({
   deck,
   labels,
   emptyDeckLabel,
+  exportLabels,
   shareLabels,
 }: DeckDetailsClientProps) {
   const [zoomCard, setZoomCard] = useState<Card | null>(null);
@@ -203,6 +217,7 @@ export function DeckDetailClient({
   const [isFavoriteLoaded, setIsFavoriteLoaded] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [favoriteErrorMessage, setFavoriteErrorMessage] = useState<string | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const hasLoggedViewRef = useRef(false);
   const router = useRouter();
@@ -597,6 +612,39 @@ export function DeckDetailClient({
     setZoomAnchor(anchor);
   }
 
+  function handleCardPreview(card: Card, event: PreviewEvent) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : rect.right;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : rect.bottom;
+
+    let pointerX = rect.left + rect.width / 2;
+    let pointerY = rect.top + rect.height / 2;
+
+    if ('clientX' in event && typeof event.clientX === 'number' && typeof event.clientY === 'number') {
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+    } else if (
+      event.nativeEvent &&
+      typeof (event.nativeEvent as MouseEvent).clientX === 'number' &&
+      typeof (event.nativeEvent as MouseEvent).clientY === 'number'
+    ) {
+      const native = event.nativeEvent as globalThis.MouseEvent;
+      pointerX = native.clientX;
+      pointerY = native.clientY;
+    }
+
+    handleZoom(card, 'compact', {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      viewportWidth,
+      viewportHeight,
+      pointerX,
+      pointerY,
+    });
+  }
+
   async function handleFavoriteToggle() {
     if (!deckMeta) {
       return;
@@ -762,10 +810,55 @@ export function DeckDetailClient({
             </h3>
             <span className="text-xs text-[color:var(--text-secondary)]">x{section.total}</span>
           </header>
-          <ul className="flex flex-col gap-2">
-            {section.entries.map(({ card, count }) => (
-              <DeckCardChip key={card.id} card={card} count={count} onZoom={handleZoom} readOnly />
-            ))}
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {section.entries.map(({ card, count }) => {
+              const scheme = getAffinityColorScheme(card.affinity);
+              const imageSrc = getShareRenderableImageUrl(card.imageSrc);
+
+              return (
+                <li key={card.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleZoom(card)}
+                    onMouseEnter={(event) => handleCardPreview(card, event)}
+                    onFocus={(event) => handleCardPreview(card, event)}
+                    onMouseLeave={() => handleZoom(null)}
+                    onBlur={() => handleZoom(null)}
+                    className="group relative block w-full overflow-hidden rounded-[18px] border shadow-[0_10px_20px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(0,0,0,0.28)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                    style={{
+                      borderColor: scheme.borderColor,
+                      background: 'linear-gradient(180deg, rgba(15,23,42,0.65) 0%, rgba(15,23,42,0.9) 100%)',
+                    }}
+                    aria-label={`View details for ${card.name}`}
+                  >
+                    <div className="relative aspect-[3/4] w-full">
+                      {card.imageSrc ? (
+                        <img
+                          src={imageSrc}
+                          alt={card.name}
+                          className="block h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-[color:var(--surface-muted)] text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
+                          No Art
+                        </div>
+                      )}
+                      <span
+                        className="pointer-events-none absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center justify-center rounded-full px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.16em] shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
+                        style={{
+                          backgroundColor: 'var(--accent)',
+                          color: 'var(--text-on-accent)',
+                          border: '1px solid rgba(0,0,0,0.25)',
+                        }}
+                      >
+                        x{count}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ))}
@@ -842,6 +935,30 @@ export function DeckDetailClient({
               </svg>
               <span className="sr-only">{favoriteButtonLabel}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setIsExportModalOpen(true)}
+              disabled={deckEntries.length === 0}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-secondary)] shadow-sm transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+              title={exportLabels.exportHeading}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M12 4v10" />
+                <path d="m8 10 4 4 4-4" />
+                <path d="M5 18h14" />
+              </svg>
+              <span className="sr-only">{exportLabels.exportHeading}</span>
+            </button>
             <Link
               href={`/${locale}/create?deck=${encodeURIComponent(deckMeta.id)}`}
               className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
@@ -850,6 +967,13 @@ export function DeckDetailClient({
             </Link>
         </div>
       </div>
+
+      <DeckExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        deckEntries={deckEntries}
+        labels={exportLabels}
+      />
 
       <DeckShareModal
         isOpen={isShareModalOpen}
@@ -889,9 +1013,9 @@ export function DeckDetailClient({
               {authorDisplayName}
             </span>
           )}
-          <div className="flex flex-col items-center gap-2 text-xs text-[color:var(--text-secondary)]">
-            <span className="font-semibold uppercase tracking-wide">{labels.publicProfile.socialsHeading}</span>
-            {authorSocials.length > 0 ? (
+          {authorSocials.length > 0 ? (
+            <div className="flex flex-col items-center gap-2 text-xs text-[color:var(--text-secondary)]">
+              <span className="font-semibold uppercase tracking-wide">{labels.publicProfile.socialsHeading}</span>
               <div className="flex flex-wrap justify-center gap-3">
                 {authorSocials.map((social) => (
                   <Link
@@ -905,10 +1029,8 @@ export function DeckDetailClient({
                   </Link>
                 ))}
               </div>
-            ) : (
-              <span className="text-xs text-[color:var(--text-secondary)]">{labels.publicProfile.socialsEmpty}</span>
-            )}
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
