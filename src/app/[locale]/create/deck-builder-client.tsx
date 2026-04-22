@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { AffinityFilterBar } from './deck-builder/components/affinity-filter-bar';
 import { CardSearchBar } from './deck-builder/components/card-search-bar';
@@ -9,7 +9,7 @@ import { CardLibrary } from './deck-builder/components/card-library';
 import { DeckExportModal } from './deck-builder/components/deck-export-modal';
 import { DeckImportModal } from './deck-builder/components/deck-import-modal';
 import { DeckShareModal } from './deck-builder/components/deck-share-modal';
-import { DeckSaveModal } from './deck-builder/components/deck-save-modal';
+import { DeckSaveModal, type SaveDeckMode } from './deck-builder/components/deck-save-modal';
 import { DeckPanel } from './deck-builder/components/deck-panel';
 import { SortMenu } from './deck-builder/components/sort-menu';
 import { ZoomOverlay } from './deck-builder/components/zoom-overlay';
@@ -45,11 +45,20 @@ type SaveDeckFormValues = {
   isPublic: boolean;
 };
 
+type OpenDeckMeta = {
+  id: string;
+  authorId: string | null;
+  title: string | null;
+  description: string | null;
+  isPublic: boolean;
+};
+
 
 export function DeckBuilder({ dictionary, initialCards, initialError, locale }: DeckBuilderProps) {
   const zoomButtonLabel = DEFAULT_ZOOM_LABEL;
   const { builder, cards: cardsCopy } = dictionary;
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const deckIdQuery = searchParams.get('deck');
   const saveLabels = builder.save;
@@ -57,6 +66,8 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilters, setActiveFilters] = useState<SearchQuery[]>([]);
   const [deck, setDeck] = useState<Record<string, number>>({});
+  const [openedDeck, setOpenedDeck] = useState<OpenDeckMeta | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const cards = useMemo(() => initialCards, [initialCards]);
   const [activeAffinities, setActiveAffinities] = useState<Record<string, boolean>>(
     createInitialActiveAffinities
@@ -94,6 +105,30 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
       return Object.fromEntries(nextEntries);
     });
   }, [cards]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadCurrentUser() {
+      const { data, error } = await supabase.auth.getUser();
+      if (!isActive) {
+        return;
+      }
+
+      if (error || !data?.user) {
+        setCurrentUserId(null);
+        return;
+      }
+
+      setCurrentUserId(data.user.id);
+    }
+
+    void loadCurrentUser();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!zoomCard) {
@@ -142,11 +177,20 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   useEffect(() => {
     if (!deckIdQuery) {
       prefilledDeckIdRef.current = null;
+      setDeck({});
+      setOpenedDeck(null);
       return;
     }
 
     const deckId = deckIdQuery.trim();
-    if (!deckId || cards.length === 0) {
+    if (!deckId) {
+      prefilledDeckIdRef.current = null;
+      setDeck({});
+      setOpenedDeck(null);
+      return;
+    }
+
+    if (cards.length === 0) {
       return;
     }
 
@@ -158,22 +202,35 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
 
     async function prefillDeckFromId() {
       try {
-        const { data, error } = await supabase
+        const [{ data: deckRow, error: deckError }, { data: cardRows, error: cardsError }] = await Promise.all([
+          supabase
+            .from('decks')
+            .select('id,title,description,is_public,user_id')
+            .eq('id', deckId)
+            .maybeSingle(),
+          supabase
           .from('deck_cards')
           .select('*')
-          .eq('deck_id', deckId);
+          .eq('deck_id', deckId),
+        ]);
 
         if (!isActive) {
           return;
         }
 
-        if (error) {
-          console.error('Failed to load deck for builder', error);
+        if (deckError || cardsError) {
+          console.error('Failed to load deck for builder', deckError ?? cardsError);
           prefilledDeckIdRef.current = deckId;
           return;
         }
 
-        const rows = Array.isArray(data) ? data : [];
+        if (!deckRow) {
+          prefilledDeckIdRef.current = deckId;
+          setOpenedDeck(null);
+          return;
+        }
+
+        const rows = Array.isArray(cardRows) ? cardRows : [];
         const nextDeck: Record<string, number> = {};
 
         for (const row of rows) {
@@ -198,6 +255,13 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         }
 
         setDeck(nextDeck);
+        setOpenedDeck({
+          id: String(deckRow.id),
+          authorId: typeof deckRow.user_id === 'string' ? deckRow.user_id : null,
+          title: typeof deckRow.title === 'string' ? deckRow.title : null,
+          description: typeof deckRow.description === 'string' ? deckRow.description : null,
+          isPublic: Boolean(deckRow.is_public),
+        });
         prefilledDeckIdRef.current = deckId;
       } catch (prefillError) {
         if (!isActive) {
@@ -205,6 +269,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         }
         console.error('Unexpected error while prefilling deck', prefillError);
         prefilledDeckIdRef.current = deckId;
+        setOpenedDeck(null);
       }
     }
 
@@ -241,7 +306,12 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   }, [deck, cardMap]);
 
   const totalCards = useMemo(() => deckEntries.reduce((sum, entry) => sum + entry.count, 0), [deckEntries]);
-  const initialSaveTitle = deckEntries.length > 0 ? deckEntries[0].card.name : '';
+  const canOverwriteOpenedDeck = Boolean(
+    openedDeck && currentUserId && openedDeck.authorId && openedDeck.authorId === currentUserId
+  );
+  const initialSaveTitle = openedDeck?.title ?? (deckEntries.length > 0 ? deckEntries[0].card.name : '');
+  const initialSaveDescription = openedDeck?.description ?? '';
+  const initialSaveIsPublic = openedDeck?.isPublic ?? false;
 
   const highestCost = useMemo(() => cards.reduce((max, card) => (card.cost > max ? card.cost : max), 0), [cards]);
 
@@ -366,7 +436,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
     setSaveRequiresAuth(false);
   }
 
-  async function handleSaveDeckSubmit(values: SaveDeckFormValues) {
+  async function handleSaveDeckSubmit(values: SaveDeckFormValues, mode: SaveDeckMode) {
     if (isSavingDeck) {
       return;
     }
@@ -394,47 +464,128 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
     const trimmedDescription = values.description.trim();
     const isPublic = values.isPublic;
     const finalTitle = trimmedTitle.length > 0 ? trimmedTitle : saveLabels.titlePlaceholder;
+    let savedDeckMeta: OpenDeckMeta | null = null;
 
     try {
-      const { data: insertedDeck, error: deckInsertError } = await supabase
-        .from('decks')
-        .insert({
-          user_id: userId,
-          title: finalTitle,
-          description: trimmedDescription.length > 0 ? trimmedDescription : null,
-          is_public: isPublic,
-        })
-        .select('id')
-        .single();
-
-      if (deckInsertError || !insertedDeck) {
-        throw deckInsertError ?? new Error('Deck insertion failed');
-      }
-
-      const deckId = insertedDeck.id;
-
       const cardsPayload = deckEntries.map((entry) => ({
-        deck_id: deckId,
         card_id: entry.card.id,
         quantity: entry.count,
       }));
 
-      if (cardsPayload.length > 0) {
-        const { error: cardsError } = await supabase.from('deck_cards').insert(cardsPayload);
-        if (cardsError) {
-          try {
-            await supabase.from('decks').delete().eq('id', deckId);
-          } catch (cleanupError) {
-            console.error('Failed to clean up deck after card insertion error', cleanupError);
-          }
-          throw cardsError;
+      if (mode === 'overwrite' && openedDeck && openedDeck.authorId === userId) {
+        const deckId = openedDeck.id;
+        const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
+        const accessToken = sessionResult.session?.access_token ?? null;
+        if (sessionError || !accessToken) {
+          throw new Error(saveLabels.signInPrompt);
         }
+
+        const response = await fetch(`/api/decks/${encodeURIComponent(deckId)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            title: finalTitle,
+            description: trimmedDescription,
+            is_public: isPublic,
+            cards: cardsPayload,
+          }),
+        });
+
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string; deck?: OpenDeckMeta | null }
+          | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.message ?? `Unable to update deck (${response.status})`);
+        }
+
+        if (payload?.deck) {
+          setOpenedDeck({
+            id: String(payload.deck.id),
+            authorId: payload.deck.authorId ?? userId,
+            title: payload.deck.title ?? finalTitle,
+            description: payload.deck.description ?? null,
+            isPublic: Boolean(payload.deck.isPublic),
+          });
+        } else {
+          setOpenedDeck((previous) =>
+            previous && previous.id === deckId
+              ? {
+                  ...previous,
+                  title: finalTitle,
+                  description: trimmedDescription.length > 0 ? trimmedDescription : null,
+                  isPublic,
+                }
+              : previous
+          );
+        }
+      } else {
+        const { data: insertedDeck, error: deckInsertError } = await supabase
+          .from('decks')
+          .insert({
+            user_id: userId,
+            title: finalTitle,
+            description: trimmedDescription.length > 0 ? trimmedDescription : null,
+            is_public: isPublic,
+          })
+          .select('id')
+          .single();
+
+        if (deckInsertError || !insertedDeck) {
+          throw deckInsertError ?? new Error('Deck insertion failed');
+        }
+
+        const deckId = insertedDeck.id;
+
+        if (cardsPayload.length > 0) {
+          const { error: cardsError } = await supabase.from('deck_cards').insert(
+            cardsPayload.map((entry) => ({
+              deck_id: deckId,
+              card_id: entry.card_id,
+              quantity: entry.quantity,
+            }))
+          );
+          if (cardsError) {
+            try {
+              await supabase.from('decks').delete().eq('id', deckId);
+            } catch (cleanupError) {
+              console.error('Failed to clean up deck after card insertion error', cleanupError);
+            }
+            throw cardsError;
+          }
+        }
+
+        savedDeckMeta = {
+          id: String(deckId),
+          authorId: userId,
+          title: finalTitle,
+          description: trimmedDescription.length > 0 ? trimmedDescription : null,
+          isPublic,
+        };
+      }
+
+      if (mode === 'new' && savedDeckMeta) {
+        prefilledDeckIdRef.current = savedDeckMeta.id;
+        setOpenedDeck(savedDeckMeta);
+
+        const nextSearchParams = new URLSearchParams(searchParams.toString());
+        nextSearchParams.set('deck', savedDeckMeta.id);
+        router.replace(`${pathname}?${nextSearchParams.toString()}`);
       }
 
       setIsSaveModalOpen(false);
       setSaveErrorMessage(null);
       setSaveRequiresAuth(false);
-      setSaveNotice({ type: 'success', message: saveLabels.successMessage });
+      setSaveNotice({
+        type: 'success',
+        message:
+          mode === 'overwrite' && openedDeck?.authorId === userId
+            ? saveLabels.updateSuccessMessage
+            : saveLabels.successMessage,
+      });
     } catch (error) {
       console.error('Failed to save deck', error);
       const message =
@@ -635,10 +786,13 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         isSaving={isSavingDeck}
         errorMessage={saveErrorMessage}
         requiresAuth={saveRequiresAuth}
+        allowOverwrite={canOverwriteOpenedDeck}
         labels={saveLabels}
         totalCards={totalCards}
         totalCardsLabel={builder.totalCardsLabel}
         initialTitle={initialSaveTitle}
+        initialDescription={initialSaveDescription}
+        initialIsPublic={initialSaveIsPublic}
         signInHref={signInHref}
       />
 

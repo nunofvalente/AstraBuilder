@@ -3,13 +3,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 
+export type SaveDeckMode = 'new' | 'overwrite';
+
 type DeckSaveModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: { title: string; description: string; isPublic: boolean }) => void;
+  onSubmit: (values: { title: string; description: string; isPublic: boolean }, mode: SaveDeckMode) => void;
   isSaving: boolean;
   errorMessage: string | null;
   requiresAuth: boolean;
+  allowOverwrite: boolean;
   labels: {
     heading: string;
     titleLabel: string;
@@ -18,12 +21,15 @@ type DeckSaveModalProps = {
     descriptionPlaceholder: string;
     cancel: string;
     submit: string;
+    update: string;
+    saveAsNew: string;
     saving: string;
     signInPrompt: string;
     signInButton: string;
     emptyDeckError: string;
     genericError: string;
     successMessage: string;
+    updateSuccessMessage: string;
     dismissNotice: string;
     publicLabel: string;
     publicHelp: string;
@@ -31,6 +37,8 @@ type DeckSaveModalProps = {
   totalCards: number;
   totalCardsLabel: string;
   initialTitle: string;
+  initialDescription: string;
+  initialIsPublic: boolean;
   signInHref: string;
 };
 
@@ -41,15 +49,18 @@ export function DeckSaveModal({
   isSaving,
   errorMessage,
   requiresAuth,
+  allowOverwrite,
   labels,
   totalCards,
   totalCardsLabel,
   initialTitle,
+  initialDescription,
+  initialIsPublic,
   signInHref,
 }: DeckSaveModalProps) {
   const [title, setTitle] = useState(initialTitle ?? '');
-  const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
+  const [description, setDescription] = useState(initialDescription ?? '');
+  const [isPublic, setIsPublic] = useState(initialIsPublic ?? false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -57,9 +68,9 @@ export function DeckSaveModal({
     }
 
     setTitle((initialTitle ?? '').slice(0, 45));
-    setDescription('');
-    setIsPublic(false);
-  }, [isOpen, initialTitle]);
+    setDescription((initialDescription ?? '').slice(0, 100));
+    setIsPublic(Boolean(initialIsPublic));
+  }, [isOpen, initialDescription, initialIsPublic, initialTitle]);
 
   if (!isOpen) {
     return null;
@@ -71,10 +82,22 @@ export function DeckSaveModal({
       title: title.slice(0, 45),
       description: description.slice(0, 100),
       isPublic,
-    });
+    }, allowOverwrite ? 'overwrite' : 'new');
   }
 
-  const saveButtonLabel = isSaving ? labels.saving : labels.submit;
+  function handleSaveAsNew() {
+    onSubmit(
+      {
+        title: title.slice(0, 45),
+        description: description.slice(0, 100),
+        isPublic,
+      },
+      'new'
+    );
+  }
+
+  const primaryButtonLabel = isSaving ? labels.saving : allowOverwrite ? labels.update : labels.submit;
+  const secondaryButtonLabel = isSaving ? labels.saving : labels.saveAsNew;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -180,13 +203,33 @@ export function DeckSaveModal({
             >
               {labels.cancel}
             </button>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:opacity-70"
-              disabled={isSaving}
-            >
-              {saveButtonLabel}
-            </button>
+            {allowOverwrite ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSaveAsNew}
+                  className="inline-flex items-center justify-center rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:opacity-70"
+                  disabled={isSaving}
+                >
+                  {secondaryButtonLabel}
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:opacity-70"
+                  disabled={isSaving}
+                >
+                  {primaryButtonLabel}
+                </button>
+              </>
+            ) : (
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:opacity-70"
+                disabled={isSaving}
+              >
+                {primaryButtonLabel}
+              </button>
+            )}
           </div>
         </form>
       </div>
