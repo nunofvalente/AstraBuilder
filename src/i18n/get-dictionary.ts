@@ -93,17 +93,20 @@ type BuilderDictionary = {
       descriptionPlaceholder: string;
       cancel: string;
       submit: string;
+      update: string;
+      saveAsNew: string;
       saving: string;
       signInPrompt: string;
       signInButton: string;
       emptyDeckError: string;
       genericError: string;
-    successMessage: string;
-    dismissNotice: string;
-    publicLabel: string;
-    publicHelp: string;
+      successMessage: string;
+      updateSuccessMessage: string;
+      dismissNotice: string;
+      publicLabel: string;
+      publicHelp: string;
+    };
   };
-};
 };
 
 type CardsDictionary = {
