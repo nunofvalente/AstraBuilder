@@ -15,7 +15,6 @@ import { supabase } from '@/lib/supabase/supabaseClient';
 import type { DeckDetailData } from '@/lib/supabase/decks';
 import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 import { getAffinityColorScheme } from '@/app/[locale]/create/deck-builder/constants';
-import { getShareRenderableImageUrl } from '@/lib/images/card-image-proxy';
 
 const CARD_TYPE_ORDER = ['Unit', 'Renowned Unit', 'Tactic', 'Territory'];
 const FALLBACK_SECTION_LABEL = 'Other';
@@ -813,7 +812,6 @@ export function DeckDetailClient({
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {section.entries.map(({ card, count }) => {
               const scheme = getAffinityColorScheme(card.affinity);
-              const imageSrc = getShareRenderableImageUrl(card.imageSrc);
 
               return (
                 <li key={card.id}>
@@ -834,7 +832,7 @@ export function DeckDetailClient({
                     <div className="relative aspect-[3/4] w-full">
                       {card.imageSrc ? (
                         <img
-                          src={imageSrc}
+                          src={card.imageSrc}
                           alt={card.name}
                           className="block h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
                           loading="lazy"
