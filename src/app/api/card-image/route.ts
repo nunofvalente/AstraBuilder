@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { isAllowedCardImageUrl } from '@/lib/images/card-image-proxy';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-const CACHE_CONTROL_HEADER = 'no-store, no-cache, must-revalidate';
+const CLIENT_CACHE_HEADER = 'public, max-age=86400';
+const VERCEL_CACHE_HEADER = 'public, s-maxage=31536000, stale-while-revalidate=86400';
 
 export async function GET(request: NextRequest) {
   const sourceUrl = request.nextUrl.searchParams.get('url')?.trim() ?? '';
@@ -20,7 +18,6 @@ export async function GET(request: NextRequest) {
       headers: {
         Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
       },
-      cache: 'no-store',
     });
   } catch {
     return new NextResponse('Unable to fetch image', { status: 502 });
@@ -36,8 +33,10 @@ export async function GET(request: NextRequest) {
   return new NextResponse(body, {
     status: 200,
     headers: {
+      'access-control-allow-origin': '*',
+      'cache-control': CLIENT_CACHE_HEADER,
       'content-type': contentType,
-      'cache-control': CACHE_CONTROL_HEADER,
+      'vercel-cdn-cache-control': VERCEL_CACHE_HEADER,
     },
   });
 }

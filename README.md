@@ -47,6 +47,8 @@ Open <http://localhost:3000> to access the site.
 
 Card artwork is served directly from the Echoes of Astra asset host. Next.js image optimization remains disabled via `next.config.ts` to avoid unnecessary transformation work in deployment.
 
+The deck share image generator renders remote card art into a browser canvas. It uses a cacheable `/api/card-image` proxy so share exports can work even when the asset CDN does not return CORS headers. Normal card browsing still loads artwork directly from `assets.echoesofastra.com`.
+
 ### Linting and type-checking
 
 ```bash
