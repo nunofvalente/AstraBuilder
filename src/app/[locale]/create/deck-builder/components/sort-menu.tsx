@@ -71,7 +71,7 @@ export function SortMenu({ options, value, onChange }: SortMenuProps) {
           id="card-sort-menu"
           role="menu"
           aria-orientation="vertical"
-          className="absolute right-0 z-20 mt-2 w-48 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-lg"
+          className="absolute left-0 z-20 mt-2 w-48 max-w-[calc(100vw-2rem)] rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-lg"
         >
           {options.map((option) => {
             const isActive = option.value === value;

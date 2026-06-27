@@ -227,7 +227,7 @@ export function CardSearchBar({
         </div>
       ) : null}
 
-      {children ? <div className="mt-3 flex flex-wrap items-center justify-between gap-3">{children}</div> : null}
+      {children ? <div className="mt-3 flex flex-wrap items-center gap-3">{children}</div> : null}
     </div>
   );
 }

@@ -26,6 +26,35 @@ type DeckShareModalProps = {
   };
 };
 
+async function waitForSharePreviewImages(root: HTMLElement): Promise<void> {
+  const images = Array.from(root.querySelectorAll('img'));
+
+  await Promise.all(
+    images.map(async (image) => {
+      if (image.complete && image.naturalWidth > 0) {
+        return;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        image.addEventListener('load', () => resolve(), { once: true });
+        image.addEventListener('error', () => reject(new Error(`Unable to load ${image.currentSrc || image.src}`)), {
+          once: true,
+        });
+      });
+    })
+  );
+
+  await Promise.all(
+    images.map((image) => {
+      if (typeof image.decode !== 'function') {
+        return Promise.resolve();
+      }
+
+      return image.decode().catch(() => undefined);
+    })
+  );
+}
+
 export function DeckShareModal({
   isOpen,
   onClose,
@@ -101,6 +130,14 @@ export function DeckShareModal({
         return a.entry.card.name.localeCompare(b.entry.card.name);
       });
   }, [deckEntries]);
+
+  const deckSnapshotKey = useMemo(
+    () =>
+      shareCards
+        .map(({ entry }) => `${entry.card.id}:${entry.count}:${entry.card.imageSrc ?? ''}`)
+        .join('|'),
+    [shareCards]
+  );
 
   const shareLayout = useMemo(() => {
     const total = shareCards.length;
@@ -233,7 +270,9 @@ export function DeckShareModal({
         return;
       }
 
-      if (!sharePreviewRef.current) {
+      const sharePreview = sharePreviewRef.current;
+
+      if (!sharePreview) {
         if (!cancelled) {
           setShareError(labels.shareError);
           setIsGeneratingShare(false);
@@ -242,6 +281,11 @@ export function DeckShareModal({
       }
 
       try {
+        await waitForSharePreviewImages(sharePreview);
+        if (cancelled) {
+          return;
+        }
+
         const htmlToImageModule = await import('html-to-image');
         const toPng =
           (htmlToImageModule as typeof import('html-to-image')).toPng ??
@@ -255,9 +299,10 @@ export function DeckShareModal({
           backgroundColor = surface || backgroundColor;
         }
 
-        const dataUrl = await toPng(sharePreviewRef.current, {
+        const dataUrl = await toPng(sharePreview, {
           pixelRatio: 2,
           cacheBust: true,
+          includeQueryParams: true,
           backgroundColor,
           skipFonts: true,
         });
@@ -282,7 +327,7 @@ export function DeckShareModal({
       cancelled = true;
       cancelAnimationFrame(frame);
     };
-  }, [isOpen, hasDeck, deckEntries, labels.shareEmpty, labels.shareError]);
+  }, [isOpen, hasDeck, deckSnapshotKey, labels.shareEmpty, labels.shareError]);
 
   if (!isOpen) {
     return null;
@@ -385,6 +430,7 @@ export function DeckShareModal({
 
       <div className="pointer-events-none fixed -left-[9999px] top-0">
         <div
+          key={deckSnapshotKey}
           ref={sharePreviewRef}
           className="overflow-hidden rounded-[32px] border border-black/15 shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
           style={{
@@ -452,7 +498,7 @@ export function DeckShareModal({
                         alt={card.name}
                         className="block h-full w-full object-cover"
                         crossOrigin="anonymous"
-                        loading="lazy"
+                        loading="eager"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase tracking-[0.24em] text-white/60">
