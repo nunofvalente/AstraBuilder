@@ -96,7 +96,7 @@ export function getCardImageVariantUrl(value: string, variant: CardImageVariant)
 }
 
 function getAstraCardImageVariantUrl(value: string, variant: CardImageVariant): string {
-  if (variant !== 'large') {
+  if (variant === 'small') {
     return value;
   }
 

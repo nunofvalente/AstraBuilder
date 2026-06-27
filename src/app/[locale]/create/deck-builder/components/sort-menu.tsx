@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ArrowUpDown, Check } from 'lucide-react';
 
 type SortOption = {
   value: string;
@@ -62,21 +63,8 @@ export function SortMenu({ options, value, onChange }: SortMenuProps) {
         aria-controls="card-sort-menu"
         className="flex items-center gap-2 rounded-md border border-[color:var(--border)] bg-transparent px-3 py-2 text-xs uppercase tracking-wide text-[color:var(--text-secondary)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
       >
+        <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
         <span>Sort</span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          aria-hidden="true"
-        >
-          <path d="M8 10.5 12 6l4 4.5" />
-          <path d="M8 13.5 12 18l4-4.5" />
-        </svg>
       </button>
       {isOpen ? (
         <div
@@ -105,17 +93,7 @@ export function SortMenu({ options, value, onChange }: SortMenuProps) {
               >
                 <span>{option.label}</span>
                 {isActive ? (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="h-4 w-4"
-                    aria-hidden="true"
-                  >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="h-4 w-4" aria-hidden="true" />
                 ) : null}
               </button>
             );

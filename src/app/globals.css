@@ -631,6 +631,270 @@ h2,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+.deck-builder-workspace {
+  background:
+    linear-gradient(118deg, rgba(0, 54, 37, 0.18) 0 12%, transparent 12% 34%, rgba(97, 24, 11, 0.18) 34% 48%, transparent 48% 100%),
+    linear-gradient(64deg, transparent 0 42%, rgba(34, 65, 107, 0.18) 42% 55%, transparent 55% 100%),
+    linear-gradient(180deg, rgba(99, 37, 82, 0.14), transparent 13rem),
+    var(--background);
+}
+
+.deck-builder-pane {
+  border-color: color-mix(in srgb, var(--border) 72%, var(--accent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 0.22rem 0 color-mix(in srgb, var(--accent) 70%, rgba(255, 255, 255, 0.16)),
+    0 1rem 2.4rem rgba(0, 0, 0, 0.13);
+}
+
+.deck-builder-library-pane {
+  background:
+    linear-gradient(90deg, rgba(34, 65, 107, 0.12), rgba(99, 37, 82, 0.1) 38%, rgba(97, 24, 11, 0.1) 68%, rgba(0, 54, 37, 0.1)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 20rem),
+    var(--surface);
+}
+
+.deck-builder-command-surface,
+.deck-builder-deck-header {
+  background:
+    linear-gradient(90deg, rgba(34, 65, 107, 0.28), rgba(122, 119, 99, 0.16) 24%, rgba(99, 37, 82, 0.2) 52%, rgba(97, 24, 11, 0.23) 76%, rgba(0, 54, 37, 0.22)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+    color-mix(in srgb, var(--surface) 84%, var(--surface-muted));
+}
+
+.deck-builder-affinity-filter {
+  --filter-accent: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0.45rem 0.9rem color-mix(in srgb, var(--filter-accent) 18%, transparent);
+}
+
+.deck-builder-affinity-filter[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--filter-accent) 72%, white);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--filter-accent) 22%, var(--surface)), var(--surface));
+}
+
+.deck-builder-affinity-filter[data-affinity='Caelum'] {
+  --filter-accent: #24416b;
+}
+
+.deck-builder-affinity-filter[data-affinity='Lux'] {
+  --filter-accent: #d8c783;
+}
+
+.deck-builder-affinity-filter[data-affinity='Neutral'] {
+  --filter-accent: #8f928a;
+}
+
+.deck-builder-affinity-filter[data-affinity='Nox'] {
+  --filter-accent: #7d2f68;
+}
+
+.deck-builder-affinity-filter[data-affinity='Solara'] {
+  --filter-accent: #b94a20;
+}
+
+.deck-builder-affinity-filter[data-affinity='Terra'] {
+  --filter-accent: #2f7c55;
+}
+
+.deck-builder-card-frame {
+  --card-accent: var(--accent);
+  transform: translateZ(0);
+}
+
+.deck-builder-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
+}
+
+@media (max-width: 420px) {
+  .deck-builder-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(9.75rem, 100%), 1fr));
+  }
+}
+
+@media (orientation: portrait) and (min-width: 1024px) {
+  .deck-builder-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .deck-builder-main {
+    flex-direction: column !important;
+  }
+
+  .deck-builder-main .deck-builder-library-pane {
+    flex: 1 1 auto !important;
+    flex-basis: auto !important;
+  }
+
+  .deck-builder-main .deck-builder-deck-column {
+    flex: 0 0 clamp(18rem, 34vh, 24rem) !important;
+    flex-basis: clamp(18rem, 34vh, 24rem) !important;
+    min-width: 0;
+  }
+}
+
+.deck-builder-card-frame::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(115deg, transparent 0 42%, rgba(255, 255, 255, 0.2) 48%, transparent 55%),
+    linear-gradient(180deg, transparent 68%, rgba(0, 0, 0, 0.18));
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-48%);
+  transition: opacity 0.25s ease, transform 0.45s ease;
+}
+
+.group:hover .deck-builder-card-frame::after {
+  opacity: 0.42;
+  transform: translateX(26%);
+}
+
+.deck-builder-card-frame-selected {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--card-accent) 78%, white),
+    0 0.85rem 1.5rem color-mix(in srgb, var(--card-accent) 24%, rgba(0, 0, 0, 0.4));
+}
+
+.deck-builder-deck-chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.deck-builder-deck-chip::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), transparent 44%);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.deck-builder-deck-chip > * {
+  position: relative;
+  z-index: 1;
+}
+
+.deck-builder-analytics-panel {
+  max-height: min(24rem, 42vh);
+  overflow-y: auto;
+}
+
+@media (orientation: portrait) and (min-width: 1024px) {
+  .deck-builder-analytics-panel {
+    max-height: min(18rem, 26vh);
+  }
+}
+
+.deck-builder-cost-curve {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 31px,
+      color-mix(in srgb, var(--border) 42%, transparent) 32px
+    ),
+    color-mix(in srgb, var(--surface) 72%, var(--surface-muted));
+}
+
+.deck-builder-cost-curve::after {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 1.95rem;
+  left: 0.75rem;
+  height: 1px;
+  content: "";
+  background: color-mix(in srgb, var(--border) 72%, transparent);
+  pointer-events: none;
+}
+
+.deck-builder-cost-bar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, #f7d18a), color-mix(in srgb, var(--accent) 82%, #5b224b));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0.5rem 1rem color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.deck-builder-cost-bar-peak {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 35%),
+    linear-gradient(180deg, #ffd38a, var(--accent) 54%, #7d2f68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0.65rem 1.25rem color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.deck-builder-stat-bar {
+  background:
+    linear-gradient(90deg, #b94a20, color-mix(in srgb, var(--accent) 74%, #ffd38a));
+  box-shadow: 0 0.35rem 0.75rem rgba(185, 74, 32, 0.2);
+}
+
+.deck-builder-stat-bar-health {
+  background:
+    linear-gradient(90deg, #2f7c55, color-mix(in srgb, #2f7c55 72%, #d8c783));
+  box-shadow: 0 0.35rem 0.75rem rgba(47, 124, 85, 0.2);
+}
+
+.deck-builder-stat-bar-influence {
+  background:
+    linear-gradient(90deg, #24416b, color-mix(in srgb, #7d2f68 72%, #d8c783));
+  box-shadow: 0 0.35rem 0.75rem rgba(36, 65, 107, 0.2);
+}
+
+.deck-builder-type-segment {
+  display: block;
+  min-width: 0.25rem;
+}
+
+.deck-builder-type-segment-unit {
+  background: linear-gradient(90deg, #b94a20, #f18f3b);
+}
+
+.deck-builder-type-segment-tactic {
+  background: linear-gradient(90deg, #24416b, #6aa6d9);
+}
+
+.deck-builder-type-segment-territory {
+  background: linear-gradient(90deg, #2f7c55, #88c27d);
+}
+
+.deck-builder-type-segment-item {
+  background: linear-gradient(90deg, #7d2f68, #d08ac3);
+}
+
+.deck-builder-type-segment-other {
+  background: linear-gradient(90deg, #8f928a, #d8c783);
+}
+
+.deck-builder-scroll {
+  scrollbar-color: color-mix(in srgb, var(--accent) 54%, var(--border)) transparent;
+  scrollbar-width: thin;
+}
+
+.deck-builder-scroll::-webkit-scrollbar {
+  width: 0.55rem;
+}
+
+.deck-builder-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.deck-builder-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 54%, var(--border));
+}
+
+.deck-builder-mobile-nav {
+  backdrop-filter: blur(12px);
+}
+
 @keyframes home-card-drift {
   0%,
   100% {
@@ -719,7 +983,10 @@ h2,
   .deck-summary-card,
   .deck-summary-card::before,
   .deck-summary-card-title,
-  .deck-summary-card-affinity-icon {
+  .deck-summary-card-affinity-icon,
+  .deck-builder-card-frame,
+  .deck-builder-card-frame::after,
+  .deck-builder-deck-chip {
     transition: none;
   }
 }
