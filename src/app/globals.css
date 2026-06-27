@@ -708,6 +708,12 @@ h2,
   grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
 }
 
+@media (orientation: landscape) and (min-width: 1920px) {
+  .deck-builder-card-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 420px) {
   .deck-builder-card-grid {
     grid-template-columns: repeat(auto-fill, minmax(min(9.75rem, 100%), 1fr));
