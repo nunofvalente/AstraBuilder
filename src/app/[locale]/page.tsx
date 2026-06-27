@@ -1,18 +1,17 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import type { CSSProperties } from 'react';
 import { notFound } from 'next/navigation';
 
 export const revalidate = 60;
 
 import { isLocale } from '@/i18n/config';
-import { PrimaryButton } from '@/components/primary-button';
-import { SecondaryButton } from '@/components/secondary-button';
 import { getPublicAssetUrl } from '@/lib/storage/public-asset-url';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { getAllPublicDeckSummaries } from '@/lib/supabase/decks';
 import { sortDecksByTrending } from '@/lib/decks/rankings';
-import { getAffinityIconPath } from '@/lib/cards/affinity';
+import { getAffinityBaseColor, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 import {
   buildAffinityPairingStats,
   isUnknownPairing,
@@ -82,41 +81,184 @@ export default async function HomePage({ params }: LocalePageProps) {
 
   const numberFormatter = new Intl.NumberFormat(locale);
 
+  const heroCards = [
+    {
+      src: '/images/home/cards/celeste-concord-paladin.png',
+      alt: 'Celeste, Concord Paladin card',
+      className: 'home-hero-card home-hero-card-primary',
+    },
+    {
+      src: '/images/home/cards/calico-blood-witch.png',
+      alt: 'Calico, the Blood Witch card',
+      className: 'home-hero-card home-hero-card-secondary',
+    },
+    {
+      src: '/images/home/cards/varenthus-skyscourge.png',
+      alt: 'Varenthus, the Skyscourge card',
+      className: 'home-hero-card home-hero-card-tertiary',
+    },
+  ];
+  const heroAffinityIcons = ['caelum', 'solara', 'lux', 'neutral', 'terra', 'nox']
+    .map((affinity) => ({
+      affinity,
+      src: getAffinityIconPath(affinity),
+    }))
+    .filter((icon): icon is { affinity: string; src: string } => Boolean(icon.src));
+  const showcaseLinks = [
+    {
+      href: `/${locale}/create`,
+      label: home.showcaseActions.build,
+      accentClass: 'home-showcase-link-valeria',
+    },
+    {
+      href: `/${locale}/decks`,
+      label: home.showcaseActions.decks,
+      accentClass: 'home-showcase-link-nerezza',
+    },
+    {
+      href: `/${locale}/collection`,
+      label: home.showcaseActions.catalog,
+      accentClass: 'home-showcase-link-akeno',
+    },
+  ];
+  const sectionRibbonCards = [
+    {
+      src: '/images/home/cards/gaia-lord-of-nature.png',
+      objectPosition: '47% 23%',
+    },
+    {
+      src: '/images/home/cards/renata-skyborne-orphan.png',
+      objectPosition: '50% 19%',
+    },
+    {
+      src: '/images/home/cards/ruins-looter.png',
+      objectPosition: '48% 22%',
+    },
+    {
+      src: '/images/home/cards/seraphiel-herald-of-light.png',
+      objectPosition: '49% 24%',
+    },
+    {
+      src: '/images/home/cards/jormun-feldragon-of-wyrmscar.png',
+      objectPosition: '50% 24%',
+    },
+    {
+      src: '/images/home/cards/yako-illusionist.png',
+      objectPosition: '50% 19%',
+    },
+  ];
+
   return (
-    <main className="flex w-full flex-col items-center gap-12 pb-12 text-[color:var(--text-primary)]">
+    <main className="home-page flex w-full flex-col items-center gap-12 pb-12 text-[color:var(--text-primary)]">
       <section
-        className="banner-section relative left-1/2 flex w-screen max-w-none -translate-x-1/2 items-center px-6 py-14 md:py-20 mt-[-1px]"
+        className="banner-section home-hero relative left-1/2 mt-[-1px] flex w-screen max-w-none -translate-x-1/2 items-center overflow-hidden px-6 py-16 md:min-h-[34rem] md:py-24"
         style={bannerStyle}
       >
-        <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-4 text-center">
-          <div className="flex flex-col items-center gap-4">
-            <h1 className="banner-text-gradient text-3xl font-semibold tracking-tight sm:text-4xl">
+        <div className="home-hero-card-stage" aria-hidden="true">
+          {heroCards.map((card) => (
+            <Image
+              key={card.src}
+              src={card.src}
+              alt=""
+              width={1500}
+              height={2100}
+              priority
+              className={card.className}
+            />
+          ))}
+        </div>
+        <div className="home-hero-content mx-auto flex w-full max-w-6xl flex-col items-center gap-6 text-center md:items-start md:text-left">
+          <div className="flex max-w-2xl flex-col items-center gap-4 md:items-start">
+            <h1 className="banner-text-gradient text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
               {home.title}
             </h1>
             {taglineIntro.length > 0 ? (
-              <p className="mt-6 text-sm font-medium text-white sm:text-base">{taglineIntro}</p>
+              <p className="mt-3 text-sm font-medium uppercase tracking-[0.2em] text-white/80 sm:text-base">{taglineIntro}</p>
             ) : null}
             {taglineHighlight.length > 0 ? (
-              <p className="text-4xl font-bold text-white sm:text-5xl">{taglineHighlight}</p>
+              <p className="text-4xl font-bold leading-tight text-white sm:text-5xl md:text-6xl">{taglineHighlight}</p>
             ) : null}
             {taglineIntro.length === 0 && taglineHighlight.length === 0 && subtitle.length > 0 ? (
               <p className="banner-text-gradient text-4xl font-bold leading-tight sm:text-5xl">{subtitle}</p>
             ) : null}
           </div>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <SecondaryButton className="w-full sm:w-auto" href={`/${locale}/decks`}>
-              {home.actions.browse}
-            </SecondaryButton>
-            <PrimaryButton
-              className="w-full sm:w-auto"
-              href={`/${locale}/create`}
-            >
-              {home.actions.create}
-            </PrimaryButton>
+          <div className="home-hero-affinity-row mt-3" aria-hidden="true">
+            {heroAffinityIcons.map((icon) => (
+              <span key={icon.affinity} className="home-hero-affinity-mark">
+                <Image
+                  src={icon.src}
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="home-hero-affinity-icon"
+                />
+              </span>
+            ))}
           </div>
+        </div>
+        <div className="home-hero-bottom-fade" aria-hidden="true" />
+      </section>
+
+      <section className="home-showcase mx-auto grid w-full max-w-6xl gap-8 px-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="home-showcase-sticky">
+          <div className="home-showcase-stage">
+            <Image
+              src="/images/home/cards/valeria-dragoon-knight.png"
+              alt=""
+              width={600}
+              height={840}
+              className="home-showcase-card home-showcase-card-left"
+            />
+            <Image
+              src="/images/home/cards/nerezza-umbrasco-scion.png"
+              alt=""
+              width={750}
+              height={1050}
+              className="home-showcase-card home-showcase-card-center"
+            />
+            <Image
+              src="/images/home/cards/akeno-noble-samurai.png"
+              alt=""
+              width={600}
+              height={840}
+              className="home-showcase-card home-showcase-card-right"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 md:py-8">
+          {showcaseLinks.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`home-showcase-link ${item.accentClass} group focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--background)]`}
+            >
+              <span className="home-showcase-link-accent block" aria-hidden="true" />
+              <span className="home-showcase-link-copy flex min-w-0 flex-1 items-center">
+                <span className="home-showcase-link-label text-2xl font-bold sm:text-3xl">{item.label}</span>
+              </span>
+              <span className="home-showcase-link-arrow" aria-hidden="true">→</span>
+            </Link>
+          ))}
         </div>
       </section>
 
+      <section className="home-community-section relative left-1/2 w-screen max-w-none -translate-x-1/2">
+        <div className="home-community-ribbon" aria-hidden="true">
+          {sectionRibbonCards.map((card, index) => (
+            <div key={`${card.src}-${index}`} className="home-community-ribbon-tile">
+              <Image
+                src={card.src}
+                alt=""
+                width={600}
+                height={840}
+                className="h-full w-full object-cover"
+                style={{ objectPosition: card.objectPosition }}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="home-community-rule" aria-hidden="true" />
+        <div className="home-community-band">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-12 px-4">
         <section className="grid w-full gap-8 md:grid-cols-2">
           <div className="space-y-4">
@@ -132,13 +274,17 @@ export default async function HomePage({ params }: LocalePageProps) {
                   const pairingLabel = pairing.isUnknown ? home.sections.affinityPairings.unknownLabel : pairing.label;
                   const countLabel =
                     pairing.count === 1 ? home.sections.affinityPairings.deckLabel : home.sections.affinityPairings.decksLabel;
+                  const accentAffinity = pairing.affinities.find((affinity) => normalizeAffinity(affinity) !== 'Neutral');
+                  const pairingStyle = {
+                    '--pairing-accent': getAffinityBaseColor(accentAffinity),
+                  } as CSSProperties;
 
                   const card = (
-                    <div className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm transition hover:shadow-md">
+                    <div className="home-affinity-pairing-card overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm transition hover:shadow-md" style={pairingStyle}>
                       <div className="flex items-center justify-between gap-4 px-4 py-3">
                         <div className="flex items-center gap-3">
                           {pairing.affinities.length > 0 ? (
-                            <span className="flex items-center gap-2">
+                            <span className="home-affinity-pairing-icons flex items-center gap-2">
                               {pairing.affinities.map((affinity) => {
                                 const iconSrc = getAffinityIconPath(affinity);
                                 if (!iconSrc) {
@@ -151,15 +297,15 @@ export default async function HomePage({ params }: LocalePageProps) {
                                     alt={`${affinity} icon`}
                                     width={24}
                                     height={24}
-                                    className="h-6 w-6"
+                                    className="home-affinity-pairing-icon h-6 w-6"
                                   />
                                 );
                               })}
                             </span>
                           ) : null}
-                          <span className="text-sm font-medium text-[color:var(--text-secondary)]">{pairingLabel}</span>
+                          <span className="home-affinity-pairing-label text-sm font-medium text-[color:var(--text-secondary)]">{pairingLabel}</span>
                         </div>
-                        <div className="text-right">
+                        <div className="home-affinity-pairing-count text-right">
                           <span className="block text-xl font-semibold text-[color:var(--text-primary)]">
                             {numberFormatter.format(pairing.count)}
                           </span>
@@ -228,6 +374,8 @@ export default async function HomePage({ params }: LocalePageProps) {
           </div>
         </section>
       </div>
+        </div>
+      </section>
     </main>
   );
 }

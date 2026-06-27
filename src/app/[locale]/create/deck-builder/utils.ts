@@ -18,8 +18,8 @@ export function createCardArtwork(name: string, colorFrom: string, colorTo: stri
     </defs>
     <rect width="240" height="336" fill="url(#gradient)" rx="18" />
     <rect x="16" y="16" width="208" height="304" rx="14" fill="rgba(0, 0, 0, 0.25)" />
-    <text x="50%" y="56" text-anchor="middle" font-family="'Montserrat', 'Arial', sans-serif" font-size="26" fill="#ffffff" opacity="0.85">${name}</text>
-    <text x="50%" y="206" text-anchor="middle" font-family="'Montserrat', 'Arial', sans-serif" font-size="92" fill="#ffffff" font-weight="700" opacity="0.85">${initials}</text>
+    <text x="50%" y="56" text-anchor="middle" font-family="'Sora', 'Arial', sans-serif" font-size="26" fill="#ffffff" opacity="0.85">${name}</text>
+    <text x="50%" y="206" text-anchor="middle" font-family="'Sora', 'Arial', sans-serif" font-size="92" fill="#ffffff" font-weight="700" opacity="0.85">${initials}</text>
   </svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;

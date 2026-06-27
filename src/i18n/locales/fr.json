@@ -21,6 +21,11 @@
     "actions": {
       "browse": "Voir tous les decks",
       "create": "Creer un deck"
+    },
+    "showcaseActions": {
+      "build": "Creer votre deck",
+      "decks": "Explorer les decks",
+      "catalog": "Parcourir le catalogue"
     }
   },
   "affinityPage": {
@@ -351,7 +356,7 @@
     "myDecks": "Mes decks",
     "builder": "Constructeur",
     "decks": "Decks",
-    "collection": "Collection",
+    "collection": "Catalogue",
     "settings": "Parametres",
     "signOut": "Se deconnecter",
     "signingOut": "Deconnexion...",

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-const footerBackgroundClass = "bg-[#2b2927]";
+const footerBackgroundClass = "bg-[#1f1c19]";
 const footerTextClass = "text-white";
 
 export function Footer() {
@@ -19,7 +19,7 @@ export function Footer() {
 
   return (
     <>
-      <footer className={`hidden lg:block ${footerBackgroundClass} ${footerTextClass}`}>
+      <footer className={`hidden border-t border-white/10 lg:block ${footerBackgroundClass} ${footerTextClass}`}>
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6">
           <button
             type="button"
