@@ -88,7 +88,6 @@ export function CardLibrary({
               height={308}
               className="h-auto w-full select-none"
               sizes={CARD_IMAGE_SIZES}
-              quality={95}
               loading="lazy"
               fetchPriority="low"
             />
