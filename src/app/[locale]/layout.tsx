@@ -35,9 +35,9 @@ export default async function LocaleLayout({
   return (
     <>
       <LangAttribute locale={locale} />
-      <div className="flex h-screen flex-col overflow-hidden bg-[color:var(--background)] transition-colors">
+      <div className="app-shell flex flex-col overflow-hidden bg-[color:var(--background)] transition-colors">
         <TopBar locale={locale} labels={dictionary.topBar} />
-        <main className="flex flex-1 min-h-0 flex-col overflow-y-auto">{children}</main>
+        <main className="app-scroll flex flex-1 min-h-0 flex-col overflow-y-auto">{children}</main>
         <Footer />
       </div>
     </>

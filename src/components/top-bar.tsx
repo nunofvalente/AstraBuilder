@@ -242,6 +242,11 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarPr
   const isBuilderRoute = pathname === builderHref || pathname?.startsWith(`${builderHref}/`);
   const isDecksRoute = pathname === decksHref || pathname?.startsWith(`${decksHref}/`);
   const isCollectionRoute = pathname === collectionHref || pathname?.startsWith(`${collectionHref}/`);
+  const topLevelNavItems = [
+    { href: builderHref, label: labels.builder, isActive: isBuilderRoute },
+    { href: decksHref, label: labels.decks, isActive: isDecksRoute },
+    { href: collectionHref, label: labels.collection, isActive: isCollectionRoute },
+  ];
 
   const shouldShowSignInButton = isAuthReady && !user;
   const shouldShowProfileButton = isAuthReady && !!user;
@@ -255,7 +260,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarPr
   const signOutLabel = isSigningOut ? labels.signingOut : labels.signOut;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#2b2927] backdrop-blur">
       <div className="flex h-16 w-full items-center gap-4 px-4 sm:px-6">
         <span className={`shrink-0 text-lg font-semibold ${toolbarTextClass}`}>
           <Link href={`/${locale}`} className="flex items-center">
@@ -268,38 +273,21 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarPr
             />
           </Link>
         </span>
-        <nav className="flex min-w-0 flex-1 items-center justify-center overflow-x-auto px-2 [scrollbar-width:none]">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center overflow-x-auto px-2 [scrollbar-width:none] sm:flex">
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href={builderHref}
-              className={`border-b-[3px] px-3 py-2 text-base font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
-                isBuilderRoute
-                  ? 'border-[color:var(--accent)] text-white'
-                  : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
-              }`}
-            >
-              {labels.builder}
-            </Link>
-            <Link
-              href={decksHref}
-              className={`border-b-[3px] px-3 py-2 text-base font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
-                isDecksRoute
-                  ? 'border-[color:var(--accent)] text-white'
-                  : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
-              }`}
-            >
-              {labels.decks}
-            </Link>
-            <Link
-              href={collectionHref}
-              className={`border-b-[3px] px-3 py-2 text-base font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
-                isCollectionRoute
-                  ? 'border-[color:var(--accent)] text-white'
-                  : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
-              }`}
-            >
-              {labels.collection}
-            </Link>
+            {topLevelNavItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`border-b-[3px] px-3 py-2 text-base font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                  item.isActive
+                    ? 'border-[color:var(--accent)] text-white'
+                    : 'border-transparent text-white/85 hover:border-[color:var(--accent)] hover:text-white'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
           </div>
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-4">
@@ -378,6 +366,22 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarPr
                 className="absolute right-0 mt-2 w-48 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] shadow-lg"
                 role="menu"
               >
+                <div className="sm:hidden">
+                  {topLevelNavItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsSettingsMenuOpen(false)}
+                      className={`block w-full px-4 py-2 text-left text-sm font-semibold transition hover:bg-[var(--surface-muted)] focus:outline-none focus-visible:bg-[var(--surface-muted)] ${
+                        item.isActive ? 'bg-[var(--surface-muted)] text-[color:var(--accent)]' : menuTextClass
+                      }`}
+                      role="menuitem"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                  <div className="border-t border-[color:var(--border)]" />
+                </div>
                 <button
                   type="button"
                   onClick={handleSettingsNavigate}
