@@ -32,12 +32,13 @@ describe('card image variant URLs', () => {
     );
   });
 
-  it('returns non-Supabase URLs unchanged except large Astra asset variants', async () => {
+  it('returns non-Supabase URLs unchanged except medium and large Astra asset variants', async () => {
     const { getCardImageVariantUrl } = await importImageUrlHelpers();
     const astra = 'https://assets.echoesofastra.com/cards/alpha_web.webp';
     const external = 'https://example.com/card.png';
 
     expect(getCardImageVariantUrl(astra, 'small')).toBe(astra);
+    expect(getCardImageVariantUrl(astra, 'medium')).toBe('https://assets.echoesofastra.com/cards/alpha.webp');
     expect(getCardImageVariantUrl(astra, 'large')).toBe('https://assets.echoesofastra.com/cards/alpha.webp');
     expect(getCardImageVariantUrl(external, 'large')).toBe(external);
     expect(getCardImageVariantUrl('data:image/png;base64,abc', 'large')).toBe('data:image/png;base64,abc');

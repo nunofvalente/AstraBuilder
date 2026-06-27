@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useCallback, type FocusEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { Minus, Plus } from 'lucide-react';
 
 import { getAffinityIconPath } from '@/lib/cards/affinity';
 import { getAffinityColorScheme } from '../constants';
@@ -108,7 +109,7 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
 
   return (
     <li
-      className="flex items-center justify-between gap-4 rounded-full border px-4 py-2 shadow-sm transition-shadow hover:shadow-md"
+      className="deck-builder-deck-chip flex items-center justify-between gap-3 rounded-md border px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
       style={{
         background: scheme.gradient,
         borderColor: scheme.borderColor,
@@ -122,19 +123,19 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
         onFocus={handlePreview}
         onMouseLeave={handleClosePreview}
         onBlur={handleClosePreview}
-        className="group flex min-w-0 flex-1 items-center gap-3 text-left focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+        className="group flex min-w-0 flex-1 items-center gap-3 rounded-sm text-left focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
         aria-label={`View details for ${card.name}`}
       >
         <span className="flex items-center gap-2">
           {costIcon ? (
-            <Image src={costIcon} alt={`Cost ${card.cost}`} width={32} height={32} className="h-8 w-8" />
+            <Image src={costIcon} alt={`Cost ${card.cost}`} width={30} height={30} className="h-[30px] w-[30px]" />
           ) : (
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-xs font-semibold text-white">
               {card.cost}
             </span>
           )}
           {affinityIcon ? (
-            <Image src={affinityIcon} alt={`${card.affinity} affinity`} width={28} height={28} className="h-7 w-7" />
+            <Image src={affinityIcon} alt={`${card.affinity} affinity`} width={26} height={26} className="h-[26px] w-[26px]" />
           ) : null}
         </span>
         <span className="truncate text-sm font-semibold" style={{ color: scheme.textColor }}>
@@ -146,11 +147,11 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
           <button
             type="button"
             onClick={handleDecrement}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
             aria-label={`${removeLabel} ${card.name}`}
             disabled={readOnly || !onDecrement}
           >
-            -
+            <Minus className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
         <span className="min-w-[1.5rem] text-center text-sm font-semibold" style={{ color: scheme.textColor }}>
@@ -160,11 +161,11 @@ export function DeckCardChip({ card, count, labels, onIncrement, onDecrement, on
           <button
             type="button"
             onClick={handleIncrement}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-white/20 text-sm font-semibold text-white transition hover:bg-white/30 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
             aria-label={`${addLabel} ${card.name}`}
             disabled={readOnly || !onIncrement}
           >
-            +
+            <Plus className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
       </div>
