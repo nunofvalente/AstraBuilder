@@ -302,6 +302,7 @@ export function DeckShareModal({
         const dataUrl = await toPng(sharePreview, {
           pixelRatio: 2,
           cacheBust: true,
+          includeQueryParams: true,
           backgroundColor,
           skipFonts: true,
         });
