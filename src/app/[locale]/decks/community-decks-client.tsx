@@ -6,7 +6,7 @@ import Image from 'next/image';
 import type { Locale } from '@/i18n/config';
 import type { PublicDeckSummary } from '@/lib/supabase/decks';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
-import { normalizeAffinity } from '@/lib/cards/affinity';
+import { getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 import { AFFINITY_FILTERS } from '@/app/[locale]/create/deck-builder/constants';
 import { sortDecksByOption, type DeckSortOption } from '@/lib/decks/rankings';
 
@@ -187,14 +187,15 @@ export function CommunityDecksClient({
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 shadow-sm">
             {AFFINITY_FILTERS.map((filter) => {
               const isEnabled = activeAffinities[filter.value] ?? true;
-              const iconSrc = isEnabled ? filter.filledIcon : filter.disabledIcon;
+              const iconSrc = getAffinityIconPath(filter.value) ?? filter.filledIcon;
 
               return (
                 <button
                   key={filter.value}
                   type="button"
+                  data-affinity={filter.value}
                   onClick={() => toggleAffinity(filter.value)}
-                  className={`flex h-12 w-12 items-center justify-center rounded-lg border transition-transform duration-150 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] hover:-translate-y-1 hover:shadow-lg ${
+                  className={`deck-builder-affinity-filter flex h-12 w-12 items-center justify-center rounded-lg border transition-transform duration-150 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] hover:-translate-y-1 hover:shadow-lg ${
                     isEnabled
                       ? 'border-[color:var(--accent)]/50 bg-[color:var(--surface)]'
                       : 'border-transparent bg-[color:var(--surface-muted)]/60'
@@ -202,7 +203,13 @@ export function CommunityDecksClient({
                   aria-pressed={isEnabled}
                   title={filter.label}
                 >
-                  <Image src={iconSrc} alt={`${filter.label} icon`} width={36} height={36} className="h-9 w-9 select-none" />
+                  <Image
+                    src={iconSrc}
+                    alt={`${filter.label} icon`}
+                    width={36}
+                    height={36}
+                    className={`h-9 w-9 select-none transition ${isEnabled ? 'opacity-100' : 'grayscale opacity-45'}`}
+                  />
                   <span className="sr-only">{filter.label}</span>
                 </button>
               );

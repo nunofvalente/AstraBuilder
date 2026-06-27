@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Layers, Library, X } from 'lucide-react';
 
 import { AffinityFilterBar } from './deck-builder/components/affinity-filter-bar';
 import { CardSearchBar } from './deck-builder/components/card-search-bar';
@@ -642,10 +643,10 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   const isDeckVisible = activeMobilePane === 'deck';
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-0 overflow-hidden px-0 pb-20 pt-0 text-[color:var(--text-primary)] lg:pb-0">
-      <div className="flex flex-1 min-h-0 flex-col items-stretch gap-0 lg:flex-row">
+    <div className="deck-builder-workspace flex h-full min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden px-3 pb-20 pt-3 text-[color:var(--text-primary)] sm:px-4 sm:pt-4 lg:gap-4 lg:pb-4">
+      <div className="deck-builder-main flex flex-1 min-h-0 flex-col items-stretch gap-3 lg:flex-row lg:gap-4">
         <section
-          className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-none border border-[color:var(--border)] bg-[color:var(--surface)] ${isCatalogueVisible ? 'flex' : 'hidden'} lg:flex lg:basis-1/2 xl:basis-3/5 min-[1920px]:basis-2/3`}
+          className={`deck-builder-pane deck-builder-library-pane min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] ${isCatalogueVisible ? 'flex' : 'hidden'} lg:flex lg:basis-1/2 xl:basis-3/5 min-[1920px]:basis-2/3`}
         >
           <CardSearchBar
             searchTerm={searchTerm}
@@ -663,7 +664,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
             <SortMenu options={CARD_SORT_OPTIONS} value={sortOption} onChange={handleSortChange} />
           </CardSearchBar>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
+          <div className="deck-builder-scroll flex-1 min-h-0 overflow-y-auto px-3 pb-4 pt-4 sm:px-4">
             <CardLibrary
               cards={filteredCards}
               deck={deck}
@@ -680,10 +681,10 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         </section>
 
         <div
-          className={`min-h-0 flex-1 flex-col ${isDeckVisible ? 'flex' : 'hidden'} lg:flex lg:min-h-0 lg:min-w-0 lg:basis-1/2 xl:basis-2/5 min-[1920px]:basis-1/3`}
+          className={`deck-builder-deck-column min-h-0 flex-1 flex-col ${isDeckVisible ? 'flex' : 'hidden'} lg:flex lg:min-h-0 lg:min-w-0 lg:basis-1/2 xl:basis-2/5 min-[1920px]:basis-1/3`}
         >
           {saveNotice ? (
-            <div className="mx-4 mt-4 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/70 px-4 py-3 text-sm text-[color:var(--text-primary)] lg:mx-6">
+            <div className="mx-1 mb-3 rounded-md border border-[color:var(--accent)]/35 bg-[color:var(--surface)]/90 px-4 py-3 text-sm text-[color:var(--text-primary)] shadow-lg shadow-black/10 lg:mx-0">
               <div className="flex items-start justify-between gap-4">
                 <span>{saveNotice.message}</span>
                 <button
@@ -692,16 +693,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
                   className="rounded-full bg-black/40 p-1 text-xs text-white transition hover:bg-black/60 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                   aria-label={saveLabels.dismissNotice}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    className="h-3.5 w-3.5"
-                  >
-                    <path d="M6 6l12 12M6 18L18 6" />
-                  </svg>
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -719,6 +711,12 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
               addButton: builder.addButton,
               costCurveHeading: builder.costCurveHeading,
               costCurveEmpty: builder.costCurveEmpty,
+              unitStatsHeading: builder.unitStatsHeading,
+              unitStatsEmpty: builder.unitStatsEmpty,
+              cardTypeBreakdownHeading: builder.cardTypeBreakdownHeading,
+              attackLabel: cardsCopy.fields.attack,
+              healthLabel: cardsCopy.fields.health,
+              influenceLabel: cardsCopy.fields.influence,
               showCostCurve: builder.showCostCurve,
               hideCostCurve: builder.hideCostCurve,
               menuButton: builder.menuButton,
@@ -738,7 +736,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         </div>
       </div>
 
-      <nav className="lg:hidden border-t border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3">
+      <nav className="deck-builder-mobile-nav lg:hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]/95 px-3 py-3 shadow-lg shadow-black/10">
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -746,12 +744,17 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
             aria-pressed={isCatalogueVisible}
             className={`flex w-full flex-col items-center justify-center gap-1 rounded-md border px-3 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
               isCatalogueVisible
-                ? 'border-[color:var(--border)] bg-[color:var(--surface-muted)] text-[color:var(--text-primary)]'
-                : 'border-transparent text-[color:var(--text-secondary)]'
+                ? 'border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--text-on-accent)]'
+                : 'border-transparent bg-[color:var(--surface-muted)]/55 text-[color:var(--text-secondary)]'
             }`}
           >
-            <span>{builder.cardsHeading}</span>
-            <span className="text-[11px] font-normal text-[color:var(--text-secondary)]">{cardCountLabel}</span>
+            <span className="flex items-center gap-2">
+              <Library className="h-4 w-4" aria-hidden="true" />
+              {builder.cardsHeading}
+            </span>
+            <span className={`text-[11px] font-normal ${isCatalogueVisible ? 'text-[color:var(--text-on-accent)]' : 'text-[color:var(--text-secondary)]'}`}>
+              {cardCountLabel}
+            </span>
           </button>
 
           <button
@@ -760,12 +763,15 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
             aria-pressed={isDeckVisible}
             className={`flex w-full flex-col items-center justify-center gap-1 rounded-md border px-3 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
               isDeckVisible
-                ? 'border-[color:var(--border)] bg-[color:var(--surface-muted)] text-[color:var(--text-primary)]'
-                : 'border-transparent text-[color:var(--text-secondary)]'
+                ? 'border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--text-on-accent)]'
+                : 'border-transparent bg-[color:var(--surface-muted)]/55 text-[color:var(--text-secondary)]'
             }`}
           >
-            <span>{builder.deckHeading}</span>
-            <span className="text-[11px] font-normal text-[color:var(--text-secondary)]">
+            <span className="flex items-center gap-2">
+              <Layers className="h-4 w-4" aria-hidden="true" />
+              {builder.deckHeading}
+            </span>
+            <span className={`text-[11px] font-normal ${isDeckVisible ? 'text-[color:var(--text-on-accent)]' : 'text-[color:var(--text-secondary)]'}`}>
               {builder.totalCardsLabel}: {totalCards}
             </span>
           </button>

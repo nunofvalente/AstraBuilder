@@ -1,8 +1,11 @@
 import Image from 'next/image';
+import type { CSSProperties } from 'react';
+import { Search } from 'lucide-react';
 import { CARD_IMAGE_SIZES } from '../constants';
 import { getCardImageVariantUrl } from '../image-url';
 import type { Card } from '../types';
 import type { ZoomAnchor } from './zoom-overlay';
+import { getAffinityBaseColor } from '@/lib/cards/affinity';
 
 export type CardLibraryProps = {
   cards: Card[];
@@ -20,7 +23,7 @@ export type CardLibraryProps = {
 };
 
 const DEFAULT_GRID_CLASS_NAME =
-  'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 xl:gap-2 2xl:grid-cols-6 min-[2200px]:grid-cols-7';
+  'deck-builder-card-grid grid gap-4';
 
 export function CardLibrary({
   cards,
@@ -64,11 +67,18 @@ export function CardLibrary({
         const isMaxed = copies >= 3;
         const isAddDisabled = readOnly || isMaxed || !onAdd;
 
-        const thumbnailSrc = getCardImageVariantUrl(card.imageSrc, 'small');
+        const thumbnailSrc = getCardImageVariantUrl(card.imageSrc, 'large');
+        const cardAccent = getAffinityBaseColor(card.affinity);
+        const cardFrameStyle = {
+          '--card-accent': cardAccent,
+        } as CSSProperties;
         const cardFrame = (
           <div
-            className={`relative overflow-hidden rounded-none shadow-md transition-transform duration-150 group-hover:-translate-y-1 group-hover:shadow-2xl ${
-              isSelected ? 'ring-2 ring-[color:var(--accent)]' : ''
+            style={cardFrameStyle}
+            className={`deck-builder-card-frame relative overflow-hidden rounded-md border bg-black/15 shadow-md transition duration-150 group-hover:-translate-y-1 group-hover:shadow-2xl ${
+              isSelected
+                ? 'deck-builder-card-frame-selected border-[color:var(--card-accent)] ring-2 ring-[color:var(--card-accent)]/55'
+                : 'border-black/20'
             }`}
           >
             <Image
@@ -78,12 +88,18 @@ export function CardLibrary({
               height={308}
               className="h-auto w-full select-none"
               sizes={CARD_IMAGE_SIZES}
+              quality={95}
               loading="lazy"
               fetchPriority="low"
             />
             {copies > 0 ? (
-              <span className="absolute bottom-2 right-2 inline-flex items-center justify-center rounded-full bg-[color:var(--accent)] px-2 py-0.5 text-xs font-semibold text-[color:var(--text-on-accent)] shadow-md">
+              <span className="absolute bottom-2 right-2 inline-flex min-w-8 items-center justify-center rounded-full bg-[color:var(--accent)] px-2 py-1 text-xs font-bold text-[color:var(--text-on-accent)] shadow-lg shadow-black/35">
                 x{copies}
+              </span>
+            ) : null}
+            {isMaxed ? (
+              <span className="absolute left-2 top-2 rounded-full border border-white/25 bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-md">
+                Max
               </span>
             ) : null}
           </div>
@@ -109,7 +125,7 @@ export function CardLibrary({
                   aria-label={`${addButtonLabel ?? 'Add'} ${card.name}`}
                   aria-disabled={isAddDisabled}
                   disabled={isAddDisabled}
-                  className={`relative block h-full w-full focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                  className={`relative block h-full w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] ${
                     isAddDisabled ? 'cursor-not-allowed opacity-90' : ''
                   }`}
                 >
@@ -125,19 +141,9 @@ export function CardLibrary({
                   onZoom(card);
                 }}
                 aria-label={`${zoomButtonLabel} ${card.name}`}
-                className="pointer-events-auto absolute right-2 top-2 z-10 rounded-full border border-white/80 bg-black/70 p-2 text-white opacity-0 transition hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100"
+                className="pointer-events-auto absolute right-2 top-2 z-10 rounded-full border border-white/80 bg-black/70 p-2 text-white opacity-0 shadow-lg transition hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className="h-4 w-4"
-                >
-                  <path d="m21 21-4.35-4.35" />
-                  <circle cx="11" cy="11" r="6" />
-                </svg>
+                <Search className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </li>

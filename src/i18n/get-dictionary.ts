@@ -52,6 +52,9 @@ type BuilderDictionary = {
     comingSoon: string;
     costCurveHeading: string;
     costCurveEmpty: string;
+    unitStatsHeading: string;
+    unitStatsEmpty: string;
+    cardTypeBreakdownHeading: string;
     showCostCurve: string;
     hideCostCurve: string;
     menuImport: string;

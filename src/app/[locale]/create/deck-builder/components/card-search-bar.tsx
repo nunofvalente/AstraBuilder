@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 
 import type { SearchQuery, SearchSuggestion } from '../search';
 
@@ -141,8 +142,8 @@ export function CardSearchBar({
   }
 
   return (
-    <div className="border-b border-[color:var(--border)] px-4 py-4" ref={rootRef}>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="deck-builder-command-surface border-b border-[color:var(--border)] px-3 py-3 sm:px-4" ref={rootRef}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex min-w-0 flex-1">
           <input
             id="card-search"
@@ -158,14 +159,14 @@ export function CardSearchBar({
             aria-expanded={hasSuggestions && isSuggestionOpen}
             aria-controls={hasSuggestions && isSuggestionOpen ? suggestionListId : undefined}
             aria-activedescendant={activeSuggestionId}
-            className="w-full border border-[color:var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
+            className="h-11 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)]/88 px-3 py-2 text-sm shadow-inner shadow-black/5 transition focus:border-[color:var(--accent)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]/35"
           />
           {hasSuggestions && isSuggestionOpen ? (
             <ul
               id={suggestionListId}
               role="listbox"
               aria-label="Search suggestions"
-              className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-lg"
+              className="absolute left-0 right-0 top-full z-30 mt-2 max-h-56 overflow-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-xl"
             >
               {suggestions.map((suggestion, index) => {
                 const suggestionId = `${suggestionListId}-${suggestion.key}`;
@@ -200,8 +201,8 @@ export function CardSearchBar({
             </ul>
           ) : null}
         </div>
-        <div className="flex flex-col items-end text-xs text-[color:var(--text-secondary)]">
-          <span>Library: {libraryCountLabel}</span>
+        <div className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface)]/75 px-3 py-2 text-right text-xs font-semibold uppercase text-[color:var(--text-secondary)] shadow-sm">
+          <span>{libraryCountLabel}</span>
         </div>
       </div>
 
@@ -210,7 +211,7 @@ export function CardSearchBar({
           {filters.map((filter, index) => (
             <span
               key={`${filter.field.key}:${filter.value}:${index}`}
-              className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)]/70 px-3 py-1 text-xs font-medium text-[color:var(--text-secondary)]"
+              className="inline-flex items-center gap-2 rounded-full border border-[color:var(--accent)]/30 bg-[color:var(--surface)]/85 px-3 py-1 text-xs font-medium text-[color:var(--text-secondary)] shadow-sm"
             >
               <span>{`${filter.field.label}: ${filter.value}`}</span>
               <button
@@ -219,16 +220,14 @@ export function CardSearchBar({
                 className="rounded-full bg-black/40 p-1 text-white transition hover:bg-black/60 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 aria-label={`Remove filter ${filter.field.label}: ${filter.value}`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3 w-3">
-                  <path d="M6 6l12 12M6 18L18 6" />
-                </svg>
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           ))}
         </div>
       ) : null}
 
-      {children ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3">{children}</div> : null}
+      {children ? <div className="mt-3 flex flex-wrap items-center justify-between gap-3">{children}</div> : null}
     </div>
   );
 }
