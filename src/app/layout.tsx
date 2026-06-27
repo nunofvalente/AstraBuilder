@@ -62,7 +62,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang={DEFAULT_LOCALE} data-theme="light">
+    <html lang={DEFAULT_LOCALE} data-theme="light" data-scroll-behavior="smooth">
       <body
         className={`${sora.variable} ${cinzel.variable} ${geistMono.variable} antialiased`}
         data-locale={DEFAULT_LOCALE}

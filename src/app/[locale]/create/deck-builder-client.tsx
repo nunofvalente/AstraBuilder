@@ -643,7 +643,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
   const isDeckVisible = activeMobilePane === 'deck';
 
   return (
-    <div className="deck-builder-workspace flex h-full min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden px-3 pb-20 pt-3 text-[color:var(--text-primary)] sm:px-4 sm:pt-4 lg:gap-4 lg:pb-4">
+    <div className="deck-builder-workspace flex h-full min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden px-3 pb-3 pt-3 text-[color:var(--text-primary)] sm:px-4 sm:pb-4 sm:pt-4 lg:gap-4">
       <div className="deck-builder-main flex flex-1 min-h-0 flex-col items-stretch gap-3 lg:flex-row lg:gap-4">
         <section
           className={`deck-builder-pane deck-builder-library-pane min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] ${isCatalogueVisible ? 'flex' : 'hidden'} lg:flex lg:basis-1/2 xl:basis-3/5 min-[1920px]:basis-2/3`}
@@ -736,7 +736,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
         </div>
       </div>
 
-      <nav className="deck-builder-mobile-nav lg:hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]/95 px-3 py-3 shadow-lg shadow-black/10">
+      <nav className="deck-builder-mobile-nav flex-shrink-0 lg:hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]/95 px-3 py-3 shadow-lg shadow-black/10">
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
