@@ -25,6 +25,11 @@ type HomeDictionary = {
       browse: string;
       create: string;
     };
+    showcaseActions: {
+      build: string;
+      decks: string;
+      catalog: string;
+    };
   };
 };
 

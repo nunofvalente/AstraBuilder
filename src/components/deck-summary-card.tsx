@@ -1,8 +1,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 
 import type { Locale } from '@/i18n/config';
-import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
+import { getAffinityBaseColor, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 
 type DeckSummaryCardDeck = {
   id: string;
@@ -64,6 +65,41 @@ const mutedStatPillClassName = `${pillBaseClassName} border border-white/20 bg-w
 const privacyTagClassName =
   'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide bg-white/15 text-white';
 
+function getDeckIdentityAffinities(affinities: string[]): string[] {
+  const uniqueAffinities: string[] = [];
+
+  for (const affinity of affinities) {
+    const normalized = normalizeAffinity(affinity);
+    if (!normalized || normalized === 'Neutral' || uniqueAffinities.includes(normalized)) {
+      continue;
+    }
+    uniqueAffinities.push(normalized);
+  }
+
+  return uniqueAffinities;
+}
+
+function buildDeckIdentityGradient(affinities: string[]): string {
+  const colors = affinities.map((affinity) => getAffinityBaseColor(affinity));
+
+  if (colors.length === 0) {
+    return 'transparent';
+  }
+
+  if (colors.length === 1) {
+    return colors[0];
+  }
+
+  const segmentSize = 100 / colors.length;
+  const stops = colors.flatMap((color, index) => {
+    const start = index * segmentSize;
+    const end = (index + 1) * segmentSize;
+    return [`${color} ${start}%`, `${color} ${end}%`];
+  });
+
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+}
+
 export function DeckSummaryCard({
   locale,
   deck,
@@ -75,9 +111,14 @@ export function DeckSummaryCard({
   editLabel,
   mutedMetrics = false,
 }: DeckSummaryCardProps) {
-  const displayAffinities = deck.affinities.filter((affinity) => normalizeAffinity(affinity) !== 'Neutral');
-  const gradient = buildAffinityGradient(displayAffinities);
-  const backgroundImage = `linear-gradient(rgba(12, 15, 21, 0.45), rgba(12, 15, 21, 0.45)), ${gradient}`;
+  const displayAffinities = getDeckIdentityAffinities(deck.affinities);
+  const primaryDeckColor = displayAffinities[0] ? getAffinityBaseColor(displayAffinities[0]) : '#4b5563';
+  const secondaryDeckColor = displayAffinities[1] ? getAffinityBaseColor(displayAffinities[1]) : primaryDeckColor;
+  const articleStyle = {
+    '--deck-primary': primaryDeckColor,
+    '--deck-secondary': secondaryDeckColor,
+    '--deck-identity-gradient': buildDeckIdentityGradient(displayAffinities),
+  } as CSSProperties;
   const title = deck.title && deck.title.trim().length > 0 ? deck.title.trim() : labels.untitled;
   const description = deck.description?.trim();
   const titleDisplay = title.length > 20 ? `${title.slice(0, 20)}…` : title;
@@ -90,17 +131,18 @@ export function DeckSummaryCard({
     <div className="flex h-full w-full flex-col gap-3">
       <Link href={detailHref} className="group block h-full">
         <article
-          className="flex h-full flex-col gap-4 overflow-hidden rounded-2xl border border-[color:var(--border)] p-5 shadow-md transition hover:shadow-lg"
-          style={{ backgroundImage }}
+          className="deck-summary-card flex h-full flex-col gap-4 overflow-hidden rounded-2xl p-5 transition"
+          style={articleStyle}
         >
+          <div className="deck-summary-card-identity" aria-hidden="true" />
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-3">
-                <span className="block break-words text-lg font-semibold text-white group-hover:underline">
+                <span className="deck-summary-card-title block break-words text-lg font-semibold text-white">
                   {titleDisplay}
                 </span>
                 {displayAffinities.length > 0 ? (
-                  <span className="flex items-center gap-1">
+                  <span className="deck-summary-card-affinities">
                     {displayAffinities.map((affinity) => {
                       const iconSrc = getAffinityIconPath(affinity);
                       if (!iconSrc) {
@@ -114,7 +156,7 @@ export function DeckSummaryCard({
                           alt={`${affinity} affinity`}
                           width={20}
                           height={20}
-                          className="h-5 w-5"
+                          className="deck-summary-card-affinity-icon"
                         />
                       );
                     })}
@@ -125,7 +167,7 @@ export function DeckSummaryCard({
                 ) : null}
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white">
+              <div className="deck-summary-card-metrics flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white">
                 <span className={metricPillClassName}>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -154,12 +196,12 @@ export function DeckSummaryCard({
               </div>
             </div>
 
-            <p className="min-h-[3.5rem] break-words text-sm text-white/80 line-clamp-3">
+            <p className="deck-summary-card-description min-h-[3.5rem] break-words text-sm text-white/80 line-clamp-3">
               {descriptionDisplay || ' '}
             </p>
           </div>
 
-          <div className="mt-auto flex items-center justify-between text-xs text-white/80">
+          <div className="deck-summary-card-footer mt-auto flex items-center justify-between text-xs text-white/80">
             <span className="font-semibold text-white">
               {labels.cards}: <span className="font-normal text-white/75">{deck.cardCount}</span>
             </span>

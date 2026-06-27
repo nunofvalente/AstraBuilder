@@ -260,7 +260,7 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarPr
   const signOutLabel = isSigningOut ? labels.signingOut : labels.signOut;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-transparent bg-[#2b2927] backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#2b2927] backdrop-blur">
       <div className="flex h-16 w-full items-center gap-4 px-4 sm:px-6">
         <span className={`shrink-0 text-lg font-semibold ${toolbarTextClass}`}>
           <Link href={`/${locale}`} className="flex items-center">

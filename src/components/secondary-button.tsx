@@ -9,7 +9,7 @@ type AnchorProps = LinkProps & React.AnchorHTMLAttributes<HTMLAnchorElement> & {
 type SecondaryButtonProps = ButtonProps | AnchorProps;
 
 const baseClasses =
-  "inline-flex items-center justify-center rounded-md border border-[color:var(--accent)] bg-transparent px-6 py-3 text-sm font-medium text-[color:var(--accent)] transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] hover:bg-[color:var(--accent)]/10";
+  "inline-flex items-center justify-center rounded-md border border-[color:var(--accent)] bg-transparent px-6 py-3 font-sans text-sm font-medium text-[color:var(--accent)] transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] hover:bg-[color:var(--accent)]/10";
 
 export const SecondaryButton = forwardRef<HTMLButtonElement | HTMLAnchorElement, SecondaryButtonProps>(
   ({ className, children, ...props }, ref) => {

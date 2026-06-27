@@ -21,6 +21,11 @@
     "actions": {
       "browse": "Lihat semua dek",
       "create": "Cipta dek"
+    },
+    "showcaseActions": {
+      "build": "Bina dek anda",
+      "decks": "Teroka dek komuniti",
+      "catalog": "Layari katalog kad"
     }
   },
   "affinityPage": {
@@ -355,7 +360,7 @@
     "myDecks": "Dek Saya",
     "builder": "Pembina",
     "decks": "Dek",
-    "collection": "Koleksi",
+    "collection": "Katalog",
     "settings": "Tetapan",
     "signOut": "Log keluar",
     "signingOut": "Sedang log keluar...",
