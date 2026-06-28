@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Cinzel, Geist_Mono, Sora } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 
 import './globals.css';
 import { DEFAULT_LOCALE } from '@/i18n/config';
@@ -69,6 +70,7 @@ export default function RootLayout({
         data-theme="light"
       >
         <ThemeProvider>{children}</ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
