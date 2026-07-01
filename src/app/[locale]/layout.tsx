@@ -6,6 +6,7 @@ import { TopBar } from '@/components/top-bar';
 import { LangAttribute } from '@/i18n/LangAttribute';
 import { SUPPORTED_LOCALES, isLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/get-dictionary';
+import { isPlaytestEnabled } from '@/lib/features';
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }));
@@ -36,7 +37,7 @@ export default async function LocaleLayout({
     <>
       <LangAttribute locale={locale} />
       <div className="app-shell flex flex-col overflow-hidden bg-[color:var(--background)] transition-colors">
-        <TopBar locale={locale} labels={dictionary.topBar} />
+        <TopBar locale={locale} labels={dictionary.topBar} showPlay={isPlaytestEnabled()} />
         <main className="app-scroll flex flex-1 min-h-0 flex-col overflow-y-auto">{children}</main>
         <Footer />
       </div>

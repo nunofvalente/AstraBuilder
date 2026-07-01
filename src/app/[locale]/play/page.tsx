@@ -1,0 +1,45 @@
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
+import { isLocale } from '@/i18n/config';
+import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { isPlaytestEnabled } from '@/lib/features';
+
+import { getStaticCards } from '../create/deck-builder/data';
+import { PlaytestClient } from './playtest-client';
+
+export const dynamic = 'force-dynamic';
+
+type LocaleParams = {
+  locale: string;
+};
+
+type PlaytestPageProps = {
+  params: Promise<LocaleParams>;
+};
+
+export async function generateMetadata({ params }: PlaytestPageProps): Promise<Metadata> {
+  const { locale } = await params;
+
+  if (!isLocale(locale) || !isPlaytestEnabled()) {
+    notFound();
+  }
+
+  return buildCanonicalMetadata(locale, ['play']);
+}
+
+export default async function PlaytestPage({ params }: PlaytestPageProps) {
+  const { locale } = await params;
+
+  if (!isLocale(locale) || !isPlaytestEnabled()) {
+    notFound();
+  }
+
+  const { cards, error } = await getStaticCards();
+
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <PlaytestClient locale={locale} initialCards={cards} initialError={error} />
+    </div>
+  );
+}

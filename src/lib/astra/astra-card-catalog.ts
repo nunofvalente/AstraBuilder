@@ -1,12 +1,27 @@
 import { getAstraAllCardsUrl } from "./astra-config";
 import type { AstraCardRecord } from "./astra-card-types";
 
-const ASTRA_CARD_CATALOG_REVALIDATE_SECONDS = 300;
+const DEFAULT_ASTRA_CARD_CATALOG_REVALIDATE_SECONDS = 86400;
+
+export function getAstraCardCatalogRevalidateSeconds(): number {
+  const configuredValue = process.env.ASTRA_CARD_CATALOG_REVALIDATE_SECONDS;
+
+  if (!configuredValue) {
+    return DEFAULT_ASTRA_CARD_CATALOG_REVALIDATE_SECONDS;
+  }
+
+  const parsedValue = Number(configuredValue);
+  if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+    return DEFAULT_ASTRA_CARD_CATALOG_REVALIDATE_SECONDS;
+  }
+
+  return Math.floor(parsedValue);
+}
 
 export async function fetchAstraCardCatalog(): Promise<AstraCardRecord[]> {
   const response = await fetch(getAstraAllCardsUrl(), {
     next: {
-      revalidate: ASTRA_CARD_CATALOG_REVALIDATE_SECONDS,
+      revalidate: getAstraCardCatalogRevalidateSeconds(),
     },
   });
 

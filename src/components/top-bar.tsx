@@ -15,12 +15,13 @@ import { ensureProfileForUser, type Profile } from '@/lib/supabase/profiles';
 type TopBarProps = {
   locale?: Locale;
   labels: Dictionary['topBar'];
+  showPlay?: boolean;
   onSettings?: () => void;
 };
 
 const RESET_FLAG_STORAGE_KEY = 'astrabuilder-auth-reset';
 
-export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarProps) {
+export function TopBar({ locale = DEFAULT_LOCALE, labels, showPlay = false, onSettings }: TopBarProps) {
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -237,13 +238,18 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarPr
   const menuTextClass = 'text-[color:var(--text-primary)]';
   const barColorClass = 'bg-white';
   const builderHref = `/${locale}/create`;
+  const playHref = `/${locale}/play`;
+  const matchHref = `/${locale}/match`;
   const decksHref = `/${locale}/decks`;
   const collectionHref = `/${locale}/collection`;
   const isBuilderRoute = pathname === builderHref || pathname?.startsWith(`${builderHref}/`);
+  const isPlayRoute = pathname === playHref || pathname?.startsWith(`${playHref}/`);
+  const isMatchRoute = pathname === matchHref || pathname?.startsWith(`${matchHref}/`);
   const isDecksRoute = pathname === decksHref || pathname?.startsWith(`${decksHref}/`);
   const isCollectionRoute = pathname === collectionHref || pathname?.startsWith(`${collectionHref}/`);
   const topLevelNavItems = [
     { href: builderHref, label: labels.builder, isActive: isBuilderRoute },
+    ...(showPlay ? [{ href: playHref, label: labels.play, isActive: isPlayRoute }] : []),
     { href: decksHref, label: labels.decks, isActive: isDecksRoute },
     { href: collectionHref, label: labels.collection, isActive: isCollectionRoute },
   ];
@@ -259,8 +265,12 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, onSettings }: TopBarPr
   const profileButtonTitle = profileName;
   const signOutLabel = isSigningOut ? labels.signingOut : labels.signOut;
 
+  if (isMatchRoute) {
+    return null;
+  }
+
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#2b2927] backdrop-blur">
+    <header className="app-top-bar sticky top-0 z-50 border-b border-white/10 bg-[#2b2927] backdrop-blur">
       <div className="flex h-16 w-full items-center gap-4 px-4 sm:px-6">
         <span className={`shrink-0 text-lg font-semibold ${toolbarTextClass}`}>
           <Link href={`/${locale}`} className="flex items-center">

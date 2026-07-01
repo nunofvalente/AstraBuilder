@@ -394,6 +394,7 @@ type TopBarDictionary = {
     profile: string;
     myDecks: string;
     builder: string;
+    play: string;
     decks: string;
     collection: string;
     settings: string;
