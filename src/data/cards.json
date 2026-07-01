@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-10T21:42:09.770Z",
+  "generatedAt": "2026-07-01T18:39:19.112Z",
   "cards": [
     {
       "id": "IMP087",
@@ -762,6 +762,25 @@
       "detailLabel": "Drifter's Necklace Item (Equipment) Cost 3 Affinity Caelum Rarity Common"
     },
     {
+      "id": "IMPT001",
+      "name": "Drone",
+      "type": "Unit",
+      "affinity": "Neutral",
+      "number": null,
+      "cost": 0,
+      "attack": 1,
+      "health": 1,
+      "subtype": "Drone Token",
+      "rarity": "Token",
+      "artist": "Parhelion Studio",
+      "influence": 0,
+      "rulesText": "",
+      "description": "\"The future of warfare is here. Deadly, nimble, and at an affordable price!\" - Falrich, Merchant of War",
+      "imageSrc": "/images/tokens/drone-token.png",
+      "searchContent": "drone unit drone token neutral token parhelion studio  \"the future of warfare is here. deadly, nimble, and at an affordable price!\" - falrich, merchant of war 0 0 1 1",
+      "detailLabel": "Drone Unit (Drone Token) Cost 0 Affinity Neutral Rarity Token"
+    },
+    {
       "id": "IMP006",
       "name": "Ebonblight Invoker",
       "type": "Unit",
@@ -931,6 +950,25 @@
       "imageSrc": "https://assets.echoesofastra.com/cards/IMP159_Excavator_web.png",
       "searchContent": "excavator unit vehicle neutral uncommon eliasart & parhelion studio on attack: you may destroy a territory in the same combat zone as this unit. \"think of it as automated landscaping on treads!\" - falrich 159 1 4 3 4",
       "detailLabel": "Excavator Unit (Vehicle) Cost 4 Affinity Neutral Rarity Uncommon"
+    },
+    {
+      "id": "IMP000",
+      "name": "Experiment",
+      "type": "Unit",
+      "affinity": "Neutral",
+      "number": 0,
+      "cost": 0,
+      "attack": 2,
+      "health": 2,
+      "subtype": "Experiment Token",
+      "rarity": "Token",
+      "artist": "Parhelion Studio",
+      "influence": 0,
+      "rulesText": "",
+      "description": "\"Not my most impressive work, but this should suffice.\" - Vermillion",
+      "imageSrc": "/images/tokens/experiment-token.png",
+      "searchContent": "experiment unit experiment token neutral token parhelion studio  \"not my most impressive work, but this should suffice.\" - vermillion 0 0 0 2 2",
+      "detailLabel": "Experiment Unit (Experiment Token) Cost 0 Affinity Neutral Rarity Token"
     },
     {
       "id": "IMP028",

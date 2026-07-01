@@ -1,6 +1,6 @@
 ## AstraBuilder
 
-AstroBuilder is a Next.js application for browsing cards and building decks for **Echoes of Astra**. It uses the official Astra API for live card data while keeping Supabase for app-specific features such as auth and saved decks.
+AstroBuilder is a Next.js application for browsing cards and building decks for **Echoes of Astra**. It uses Supabase for auth, saved decks, and the card catalogue cache.
 
 ## Development
 
@@ -22,15 +22,36 @@ Optional:
 
 ```env
 ASTRA_API_BASE_URL=https://api.echoesofastra.com
+SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-When you need to work offline or avoid hitting the Supabase quota, enable the local fixture by setting:
+`SUPABASE_SERVICE_ROLE_KEY` is only needed for local admin scripts, such as syncing card data. Do not expose it to the browser.
+
+When you need to work offline or avoid hitting Supabase, enable the local fixture by setting:
 
 ```env
 NEXT_PUBLIC_USE_DEV_CARDS=true
 ```
 
 With this flag the deck builder serves `src/data/cards-dev.json`, which ships with one sample card per affinity and gradient placeholder art in `public/images/dev-cards/`. Set the flag to `false` (or remove it) to restore Supabase-backed data.
+
+### Card catalogue
+
+The app reads printed card data from the Supabase `cards` table and falls back to `src/data/cards.json` if Supabase is not configured or has no rows.
+
+To set up the table, run the SQL in:
+
+```bash
+supabase/migrations/20260701161000_create_cards_table.sql
+```
+
+To sync the current Astra catalogue into Supabase:
+
+```bash
+npm run cards:sync
+```
+
+The sync command requires `NEXT_PUBLIC_SUPABASE_URL` or `SUPABASE_URL`, plus `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### Running locally
 
@@ -41,7 +62,7 @@ npm run dev
 
 Open <http://localhost:3000> to access the site.
 
-`src/data/cards.json` is kept in the repo as a fallback snapshot when the Astra API is unavailable or returns no rows.
+`src/data/cards.json` is kept in the repo as a fallback snapshot when Supabase is unavailable or returns no rows.
 
 ### Image optimization
 

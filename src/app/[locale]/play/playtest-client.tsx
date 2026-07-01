@@ -9,17 +9,31 @@ import { Archive, ArrowDownToLine, Ban, Bot, ChevronsRight, Flag, Hand, Layers, 
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import type { Card, DeckEntry } from '../create/deck-builder/types';
+import {
+  BOT_TURN_STEPS,
+  BATTLEFIELD_ZONES,
+  addLogEntry,
+  advanceToNextTurn,
+  applyBotTurnStep,
+  buildInitialGameState,
+  createLogEntry,
+  getBattlefieldPlacementError,
+  isTerritoryCard,
+  isUnitCard,
+  placeCardIntoSupply,
+  placeStartingSupply,
+  prepareCardForZone,
+  rollFirstPlayer,
+  shuffleCards,
+  startGameAfterSetup,
+  splitBattlefieldReplacement,
+  type GameCardInstance,
+  type GameState,
+  type PrivateZones,
+  type SavedDeck,
+  type ZoneId,
+} from './playtest-rules';
 
-type ZoneId =
-  | 'deck'
-  | 'hand'
-  | 'staging'
-  | 'supply'
-  | 'graveyard'
-  | 'banish'
-  | 'battlefieldLeft'
-  | 'battlefieldCenter'
-  | 'battlefieldRight';
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'auth' | 'error';
 type PlayMode = 'matchmaking' | 'lobby' | 'practice';
 type PlayQueue = 'ranked' | 'casual';
@@ -37,38 +51,6 @@ type DeckRow = {
   deck_cards?: DeckCardRow[] | null;
 };
 
-type SavedDeck = {
-  id: string;
-  title: string | null;
-  cardCount: number;
-  entries: DeckEntry[];
-};
-
-type GameCardInstance = {
-  instanceId: string;
-  card: Card;
-};
-
-type PrivateZones = Pick<Record<ZoneId, GameCardInstance[]>, 'deck' | 'hand' | 'staging' | 'supply' | 'graveyard' | 'banish'>;
-
-type GameState = {
-  deckId: string;
-  deckTitle: string;
-  botDeckId: string | null;
-  botDeckTitle: string | null;
-  turn: number;
-  zones: Record<ZoneId, GameCardInstance[]>;
-  opponentZones: PrivateZones;
-  log: LogEntry[];
-};
-
-type LogEntry = {
-  id: string;
-  prefix?: string;
-  cardName?: string;
-  suffix: string;
-};
-
 export type PlaytestClientProps = {
   locale: Locale;
   initialCards: Card[];
@@ -79,6 +61,7 @@ export type PlaytestClientProps = {
 type MatchSessionPayload = {
   deckId: string;
   botDeckId: string | null;
+  mode?: 'practice' | 'multiplayer';
 };
 
 const ZONE_LABELS: Record<ZoneId, string> = {
@@ -95,8 +78,8 @@ const ZONE_LABELS: Record<ZoneId, string> = {
 
 const MATCH_SESSION_STORAGE_KEY = 'astrabuilder-playtest-match';
 
-const BATTLEFIELD_ZONES = new Set<ZoneId>(['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']);
 const CARD_BACK_IMAGE_SRC = '/images/card-back.png';
+const BOT_TURN_STEP_DELAY_MS = 900;
 
 function useCloseOnOutsidePointerDown(
   isOpen: boolean,
@@ -142,6 +125,10 @@ function CardZoomPreview({ card }: { card: Card | null }) {
     </div>
   );
 }
+
+function getReadyStateClassName(instance: GameCardInstance): string {
+  return instance.ready ? '' : 'rotate-90 opacity-85';
+}
 const DEFAULT_MOVE_TARGETS: ZoneId[] = [
   'hand',
   'staging',
@@ -172,69 +159,6 @@ function resolveDeckCardId(entry: DeckCardRow | null | undefined): string | null
   }
 
   return null;
-}
-
-function shuffleCards(cards: GameCardInstance[]): GameCardInstance[] {
-  const shuffled = [...cards];
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
-  }
-
-  return shuffled;
-}
-
-function buildDeckInstances(deck: SavedDeck, owner: 'player' | 'opponent'): GameCardInstance[] {
-  return deck.entries.flatMap((entry) =>
-    Array.from({ length: entry.count }, (_, index) => ({
-      instanceId: `${owner}-${entry.card.id}-${index}-${crypto.randomUUID()}`,
-      card: entry.card,
-    }))
-  );
-}
-
-function createPrivateZones(deckCards: GameCardInstance[]): PrivateZones {
-  const shuffledDeck = shuffleCards(deckCards);
-  const openingHand = shuffledDeck.slice(0, 7);
-
-  return {
-    deck: shuffledDeck.slice(openingHand.length),
-    hand: openingHand,
-    staging: [],
-    supply: [],
-    graveyard: [],
-    banish: [],
-  };
-}
-
-function buildInitialGameState(deck: SavedDeck, botDeck: SavedDeck | null): GameState {
-  const instances = buildDeckInstances(deck, 'player');
-  const opponentInstances = botDeck ? buildDeckInstances(botDeck, 'opponent') : [];
-  const playerZones = createPrivateZones(instances);
-  const opponentZones = createPrivateZones(opponentInstances);
-
-  return {
-    deckId: deck.id,
-    deckTitle: deck.title?.trim() || 'Untitled deck',
-    botDeckId: botDeck?.id ?? null,
-    botDeckTitle: botDeck?.title?.trim() || null,
-    turn: 1,
-    zones: {
-      ...playerZones,
-      battlefieldLeft: [],
-      battlefieldCenter: [],
-      battlefieldRight: [],
-    },
-    opponentZones,
-    log: [
-      createLogEntry({
-        suffix: botDeck
-          ? `Started practice with ${instances.length} cards against ${botDeck.title?.trim() || 'Untitled deck'}. Both players drew 7 cards.`
-          : `Started practice with ${instances.length} cards. You drew 7 cards.`,
-      }),
-    ],
-  };
 }
 
 function mapDeckRows(rows: DeckRow[], cardMap: Map<string, Card>): SavedDeck[] {
@@ -273,27 +197,6 @@ function mapDeckRows(rows: DeckRow[], cardMap: Map<string, Card>): SavedDeck[] {
       entries,
     };
   });
-}
-
-function createLogEntry({
-  prefix,
-  cardName,
-  suffix,
-}: {
-  prefix?: string;
-  cardName?: string;
-  suffix: string;
-}): LogEntry {
-  return {
-    id: crypto.randomUUID(),
-    prefix,
-    cardName,
-    suffix,
-  };
-}
-
-function addLogEntry(state: GameState, entry: Omit<LogEntry, 'id'>): LogEntry[] {
-  return [createLogEntry(entry), ...state.log].slice(0, 40);
 }
 
 function ZoneIcon({ zone }: { zone: ZoneId }) {
@@ -438,64 +341,111 @@ function BattlefieldPanel({
   zone,
   cards,
   onMove,
+  disabled = false,
 }: {
   zone: ZoneId;
   cards: GameCardInstance[];
   onMove: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
+  disabled?: boolean;
 }) {
-  const instance = cards[0] ?? null;
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const unit = cards.find((instance) => isUnitCard(instance.card) || !isTerritoryCard(instance.card)) ?? null;
+  const playerTerritory = cards.find((instance) => instance.owner === 'player' && isTerritoryCard(instance.card)) ?? null;
+  const opponentTerritory = cards.find((instance) => instance.owner === 'opponent' && isTerritoryCard(instance.card)) ?? null;
+  const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
+  const activeInstance = cards.find((instance) => instance.instanceId === activeInstanceId) ?? null;
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const targets: ZoneId[] = ['staging', 'graveyard', 'banish', 'hand'];
 
-  useCloseOnOutsidePointerDown(isMenuOpen, [triggerRef, menuRef], () => setIsMenuOpen(false));
+  useCloseOnOutsidePointerDown(activeInstance !== null, [triggerRef, menuRef], () => setActiveInstanceId(null));
 
   function handleMove(instanceId: string, target: ZoneId) {
+    if (disabled) {
+      setActiveInstanceId(null);
+      setPreviewCard(null);
+      return;
+    }
+
     onMove(instanceId, zone, target);
-    setIsMenuOpen(false);
+    setActiveInstanceId(null);
     setPreviewCard(null);
   }
 
-  return (
-    <section className="relative flex min-h-0 flex-col rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]/92">
-      <CardZoomPreview card={previewCard} />
-      <div className="flex min-h-0 flex-1 items-center justify-center p-2">
-        {instance ? (
-          <button
-            ref={triggerRef}
-            type="button"
-            onClick={() => setIsMenuOpen((current) => !current)}
-            onMouseEnter={() => setPreviewCard(instance.card)}
-            onFocus={() => setPreviewCard(instance.card)}
-            onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-            onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-            className="relative aspect-[5/7] h-[min(8.5rem,100%)] overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-            aria-expanded={isMenuOpen}
-            aria-haspopup="menu"
-          >
-            <span className="sr-only">Open {ZONE_LABELS[zone]} actions</span>
-            <span className="relative block h-full w-full">
-              {instance.card.imageSrc ? (
-                <Image src={instance.card.imageSrc} alt="" fill sizes="96px" className="object-cover" />
-              ) : null}
-            </span>
-          </button>
-        ) : (
-          <p className="text-center text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-            {ZONE_LABELS[zone]}
-          </p>
-        )}
+  function renderSlot(instance: GameCardInstance | null, label: string | null, size: 'unit' | 'territory') {
+    const isActive = activeInstanceId === instance?.instanceId;
+    const sizeClassName = size === 'unit' ? 'h-[min(11rem,100%)]' : 'h-[min(10.25rem,100%)]';
+    const slotClassName =
+      size === 'unit'
+        ? 'border-[color:var(--accent)]/45 bg-[color:var(--surface-muted)]/35'
+        : 'border-[color:var(--border)]/75 bg-[color:var(--background)]/35';
+
+    if (!instance) {
+      return (
+        <div className={`flex aspect-[5/7] ${sizeClassName} ${slotClassName} items-center justify-center rounded-md border border-dashed px-1 text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]`}>
+          {label}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        ref={isActive ? triggerRef : undefined}
+        type="button"
+        onClick={() => !disabled && setActiveInstanceId((current) => (current === instance.instanceId ? null : instance.instanceId))}
+        onMouseEnter={() => setPreviewCard(instance.card)}
+        onFocus={() => setPreviewCard(instance.card)}
+        onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
+        onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
+        className={`relative aspect-[5/7] ${sizeClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+        aria-expanded={isActive}
+        aria-haspopup={disabled ? undefined : 'menu'}
+        aria-disabled={disabled}
+      >
+        <span className="sr-only">Open {instance.card.name} actions in {ZONE_LABELS[zone]}</span>
+        <span className="relative block h-full w-full">
+          {instance.card.imageSrc ? (
+            <Image src={instance.card.imageSrc} alt="" fill sizes={size === 'unit' ? '88px' : '56px'} className="object-cover" />
+          ) : null}
+        </span>
+      </button>
+    );
+  }
+
+  function renderTerritoryColumn(label: string, instance: GameCardInstance | null) {
+    return (
+      <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] place-items-center gap-0.5">
+        <p className="truncate text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
+          {label}
+        </p>
+        {renderSlot(instance, null, 'territory')}
       </div>
-      {instance && isMenuOpen ? (
+    );
+  }
+
+  return (
+    <section className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]">
+      <CardZoomPreview card={previewCard} />
+      <p className="truncate text-center text-[0.7rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+        {ZONE_LABELS[zone]}
+      </p>
+      <div className="grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
+        {renderTerritoryColumn('Your territory', playerTerritory)}
+        <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
+        <div className="flex min-h-0 items-center justify-center">
+          {renderSlot(unit, 'Unit', 'unit')}
+        </div>
+        <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
+        {renderTerritoryColumn('Enemy territory', opponentTerritory)}
+      </div>
+      {activeInstance && !disabled ? (
         <div ref={menuRef} className="absolute left-1/2 top-2 z-40 w-36 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl">
           {targets.map((target) => (
             <button
               key={target}
               type="button"
               role="menuitem"
-              onClick={() => handleMove(instance.instanceId, target)}
+              onClick={() => handleMove(activeInstance.instanceId, target)}
               className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
             >
               {`Move to ${ZONE_LABELS[target]}`}
@@ -564,6 +514,7 @@ function CombinedStagingSupplyPanel({
   compact = false,
   mirror = false,
   onMove,
+  disabled = false,
 }: {
   stagingCards: GameCardInstance[];
   supplyCards: GameCardInstance[];
@@ -573,6 +524,7 @@ function CombinedStagingSupplyPanel({
   compact?: boolean;
   mirror?: boolean;
   onMove?: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
+  disabled?: boolean;
 }) {
   const [activeStagingCardId, setActiveStagingCardId] = useState<string | null>(null);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
@@ -588,11 +540,13 @@ function CombinedStagingSupplyPanel({
       ? 'grid-rows-[minmax(5.75rem,0.44fr)_minmax(12rem,0.86fr)]'
       : 'grid-rows-[minmax(12rem,0.86fr)_minmax(5.75rem,0.44fr)]';
   const stagingCardClassName = compact ? 'h-[min(8rem,100%)]' : 'h-[min(10.75rem,100%)]';
+  const panelToneClassName = 'border-[color:var(--accent)]/24 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.10),transparent_42%),linear-gradient(180deg,rgba(54,48,42,0.78),rgba(30,28,26,0.72))]';
+  const stagingToneClassName = 'border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(255,226,183,0.045),rgba(0,0,0,0.13))]';
 
-  useCloseOnOutsidePointerDown(Boolean(onMove && activeStagingCard), [activeStagingTriggerRef, stagingMenuRef], () => setActiveStagingCardId(null));
+  useCloseOnOutsidePointerDown(Boolean(onMove && !disabled && activeStagingCard), [activeStagingTriggerRef, stagingMenuRef], () => setActiveStagingCardId(null));
 
   function handleStagingMove(instanceId: string, target: ZoneId) {
-    if (!onMove) {
+    if (!onMove || disabled) {
       return;
     }
 
@@ -602,10 +556,10 @@ function CombinedStagingSupplyPanel({
   }
 
   return (
-    <section className="relative grid min-h-0 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-3">
+    <section className={`relative grid min-h-0 overflow-hidden rounded-lg border bg-[color:var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${panelToneClassName}`}>
       <CardZoomPreview card={previewCard} />
       <div className={`grid min-h-0 ${rowsClassName} gap-3`}>
-        <div className={`grid min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] rounded-md border border-[color:var(--border)]/65 bg-[color:var(--surface-muted)]/10 ${mirror ? 'order-2' : 'order-1'}`}>
+        <div className={`grid min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] rounded-md border ${stagingToneClassName} ${mirror ? 'order-2' : 'order-1'}`}>
           <div className="deck-builder-scroll flex min-h-0 items-center gap-3 overflow-x-auto overflow-y-hidden px-3 py-1.5">
             {stagingCards.length === 0 ? (
               <p className="flex h-full w-full items-center justify-center text-center text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
@@ -613,18 +567,22 @@ function CombinedStagingSupplyPanel({
               </p>
             ) : (
               stagingCards.map((instance) => (
-                <div key={instance.instanceId} className="relative flex h-full flex-none items-center">
+                <div
+                  key={instance.instanceId}
+                  className={`relative flex h-full flex-none items-center justify-center ${instance.ready ? '' : compact ? 'w-[8rem]' : 'w-[10.75rem]'}`}
+                >
                   <button
                     ref={activeStagingCardId === instance.instanceId ? activeStagingTriggerRef : undefined}
                     type="button"
-                    onClick={() => onMove && setActiveStagingCardId((current) => (current === instance.instanceId ? null : instance.instanceId))}
+                    onClick={() => onMove && !disabled && setActiveStagingCardId((current) => (current === instance.instanceId ? null : instance.instanceId))}
                     onMouseEnter={() => setPreviewCard(instance.card)}
                     onFocus={() => setPreviewCard(instance.card)}
                     onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
                     onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-                    className={`relative aspect-[5/7] ${stagingCardClassName} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-lg transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.38)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+                    className={`relative aspect-[5/7] ${stagingCardClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-lg transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.38)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
                     aria-expanded={activeStagingCardId === instance.instanceId}
-                    aria-haspopup={onMove ? 'menu' : undefined}
+                    aria-haspopup={onMove && !disabled ? 'menu' : undefined}
+                    aria-disabled={disabled}
                   >
                     {instance.card.imageSrc ? (
                       <Image src={instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
@@ -645,7 +603,7 @@ function CombinedStagingSupplyPanel({
             </div>
           </div>
         </div>
-        <div className={`relative flex min-h-0 flex-col rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/25 ${mirror ? 'order-1' : 'order-2'}`}>
+        <div className={`relative flex min-h-0 flex-col rounded-md border border-[color:var(--border)]/70 bg-black/10 ${mirror ? 'order-1' : 'order-2'}`}>
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_1px_auto] py-3 pl-3 pr-0">
             <div className="relative min-h-0 pr-3">
               <span className="absolute right-5 top-0 z-10 rounded-full bg-black/55 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
@@ -660,7 +618,7 @@ function CombinedStagingSupplyPanel({
                 supplyCards.map((instance) => (
                   <div
                     key={instance.instanceId}
-                    className="relative aspect-[5/7] h-20 flex-none overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md"
+                    className={`relative aspect-[5/7] h-20 flex-none ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}
                     aria-hidden="true"
                   >
                     <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
@@ -675,7 +633,7 @@ function CombinedStagingSupplyPanel({
             </div>
           </div>
         </div>
-        {activeStagingCard && onMove ? (
+        {activeStagingCard && onMove && !disabled ? (
           <div ref={stagingMenuRef} className="absolute left-1/2 top-6 z-50 w-52 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl">
             {stagingTargets.map((target) => (
               <button
@@ -698,16 +656,18 @@ function CombinedStagingSupplyPanel({
 function HandStrip({
   cards,
   onMove,
+  disabled = false,
 }: {
   cards: GameCardInstance[];
   onMove: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
+  disabled?: boolean;
 }) {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const activeHandTriggerRef = useRef<HTMLButtonElement | null>(null);
   const handMenuRef = useRef<HTMLDivElement | null>(null);
   const activeInstance = cards.find((instance) => instance.instanceId === activeCardId) ?? null;
-  const actionTargets: ZoneId[] = ['staging', 'supply', 'battlefieldLeft', 'battlefieldCenter', 'battlefieldRight', 'graveyard'];
+  const actionTargets: ZoneId[] = ['staging', 'supply'];
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [activeHandTriggerRef, handMenuRef], closeHandMenu);
 
@@ -717,6 +677,11 @@ function HandStrip({
   }
 
   function handleMove(instanceId: string, target: ZoneId) {
+    if (disabled) {
+      closeHandMenu();
+      return;
+    }
+
     onMove(instanceId, 'hand', target);
     closeHandMenu();
   }
@@ -724,7 +689,7 @@ function HandStrip({
   return (
     <section className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2 xl:left-[13.5rem] xl:right-4">
       {activeInstance ? (
-        <div ref={handMenuRef} className="absolute bottom-[6.75rem] left-1/2 z-50 w-[min(94vw,32rem)] -translate-x-1/2 overflow-hidden rounded-xl border-2 border-[color:var(--accent)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
+        <div ref={handMenuRef} className="absolute bottom-[5.75rem] left-1/2 z-50 w-[min(94vw,32rem)] -translate-x-1/2 overflow-hidden rounded-xl border-2 border-[color:var(--accent)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
           <button
             type="button"
             onClick={closeHandMenu}
@@ -754,7 +719,7 @@ function HandStrip({
                   {activeInstance.card.description ? <p className="mt-2 italic text-[color:var(--text-secondary)]">{activeInstance.card.description}</p> : null}
                 </div>
               ) : null}
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="mt-4 grid grid-cols-2 gap-2">
                 {actionTargets.map((target) => (
                   <button
                     key={target}
@@ -772,7 +737,7 @@ function HandStrip({
       ) : null}
       <CardZoomPreview card={previewCard} />
       {cards.length === 0 ? (
-        <p className="mx-auto max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-4 text-center text-sm text-[color:var(--text-secondary)]">
+        <p className="mx-auto translate-y-4 max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-4 text-center text-sm text-[color:var(--text-secondary)]">
           Draw cards to fill your hand.
         </p>
       ) : (
@@ -783,7 +748,7 @@ function HandStrip({
             const rotation = Math.max(-12, Math.min(12, offsetFromCenter * 3.2));
             const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
             const handCardStyle = {
-              '--hand-card-y': `${44 + verticalOffset}px`,
+              '--hand-card-y': `${62 + verticalOffset}px`,
               '--hand-card-rotation': `${rotation}deg`,
               transformOrigin: '50% 115%',
             } as CSSProperties;
@@ -797,7 +762,7 @@ function HandStrip({
               <button
                 ref={activeCardId === instance.instanceId ? activeHandTriggerRef : undefined}
                 type="button"
-                onClick={() => setActiveCardId((current) => (current === instance.instanceId ? null : instance.instanceId))}
+                onClick={() => !disabled && setActiveCardId((current) => (current === instance.instanceId ? null : instance.instanceId))}
                 onMouseEnter={() => setPreviewCard(instance.card)}
                 onFocus={() => setPreviewCard(instance.card)}
                 onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
@@ -805,7 +770,8 @@ function HandStrip({
                 className="group flex w-28 translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] rounded-md focus:outline-none transition-transform duration-200 hover:translate-y-6 hover:rotate-0 focus-visible:translate-y-6 focus-visible:rotate-0"
                 style={handCardStyle}
                 aria-expanded={activeCardId === instance.instanceId}
-                aria-haspopup="menu"
+                aria-haspopup={disabled ? undefined : 'menu'}
+                aria-disabled={disabled}
               >
                 <span
                   className={`relative aspect-[5/7] w-28 overflow-hidden rounded-md border-2 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30 transition-[border-color,box-shadow,transform] duration-200 group-hover:border-[color:var(--accent)] group-hover:shadow-[0_0_1rem_rgba(241,143,59,0.45)] group-focus-visible:border-[color:var(--accent)] ${
@@ -869,6 +835,107 @@ function OpponentHandStrip({ cards }: { cards: GameCardInstance[] }) {
   );
 }
 
+function InfluenceScoreControl({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value?: number;
+  tone: 'player' | 'opponent';
+}) {
+  const toneClassName =
+    tone === 'player'
+      ? 'border-[color:var(--accent)]/45 bg-[linear-gradient(135deg,rgba(241,143,59,0.18),rgba(44,180,120,0.10),rgba(0,0,0,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_1rem_rgba(241,143,59,0.08)]'
+      : 'border-red-400/45 bg-[linear-gradient(135deg,rgba(239,68,68,0.18),rgba(127,29,29,0.12),rgba(0,0,0,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_1rem_rgba(239,68,68,0.08)]';
+  const topBarClassName = tone === 'player' ? 'bg-[color:var(--accent)]' : 'bg-red-400';
+
+  return (
+    <div className={`relative overflow-hidden rounded-md border p-2 ${toneClassName}`}>
+      <div className={`absolute inset-x-0 top-0 h-0.5 ${topBarClassName}`} aria-hidden="true" />
+      <div className="flex items-center justify-center">
+        <p className="truncate text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">{label}</p>
+      </div>
+      <div className="mt-2 grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-center gap-2">
+        <div className="h-px bg-[color:var(--border)]/80" aria-hidden="true" />
+        <div className="min-w-0 rounded-md border border-white/10 bg-black/20 py-1 text-center text-3xl font-black leading-none text-[color:var(--text-primary)] shadow-inner">
+          {value ?? 0}
+        </div>
+        <div className="h-px bg-[color:var(--border)]/80" aria-hidden="true" />
+      </div>
+    </div>
+  );
+}
+
+function RequiredActionToast({
+  message,
+  actions,
+}: {
+  message: string | null;
+  actions?: React.ReactNode;
+}) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-[24rem] z-50 flex justify-center px-4 xl:left-[13.5rem] xl:right-4">
+      <div className="max-w-lg rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)]/95 px-4 py-3 text-center text-sm font-bold text-[color:var(--text-primary)] shadow-2xl shadow-black/35 backdrop-blur">
+        {message}
+        {actions ? <div className="mt-3 flex justify-center gap-2">{actions}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function getLogGroupLabel(entry: GameState['log'][number]): string {
+  if (entry.phase === 'setup') {
+    return 'Setup';
+  }
+
+  if (typeof entry.turn === 'number') {
+    return `Turn ${entry.turn}`;
+  }
+
+  return 'Log';
+}
+
+function ActionLogList({ entries }: { entries: GameState['log'] }) {
+  const groups: Array<{ label: string; entries: GameState['log'] }> = [];
+
+  for (const entry of entries) {
+    const label = getLogGroupLabel(entry);
+    const currentGroup = groups[groups.length - 1];
+
+    if (currentGroup?.label === label) {
+      currentGroup.entries.push(entry);
+    } else {
+      groups.push({ label, entries: [entry] });
+    }
+  }
+
+  return (
+    <>
+      {groups.map((group) => (
+        <li key={`${group.label}-${group.entries[0]?.id}`} className="flex flex-col gap-2">
+          <h3 className="text-center text-xs font-black uppercase tracking-wide text-[color:var(--text-primary)] underline decoration-[color:var(--accent)] decoration-2 underline-offset-4">
+            {group.label}
+          </h3>
+          <ol className="flex flex-col gap-2">
+            {group.entries.map((entry) => (
+              <li key={entry.id} className="rounded-md bg-[color:var(--surface-muted)]/60 px-3 py-2">
+                {entry.prefix}
+                {entry.cardName ? <strong className="font-bold text-[color:var(--text-primary)]">{entry.cardName}</strong> : null}
+                {entry.suffix}
+              </li>
+            ))}
+          </ol>
+        </li>
+      ))}
+    </>
+  );
+}
+
 export function PlaytestClient({ locale, initialCards, initialError, initialMode = 'lobby' }: PlaytestClientProps) {
   const router = useRouter();
   const [status, setStatus] = useState<LoadStatus>('idle');
@@ -879,8 +946,10 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
   const [selectedBotDeckId, setSelectedBotDeckId] = useState('');
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
+  const [isPassTurnDialogOpen, setIsPassTurnDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [matchSetupError, setMatchSetupError] = useState<string | null>(null);
+  const botTurnTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const cardMap = useMemo(() => new Map(initialCards.map((card) => [card.id, card])), [initialCards]);
   const selectedDeck = useMemo(
     () => decks.find((deck) => deck.id === selectedDeckId) ?? null,
@@ -894,6 +963,42 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
   const lobbyHref = `/${locale}/play`;
   const matchHref = `/${locale}/match`;
   const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(isMatchRoute ? matchHref : lobbyHref)}`;
+
+  function clearBotTurnTimers() {
+    for (const timerId of botTurnTimersRef.current) {
+      clearTimeout(timerId);
+    }
+
+    botTurnTimersRef.current = [];
+  }
+
+  function playAutomaticBotTurn(botTurnState: GameState) {
+    clearBotTurnTimers();
+    setGameState(botTurnState);
+
+    for (const [index, step] of BOT_TURN_STEPS.entries()) {
+      const timerId = setTimeout(() => {
+        setGameState((previous) => (previous ? applyBotTurnStep(previous, step) : previous));
+      }, BOT_TURN_STEP_DELAY_MS * (index + 1));
+
+      botTurnTimersRef.current.push(timerId);
+    }
+
+    const passTurnTimerId = setTimeout(() => {
+      setGameState((previous) => {
+        if (!previous || previous.phase !== 'main' || previous.activePlayer !== 'opponent') {
+          return previous;
+        }
+
+        return advanceToNextTurn(previous);
+      });
+      botTurnTimersRef.current = [];
+    }, BOT_TURN_STEP_DELAY_MS * (BOT_TURN_STEPS.length + 1));
+
+    botTurnTimersRef.current.push(passTurnTimerId);
+  }
+
+  useEffect(() => clearBotTurnTimers, []);
 
   useEffect(() => {
     if (!isMatchRoute) {
@@ -993,7 +1098,7 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
     setSelectedDeckId(matchDeck.id);
     setSelectedBotDeckId(matchBotDeck.id);
     setMatchSetupError(null);
-    setGameState(buildInitialGameState(matchDeck, matchBotDeck));
+    setGameState(buildInitialGameState(matchDeck, matchBotDeck, payload.mode ?? 'practice'));
   }, [decks, gameState, isMatchRoute, status]);
 
   function startSelectedDeck() {
@@ -1002,14 +1107,14 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
     }
 
     if (isMatchRoute) {
-      setGameState(buildInitialGameState(selectedDeck, selectedBotDeck));
+      setGameState(buildInitialGameState(selectedDeck, selectedBotDeck, 'practice'));
       return;
     }
 
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(
         MATCH_SESSION_STORAGE_KEY,
-        JSON.stringify({ deckId: selectedDeck.id, botDeckId: selectedBotDeck.id } satisfies MatchSessionPayload)
+        JSON.stringify({ deckId: selectedDeck.id, botDeckId: selectedBotDeck.id, mode: 'practice' } satisfies MatchSessionPayload)
       );
     }
 
@@ -1017,7 +1122,9 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
   }
 
   function returnToLobby() {
+    clearBotTurnTimers();
     setIsConcedeDialogOpen(false);
+    setIsPassTurnDialogOpen(false);
     setGameState(null);
     if (typeof window !== 'undefined') {
       window.sessionStorage.removeItem(MATCH_SESSION_STORAGE_KEY);
@@ -1029,6 +1136,31 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
 
   function confirmConcede() {
     returnToLobby();
+  }
+
+  function requestPassTurn() {
+    if (!gameState || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+      return;
+    }
+
+    setIsPassTurnDialogOpen(true);
+  }
+
+  function confirmPassTurn() {
+    if (!gameState || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+      setIsPassTurnDialogOpen(false);
+      return;
+    }
+
+    setIsPassTurnDialogOpen(false);
+    const botTurnState = advanceToNextTurn(gameState);
+
+    if (botTurnState.activePlayer === 'opponent') {
+      playAutomaticBotTurn(botTurnState);
+      return;
+    }
+
+    setGameState(botTurnState);
   }
 
   function drawCards(count: number) {
@@ -1064,17 +1196,84 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
         return previous;
       }
 
-      if (BATTLEFIELD_ZONES.has(toZone) && previous.zones[toZone].length >= 1) {
+      if (fromZone === 'hand' && toZone === 'supply' && !previous.playerStartingSupplyPlaced) {
+        const setupSupply = placeStartingSupply(previous.zones, instanceId);
+
+        if (!setupSupply) {
+          return previous;
+        }
+
+        const setupState = {
+          ...previous,
+          playerStartingSupplyPlaced: true,
+          zones: {
+            ...previous.zones,
+            ...setupSupply.zones,
+          },
+          log: addLogEntry(previous, {
+            prefix: 'Placed ',
+            cardName: setupSupply.selectedCard.card.name,
+            suffix: ` as starting supply and drew ${setupSupply.replacementDraw.length} replacement card.`,
+          }),
+        };
+
+        if (setupState.sessionMode === 'multiplayer') {
+          return startGameAfterSetup(setupState, rollFirstPlayer());
+        }
+
+        return setupState;
+      }
+
+      if (fromZone === 'hand' && toZone === 'supply') {
+        const suppliedCard = placeCardIntoSupply(previous.zones, instanceId);
+
+        if (!suppliedCard) {
+          return previous;
+        }
+
         return {
           ...previous,
-          log: addLogEntry(previous, { suffix: `${ZONE_LABELS[toZone]} already has a card.` }),
+          zones: {
+            ...previous.zones,
+            ...suppliedCard.zones,
+          },
+          log: addLogEntry(previous, {
+            prefix: 'Supplied ',
+            cardName: suppliedCard.selectedCard.card.name,
+            suffix: ` and drew ${suppliedCard.replacementDraw.length} card.`,
+          }),
         };
       }
 
+      const destinationCards = previous.zones[toZone];
+      const battlefieldPlacement = BATTLEFIELD_ZONES.has(toZone)
+        ? splitBattlefieldReplacement(card, destinationCards)
+        : { destinationCards, replacedTerritory: null };
+
+      if (BATTLEFIELD_ZONES.has(toZone)) {
+        const placementError = getBattlefieldPlacementError(card, battlefieldPlacement.destinationCards);
+
+        if (placementError) {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: `${ZONE_LABELS[toZone]} ${placementError}` }),
+          };
+        }
+      }
+
+      const sourceCards = previous.zones[fromZone].filter((instance) => instance.instanceId !== instanceId);
+      const graveyardCards = battlefieldPlacement.replacedTerritory
+        ? [battlefieldPlacement.replacedTerritory, ...(fromZone === 'graveyard' ? sourceCards : previous.zones.graveyard)]
+        : fromZone === 'graveyard'
+          ? sourceCards
+          : previous.zones.graveyard;
+      const movedCard = prepareCardForZone(card, toZone);
+
       const nextZones = {
         ...previous.zones,
-        [fromZone]: previous.zones[fromZone].filter((instance) => instance.instanceId !== instanceId),
-        [toZone]: toZone === 'deck' ? [...previous.zones[toZone], card] : [card, ...previous.zones[toZone]],
+        [fromZone]: sourceCards,
+        graveyard: graveyardCards,
+        [toZone]: toZone === 'deck' ? [...battlefieldPlacement.destinationCards, movedCard] : [movedCard, ...battlefieldPlacement.destinationCards],
       };
 
       return {
@@ -1083,7 +1282,9 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
         log: addLogEntry(previous, {
           prefix: 'Moved ',
           cardName: card.card.name,
-          suffix: ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
+          suffix: battlefieldPlacement.replacedTerritory
+            ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, replacing ${battlefieldPlacement.replacedTerritory.card.name}.`
+            : ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
         }),
       };
     });
@@ -1106,23 +1307,24 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
     });
   }
 
-  function advanceTurn() {
-    setGameState((previous) => {
-      if (!previous) {
-        return previous;
-      }
+  function chooseFirstPlayer(firstPlayer: 'player' | 'opponent') {
+    if (!gameState || gameState.phase !== 'setup' || !gameState.playerStartingSupplyPlaced) {
+      return;
+    }
 
-      const nextTurn = previous.turn + 1;
-      return {
-        ...previous,
-        turn: nextTurn,
-        log: addLogEntry(previous, { suffix: `Advanced to turn ${nextTurn}.` }),
-      };
-    });
+    const startedState = startGameAfterSetup(gameState, firstPlayer);
+
+    if (startedState.activePlayer === 'opponent') {
+      playAutomaticBotTurn(startedState);
+      return;
+    }
+
+    setGameState(startedState);
   }
 
   function resetGame() {
     if (selectedDeck) {
+      clearBotTurnTimers();
       setGameState(buildInitialGameState(selectedDeck, selectedBotDeck));
     }
   }
@@ -1400,14 +1602,36 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
         </div>
       );
     }
+    const canTakePlayerActions = gameState.phase === 'setup' || gameState.activePlayer === 'player';
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
           <div className="flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
-            <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-3">
+            <section className="rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <button type="button" onClick={returnToLobby} className="mb-2 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
                 Back to lobby
               </button>
+              <div className="mb-3 rounded-md border border-[color:var(--border)] bg-black/15 px-3 py-2 text-center">
+                <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  {gameState.phase === 'setup' ? 'Turn 0 setup' : `Turn ${gameState.turn}`}
+                </p>
+                <p className="mt-0.5 text-sm font-black text-[color:var(--text-primary)]">
+                  {gameState.phase === 'setup'
+                    ? 'Setup'
+                    : gameState.activePlayer === 'player'
+                      ? 'Your turn'
+                      : 'Bot turn'}
+                </p>
+              </div>
+              <div className="mb-3 grid gap-2">
+                <InfluenceScoreControl label="Your influence" value={gameState.playerInfluence} tone="player" />
+                <InfluenceScoreControl label="Enemy influence" value={gameState.opponentInfluence} tone="opponent" />
+              </div>
+              {!gameState.playerStartingSupplyPlaced ? (
+                <div className="mb-3 rounded-md border border-[color:var(--accent)]/45 bg-[color:var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)]">
+                  Choose 1 card from hand to place as starting supply. A replacement card will be drawn automatically.
+                </div>
+              ) : null}
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => drawCards(1)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
                   <Hand className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1421,28 +1645,22 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
                   <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                   Concede
                 </button>
-                <button type="button" onClick={advanceTurn} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
+                <button type="button" onClick={requestPassTurn} disabled={gameState.phase === 'setup' || gameState.activePlayer !== 'player'} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
                   <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
                   Turn
                 </button>
               </div>
             </section>
-            <aside className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]">
+            <aside className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <header className="border-b border-[color:var(--border)] px-4 py-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide">Action log</h2>
               </header>
               <ol className="deck-builder-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm text-[color:var(--text-secondary)]">
-                {gameState.log.map((entry) => (
-                  <li key={entry.id} className="rounded-md bg-[color:var(--surface-muted)]/60 px-3 py-2">
-                    {entry.prefix}
-                    {entry.cardName ? <strong className="font-bold text-[color:var(--text-primary)]">{entry.cardName}</strong> : null}
-                    {entry.suffix}
-                  </li>
-                ))}
+                <ActionLogList entries={gameState.log} />
               </ol>
             </aside>
           </div>
-          <div className="grid min-h-[38rem] grid-rows-[minmax(13.5rem,0.9fr)_minmax(6.25rem,0.44fr)_minmax(12rem,1fr)] gap-2 xl:min-h-0">
+          <div className="grid min-h-[42rem] grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
             <CombinedStagingSupplyPanel
               stagingCards={gameState.opponentZones.staging}
               supplyCards={gameState.opponentZones.supply}
@@ -1453,9 +1671,9 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
               mirror
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} disabled={!canTakePlayerActions} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} disabled={!canTakePlayerActions} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} disabled={!canTakePlayerActions} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1464,6 +1682,7 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
               banishCards={gameState.zones.banish}
               deckCards={gameState.zones.deck}
               onMove={moveCard}
+              disabled={!canTakePlayerActions}
             />
           </div>
         </div>
@@ -1493,8 +1712,65 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
             </div>
           </div>
         ) : null}
+        {isPassTurnDialogOpen ? (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-4" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="pass-turn-title" className="w-full max-w-sm rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-2xl">
+              <h2 id="pass-turn-title" className="text-lg font-semibold text-[color:var(--text-primary)]">Pass turn?</h2>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
+                This will end your actions for this turn and pass priority to the bot.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPassTurnDialogOpen(false)}
+                  className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmPassTurn}
+                  className="rounded-md border border-[color:var(--accent)]/50 bg-[color:var(--accent)]/20 px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Pass turn
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        <RequiredActionToast
+          message={
+            !gameState.playerStartingSupplyPlaced
+              ? 'Choose 1 card from your hand to place as starting supply.'
+              : gameState.phase === 'setup'
+                ? gameState.sessionMode === 'multiplayer'
+                  ? 'Rolling to choose who takes the first turn.'
+                  : 'Choose who takes the first turn.'
+                : null
+          }
+          actions={
+            gameState.sessionMode === 'practice' && gameState.phase === 'setup' && gameState.playerStartingSupplyPlaced ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => chooseFirstPlayer('player')}
+                  className="pointer-events-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  You first
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseFirstPlayer('opponent')}
+                  className="pointer-events-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Bot first
+                </button>
+              </>
+            ) : null
+          }
+        />
         <OpponentHandStrip cards={gameState.opponentZones.hand} />
-        <HandStrip cards={gameState.zones.hand} onMove={moveCard} />
+        <HandStrip cards={gameState.zones.hand} onMove={moveCard} disabled={!canTakePlayerActions} />
       </div>
     );
   })();
