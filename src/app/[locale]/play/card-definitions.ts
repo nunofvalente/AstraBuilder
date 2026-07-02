@@ -1,14 +1,14 @@
 import type { Card } from '../create/deck-builder/types';
-import { getPrintedAbilityTriggers, type AbilityTrigger } from './playtest-abilities';
+import { getPrintedAbilityTriggers, type AbilityTrigger } from './card-abilities';
 
-export type PlaytestCardType = 'unit' | 'tactic' | 'territory' | 'item' | 'token' | 'unknown';
-export type PlaytestKeyword = 'blitz' | 'flanking' | 'flying' | 'fortify' | 'glory' | 'impede' | 'provoke' | 'radiance' | 'swift';
+export type CardType = 'unit' | 'tactic' | 'territory' | 'item' | 'token' | 'unknown';
+export type CardKeyword = 'blitz' | 'flanking' | 'flying' | 'fortify' | 'glory' | 'impede' | 'provoke' | 'radiance' | 'swift';
 export type DefaultPlayDestination = 'staging' | 'battlefield' | 'graveyard' | null;
 
-export type PlaytestCardDefinition = {
+export type CardDefinition = {
   id: string;
   name: string;
-  type: PlaytestCardType;
+  type: CardType;
   printedType: string;
   subtype: string | null;
   affinity: string;
@@ -16,14 +16,14 @@ export type PlaytestCardDefinition = {
   attack: number | null;
   health: number | null;
   influence: number | null;
-  keywords: PlaytestKeyword[];
+  keywords: CardKeyword[];
   printedTriggers: AbilityTrigger[];
   defaultPlayDestination: DefaultPlayDestination;
   canScore: boolean;
   entersStagingExhausted: boolean;
 };
 
-const KEYWORD_PATTERNS: Record<PlaytestKeyword, RegExp> = {
+const KEYWORD_PATTERNS: Record<CardKeyword, RegExp> = {
   blitz: /\bblitz\b/i,
   flanking: /\bflanking\b/i,
   flying: /\bflying\b/i,
@@ -35,7 +35,7 @@ const KEYWORD_PATTERNS: Record<PlaytestKeyword, RegExp> = {
   swift: /\bswift\b/i,
 };
 
-export function getPlaytestCardType(card: Card): PlaytestCardType {
+export function getCardType(card: Card): CardType {
   const type = card.type.toLowerCase();
 
   if (type.includes('token')) {
@@ -61,18 +61,18 @@ export function getPlaytestCardType(card: Card): PlaytestCardType {
   return 'unknown';
 }
 
-export function getPlaytestKeywords(card: Card): PlaytestKeyword[] {
+export function getCardKeywords(card: Card): CardKeyword[] {
   return Object.entries(KEYWORD_PATTERNS)
     .filter(([, pattern]) => pattern.test(card.rulesText))
-    .map(([keyword]) => keyword as PlaytestKeyword);
+    .map(([keyword]) => keyword as CardKeyword);
 }
 
-export function hasPlaytestKeyword(card: Card, keyword: PlaytestKeyword): boolean {
+export function hasCardKeyword(card: Card, keyword: CardKeyword): boolean {
   return KEYWORD_PATTERNS[keyword].test(card.rulesText);
 }
 
 export function getDefaultPlayDestination(card: Card): DefaultPlayDestination {
-  const type = getPlaytestCardType(card);
+  const type = getCardType(card);
 
   if (type === 'unit' || type === 'item') {
     return 'staging';
@@ -89,9 +89,9 @@ export function getDefaultPlayDestination(card: Card): DefaultPlayDestination {
   return null;
 }
 
-export function definePlaytestCard(card: Card): PlaytestCardDefinition {
-  const type = getPlaytestCardType(card);
-  const keywords = getPlaytestKeywords(card);
+export function defineCard(card: Card): CardDefinition {
+  const type = getCardType(card);
+  const keywords = getCardKeywords(card);
   const isUnit = type === 'unit' || type === 'token';
 
   return {

@@ -53,7 +53,7 @@ export function CardZoomPreview({
     cards && cards.length > 0
       ? cards
       : card
-        ? [{ instanceId: `preview-${card.id}`, owner: 'player' as const, card, ready: true, faceDown: false, attachedToInstanceId: null }]
+        ? [{ instanceId: `preview-${card.id}`, owner: 'player' as const, card, ready: true, faceDown: false, attachedToInstanceId: null, damage: 0 }]
         : [];
 
   if (previewCards.length === 0) {
@@ -158,17 +158,18 @@ export function CompactZoneStack({
   cards,
   faceDown = false,
   compact = false,
+  onClick,
 }: {
   label: string;
   cards: GameCardInstance[];
   faceDown?: boolean;
   compact?: boolean;
+  onClick?: () => void;
 }) {
   const topCard = cards[0] ?? null;
   const showCardImage = cards.length > 0 && (faceDown || topCard?.card.imageSrc);
-
-  return (
-    <div className="grid min-h-0 w-full grid-rows-[1fr_auto] place-items-center px-2 py-1.5">
+  const stackContent = (
+    <>
       <div
         className={`relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
           compact ? 'h-[min(4.35rem,100%)]' : 'h-20'
@@ -197,6 +198,24 @@ export function CompactZoneStack({
         )}
       </div>
       <span className="mt-1 text-center text-[9px] font-bold uppercase leading-none tracking-wide text-[color:var(--text-secondary)]">{label}</span>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="grid min-h-0 w-full grid-rows-[1fr_auto] place-items-center px-2 py-1.5 transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+      >
+        {stackContent}
+      </button>
+    );
+  }
+
+  return (
+    <div className="grid min-h-0 w-full grid-rows-[1fr_auto] place-items-center px-2 py-1.5">
+      {stackContent}
     </div>
   );
 }
@@ -242,7 +261,7 @@ export function OpponentHandStrip({ cards }: { cards: GameCardInstance[] }) {
   );
 }
 
-export function InfluenceScoreControl({
+export function VictoryPointScoreControl({
   label,
   value,
   tone,

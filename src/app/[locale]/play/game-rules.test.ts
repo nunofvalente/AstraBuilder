@@ -3,13 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { createTestCard } from '../create/deck-builder/test-utils';
 import {
   applyBotTurnStep,
+  playFirstBotCounter,
+  resolveAutomaticBotTurn,
+  runBotTurn,
+} from './game-bot';
+import {
+  adjustVictoryPoints,
   buildDeckInstances,
   buildInitialGameState,
   canManuallySupplyFromHand,
   createPrivateZones,
+  declareBattlefieldAttack,
   advanceToNextTurn,
   exhaustSupplyForCost,
   getBattlefieldPlacementError,
+  getCounterPlayError,
   getEquipmentAttachmentError,
   getEquipmentHost,
   getAttachedCards,
@@ -18,19 +26,25 @@ import {
   getReadySupplyCount,
   getStagingUnitCards,
   getStagingPlacementError,
+  getBattlefieldAttackError,
   isItemCard,
+  isCounterCard,
   placeCardIntoSupply,
   placeAutomaticStartingSupply,
   placeStartingSupply,
   prepareCardForZone,
-  resolveAutomaticBotTurn,
+  passCounterPriority,
+  playCounterCard,
+  resolveBattlefieldAttack,
   rollFirstPlayer,
-  runBotTurn,
   runTurnStart,
+  clearEndOfTurnDamage,
+  scoreBattlefieldVictoryPoints,
   startGameAfterSetup,
   stabilizeAttachmentState,
   splitBattlefieldReplacement,
   triggerCardAbilities,
+  VICTORY_POINT_TARGET,
   markSuppliedThisTurn,
   type GameCardInstance,
   type SavedDeck,
@@ -58,10 +72,11 @@ function makeInstance(overrides: Partial<GameCardInstance> = {}): GameCardInstan
     ready: overrides.ready ?? false,
     faceDown: overrides.faceDown ?? false,
     attachedToInstanceId: overrides.attachedToInstanceId ?? null,
+    damage: overrides.damage ?? 0,
   };
 }
 
-describe('playtest rules', () => {
+describe('game rules', () => {
   it('sets up each player with 6 cards in hand and no automatic starting supply', () => {
     const deckCards = buildDeckInstances(makeDeck(10), 'player');
     const zones = createPrivateZones(deckCards);
@@ -313,8 +328,9 @@ describe('playtest rules', () => {
     expect(state.sessionMode).toBe('practice');
     expect(state.firstPlayer).toBeNull();
     expect(state.activePlayer).toBeNull();
-    expect(state.playerInfluence).toBe(0);
-    expect(state.opponentInfluence).toBe(0);
+    expect(state.playerVictoryPoints).toBe(0);
+    expect(state.opponentVictoryPoints).toBe(0);
+    expect(state.winner).toBeNull();
     expect(state.playerStartingSupplyPlaced).toBe(false);
     expect(state.opponentStartingSupplyPlaced).toBe(true);
     expect(state.playerSuppliedThisTurn).toBe(false);
@@ -536,6 +552,141 @@ describe('playtest rules', () => {
     expect(afterStage.opponentZones.staging[0]?.instanceId).toBe(botUnit.instanceId);
   });
 
+  it('lets the bot attack from staging to capture an empty battlefield', () => {
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const botUnit = makeInstance({
+      instanceId: 'opponent-ready-unit',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({
+        id: 'bot-ready-unit',
+        name: 'Bot Ready Unit',
+        type: 'Unit',
+        attack: 2,
+        health: 2,
+        influence: 1,
+      }),
+    });
+    const botTurn = {
+      ...startGameAfterSetup({ ...state, playerStartingSupplyPlaced: true }, 'opponent'),
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [],
+        staging: [botUnit],
+      },
+    };
+
+    const afterAttack = applyBotTurnStep(botTurn, 'attackBattlefield');
+
+    expect(afterAttack.opponentZones.staging).toEqual([]);
+    expect(afterAttack.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: botUnit.instanceId,
+      owner: 'opponent',
+      ready: true,
+    });
+    expect(afterAttack.pendingCombat).toBeNull();
+    expect(afterAttack.log.some((entry) => entry.suffix.includes('counter priority'))).toBe(false);
+    expect(afterAttack.opponentVictoryPoints).toBe(0);
+  });
+
+  it('lets the bot attack player-occupied battlefields before open ones', () => {
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const botUnit = makeInstance({
+      instanceId: 'opponent-ready-unit',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'bot-ready-unit', name: 'Bot Ready Unit', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const playerUnit = makeInstance({
+      instanceId: 'player-battlefield-unit',
+      owner: 'player',
+      ready: true,
+      card: createTestCard({ id: 'player-battlefield-unit', name: 'Player Unit', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const botTurn = {
+      ...startGameAfterSetup({ ...state, playerStartingSupplyPlaced: true }, 'opponent'),
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [],
+        staging: [botUnit],
+      },
+      zones: {
+        ...state.zones,
+        battlefieldCenter: [playerUnit],
+      },
+    };
+
+    const afterAttack = applyBotTurnStep(botTurn, 'attackBattlefield');
+
+    expect(afterAttack.pendingCombat).toMatchObject({
+      attackerOwner: 'opponent',
+      priorityOwner: 'player',
+      counterStack: [],
+    });
+    expect(afterAttack.opponentZones.staging[0]?.instanceId).toBe(botUnit.instanceId);
+    expect(afterAttack.zones.battlefieldCenter[0]?.instanceId).toBe(playerUnit.instanceId);
+
+    const playerPassed = passCounterPriority(afterAttack, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    const botPassed = passCounterPriority(playerPassed.state, 'opponent');
+    expect('error' in botPassed ? botPassed.error : null).toBeNull();
+    if ('error' in botPassed) {
+      return;
+    }
+
+    expect(botPassed.state.pendingCombat).toBeNull();
+    expect(botPassed.state.zones.battlefieldCenter[0]?.instanceId).toBe(botUnit.instanceId);
+    expect(botPassed.state.zones.graveyard[0]?.instanceId).toBe(playerUnit.instanceId);
+  });
+
+  it('does not continue bot turn actions while counter priority is pending', () => {
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const botUnit = makeInstance({
+      instanceId: 'opponent-ready-unit',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'bot-ready-unit', name: 'Bot Ready Unit', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const playerUnit = makeInstance({
+      instanceId: 'player-battlefield-unit',
+      owner: 'player',
+      ready: true,
+      card: createTestCard({ id: 'player-battlefield-unit', name: 'Player Unit', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const botHandCard = makeInstance({
+      instanceId: 'opponent-hand-card',
+      owner: 'opponent',
+      card: createTestCard({ id: 'bot-hand-card', name: 'Bot Hand Card', type: 'Action' }),
+    });
+    const botTurn = {
+      ...startGameAfterSetup({ ...state, playerStartingSupplyPlaced: true }, 'opponent'),
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [botHandCard],
+        staging: [botUnit],
+      },
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [playerUnit],
+      },
+    };
+    const declared = declareBattlefieldAttack(botTurn, 'opponent', botUnit.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(canManuallySupplyFromHand(declared.state, 'opponent')).toBe(false);
+    expect(applyBotTurnStep(declared.state, 'supply')).toBe(declared.state);
+    expect(runBotTurn(declared.state)).toBe(declared.state);
+    expect(resolveAutomaticBotTurn(declared.state)).toBe(declared.state);
+  });
+
   it('does not let the bot supply more than once in the same turn', () => {
     const state = buildInitialGameState(makeDeck(12), makeDeck(12));
     const firstSupply = makeInstance({
@@ -665,5 +816,894 @@ describe('playtest rules', () => {
 
     expect(placement.replacedTerritory).toBe(oldTerritory);
     expect(placement.destinationCards).toEqual([opponentTerritory]);
+  });
+
+  it('only allows ready staging units to attack battlefields', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit' }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit' }),
+    });
+    const battlefieldUnit = makeInstance({
+      instanceId: 'occupant',
+      ready: true,
+      card: createTestCard({ id: 'occupant', name: 'Occupant', type: 'Unit' }),
+    });
+    const state = {
+      ...buildInitialGameState(makeDeck(12), makeDeck(12)),
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...buildInitialGameState(makeDeck(12), makeDeck(12)).zones,
+        staging: [attacker],
+        battlefieldLeft: [battlefieldUnit],
+      },
+    };
+
+    expect(getBattlefieldAttackError(state, 'player', attacker.instanceId, 'battlefieldCenter')).toBeNull();
+    expect(getBattlefieldAttackError(state, 'player', battlefieldUnit.instanceId, 'battlefieldCenter')).toBe(
+      'Only units in your staging area can attack.'
+    );
+    expect(getBattlefieldAttackError(state, 'player', attacker.instanceId, 'battlefieldLeft')).toBe(
+      'battlefieldLeft is already occupied by your unit.'
+    );
+  });
+
+  it('captures an empty battlefield with a staging attacker without scoring victory points', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({
+        id: 'attacker',
+        name: 'Attacker',
+        type: 'Unit',
+        attack: 2,
+        health: 2,
+        influence: 2,
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.captured).toBe(true);
+    expect(result.scoredVictoryPoints).toBe(0);
+    expect(result.state.playerVictoryPoints).toBe(0);
+    expect(result.state.zones.staging).toEqual([]);
+    expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      ready: true,
+    });
+  });
+
+  it('declares a battlefield attack into a pending counter window before combat resolves', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(declared.state.pendingCombat).toMatchObject({
+      attackerOwner: 'player',
+      attackerInstanceId: attacker.instanceId,
+      targetZone: 'battlefieldLeft',
+      defenderInstanceId: defender.instanceId,
+      priorityOwner: 'opponent',
+      lastPassedOwner: null,
+    });
+    expect(declared.state.zones.staging[0]?.instanceId).toBe(attacker.instanceId);
+    expect(declared.state.zones.battlefieldLeft[0]?.instanceId).toBe(defender.instanceId);
+    expect(getBattlefieldAttackError(declared.state, 'player', attacker.instanceId, 'battlefieldCenter')).toBe(
+      'Resolve the pending combat before declaring another attack.'
+    );
+  });
+
+  it('does not open counter priority when attacking an empty battlefield', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    const resolved = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBe('Counter priority only opens when attacking an opposing unit.');
+    expect('error' in resolved ? resolved.error : null).toBeNull();
+    if ('error' in resolved) {
+      return;
+    }
+
+    expect(resolved.captured).toBe(true);
+    expect(resolved.state.pendingCombat).toBeNull();
+    expect(resolved.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+  });
+
+  it('resolves pending combat after both players pass counter priority', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    const opponentPassed = passCounterPriority(declared.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+
+    expect(opponentPassed.resolvedCombat).toBeNull();
+    expect(opponentPassed.state.pendingCombat).toMatchObject({
+      priorityOwner: 'player',
+      lastPassedOwner: 'opponent',
+    });
+
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.resolvedCombat?.captured).toBe(true);
+    expect(playerPassed.state.pendingCombat).toBeNull();
+    expect(playerPassed.state.zones.staging).toEqual([]);
+    expect(playerPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(playerPassed.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
+  });
+
+  it('recognizes Counter tactics and Swift cards as counters', () => {
+    const counterTactic = createTestCard({ type: 'Tactic', subtype: 'Counter', rulesText: 'Prevent combat damage.' });
+    const swiftUnit = createTestCard({ type: 'Unit', subtype: 'Medic', rulesText: 'Swift (You can play this as a counter.)' });
+    const normalTactic = createTestCard({ type: 'Tactic', subtype: 'Action', rulesText: 'Draw a card.' });
+
+    expect(isCounterCard(counterTactic)).toBe(true);
+    expect(isCounterCard(swiftUnit)).toBe(true);
+    expect(isCounterCard(normalTactic)).toBe(false);
+  });
+
+  it('pays for a counter, removes it from hand, and resets consecutive passes', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const counter = makeInstance({
+      instanceId: 'opponent-counter',
+      owner: 'opponent',
+      card: createTestCard({ id: 'counter', name: 'Blinding Mist', type: 'Tactic', subtype: 'Counter', cost: 1 }),
+    });
+    const supply = makeInstance({ instanceId: 'opponent-supply', owner: 'opponent', ready: true });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [counter],
+        supply: [supply],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    const played = playCounterCard(declared.state, 'opponent', counter.instanceId);
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) {
+      return;
+    }
+
+    expect(played.state.opponentZones.hand).toEqual([]);
+    expect(played.state.opponentZones.supply[0]?.ready).toBe(false);
+    expect(played.state.pendingCombat).toMatchObject({
+      priorityOwner: 'player',
+      lastPassedOwner: null,
+      counterStack: [counter],
+    });
+    expect(getCounterPlayError(played.state, 'opponent', counter.instanceId)).toBe(
+      'Waiting for you to pass counter priority.'
+    );
+  });
+
+  it('resolves counters top-first before combat and moves them to their owner graveyards', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const opponentCounter = makeInstance({
+      instanceId: 'opponent-counter',
+      owner: 'opponent',
+      card: createTestCard({ id: 'opponent-counter', name: 'First Counter', type: 'Tactic', subtype: 'Counter', cost: 1 }),
+    });
+    const playerCounter = makeInstance({
+      instanceId: 'player-counter',
+      owner: 'player',
+      card: createTestCard({ id: 'player-counter', name: 'Top Counter', type: 'Tactic', subtype: 'Counter', cost: 1 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        hand: [playerCounter],
+        staging: [attacker],
+        supply: [makeInstance({ instanceId: 'player-supply', ready: true })],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [opponentCounter],
+        supply: [makeInstance({ instanceId: 'opponent-supply', owner: 'opponent', ready: true })],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    if ('error' in declared) {
+      throw new Error(declared.error);
+    }
+    const firstPlayed = playCounterCard(declared.state, 'opponent', opponentCounter.instanceId);
+    if ('error' in firstPlayed) {
+      throw new Error(firstPlayed.error);
+    }
+    const topPlayed = playCounterCard(firstPlayed.state, 'player', playerCounter.instanceId);
+    if ('error' in topPlayed) {
+      throw new Error(topPlayed.error);
+    }
+    const opponentPassed = passCounterPriority(topPlayed.state, 'opponent');
+    if ('error' in opponentPassed) {
+      throw new Error(opponentPassed.error);
+    }
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.resolvedCounters.map((counter) => counter.instanceId)).toEqual([
+      playerCounter.instanceId,
+      opponentCounter.instanceId,
+    ]);
+    expect(playerPassed.state.zones.graveyard[0]?.instanceId).toBe(playerCounter.instanceId);
+    expect(playerPassed.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
+    expect(playerPassed.state.opponentZones.graveyard[1]?.instanceId).toBe(opponentCounter.instanceId);
+    expect(playerPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(playerPassed.state.log.map((entry) => entry.cardName).filter(Boolean)).toEqual(
+      expect.arrayContaining([playerCounter.card.name, opponentCounter.card.name])
+    );
+    expect(
+      playerPassed.state.log.filter((entry) => entry.prefix === 'Resolved counter ').every(
+        (entry) => entry.suffix === ', but its printed effect is not implemented yet.'
+      )
+    ).toBe(true);
+  });
+
+  it('puts a Swift unit into staging when it resolves as a counter', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 1, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 3 }),
+    });
+    const swiftCounter = makeInstance({
+      instanceId: 'swift-counter',
+      owner: 'opponent',
+      card: createTestCard({
+        id: 'swift-counter',
+        name: 'Nekora Medic',
+        type: 'Unit',
+        subtype: 'Medic',
+        cost: 1,
+        rulesText: 'Swift (You can play this as a counter.)',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [swiftCounter],
+        supply: [makeInstance({ instanceId: 'opponent-supply', owner: 'opponent', ready: true })],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    if ('error' in declared) {
+      throw new Error(declared.error);
+    }
+    const played = playCounterCard(declared.state, 'opponent', swiftCounter.instanceId);
+    if ('error' in played) {
+      throw new Error(played.error);
+    }
+    const playerPassed = passCounterPriority(played.state, 'player');
+    if ('error' in playerPassed) {
+      throw new Error(playerPassed.error);
+    }
+    const opponentPassed = passCounterPriority(playerPassed.state, 'opponent');
+
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+
+    expect(opponentPassed.state.opponentZones.staging[0]).toMatchObject({
+      instanceId: swiftCounter.instanceId,
+      ready: false,
+    });
+  });
+
+  it('lets the bot play its first affordable counter', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit' }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit' }),
+    });
+    const expensiveCounter = makeInstance({
+      instanceId: 'expensive-counter',
+      owner: 'opponent',
+      card: createTestCard({ name: 'Expensive Counter', type: 'Tactic', subtype: 'Counter', cost: 2 }),
+    });
+    const affordableCounter = makeInstance({
+      instanceId: 'affordable-counter',
+      owner: 'opponent',
+      card: createTestCard({ name: 'Affordable Counter', type: 'Tactic', subtype: 'Counter', cost: 1 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [expensiveCounter, affordableCounter],
+        supply: [makeInstance({ instanceId: 'opponent-supply', owner: 'opponent', ready: true })],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    if ('error' in declared) {
+      throw new Error(declared.error);
+    }
+
+    const counterState = playFirstBotCounter(declared.state);
+
+    expect(counterState?.pendingCombat?.counterStack.map((counter) => counter.instanceId)).toEqual([
+      affordableCounter.instanceId,
+    ]);
+    expect(counterState?.pendingCombat?.priorityOwner).toBe('player');
+  });
+
+  it('does not advance the turn while combat is pending', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit' }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit' }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      firstPlayer: 'player' as const,
+      hasFirstPlayerSkippedDraw: true,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    const nextState = advanceToNextTurn(declared.state);
+
+    expect(nextState.activePlayer).toBe('player');
+    expect(nextState.pendingCombat).toEqual(declared.state.pendingCombat);
+    expect(nextState.log[0]?.suffix).toBe('Resolve the pending combat before ending the turn.');
+  });
+
+  it('scores victory points from controlled battlefields at end of turn', () => {
+    const scoringUnit = makeInstance({
+      instanceId: 'scoring-unit',
+      ready: true,
+      card: createTestCard({
+        id: 'scoring-unit',
+        name: 'Scoring Unit',
+        type: 'Unit',
+        influence: 2,
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [scoringUnit],
+      },
+    };
+
+    const scoredState = scoreBattlefieldVictoryPoints(activeState, 'player');
+
+    expect(scoredState.playerVictoryPoints).toBe(2);
+    expect(scoredState.log[0]?.suffix).toBe('You score 2 victory points from battlefield control.');
+  });
+
+  it('scores active player battlefield control before advancing the turn', () => {
+    const scoringUnit = makeInstance({
+      instanceId: 'scoring-unit',
+      ready: true,
+      card: createTestCard({
+        id: 'scoring-unit',
+        name: 'Scoring Unit',
+        type: 'Unit',
+        influence: 1,
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      firstPlayer: 'player' as const,
+      hasFirstPlayerSkippedDraw: true,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [scoringUnit],
+      },
+    };
+
+    const nextState = advanceToNextTurn(activeState);
+
+    expect(nextState.playerVictoryPoints).toBe(1);
+    expect(nextState.activePlayer).toBe('opponent');
+  });
+
+  it('never lets victory points fall below zero', () => {
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const gainedState = adjustVictoryPoints(state, 'player', 3);
+    const reducedState = adjustVictoryPoints(gainedState, 'player', -5);
+
+    expect(reducedState.playerVictoryPoints).toBe(0);
+    expect(reducedState.winner).toBeNull();
+  });
+
+  it('declares the first player to reach 20 victory points as the winner', () => {
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const nearVictory = adjustVictoryPoints(state, 'player', VICTORY_POINT_TARGET - 1);
+    const winningState = adjustVictoryPoints(nearVictory, 'player', 3);
+
+    expect(winningState.playerVictoryPoints).toBe(22);
+    expect(winningState.winner).toBe('player');
+    expect(adjustVictoryPoints(winningState, 'opponent', VICTORY_POINT_TARGET)).toBe(winningState);
+  });
+
+  it('ends the game after scoring and damage cleanup without advancing the turn', () => {
+    const scoringUnit = makeInstance({
+      instanceId: 'winning-unit',
+      ready: true,
+      damage: 1,
+      card: createTestCard({
+        id: 'winning-unit',
+        name: 'Winning Unit',
+        type: 'Unit',
+        health: 3,
+        influence: 1,
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      firstPlayer: 'player' as const,
+      playerVictoryPoints: VICTORY_POINT_TARGET - 1,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [scoringUnit],
+      },
+    };
+
+    const winningState = advanceToNextTurn(activeState);
+
+    expect(winningState.playerVictoryPoints).toBe(VICTORY_POINT_TARGET);
+    expect(winningState.winner).toBe('player');
+    expect(winningState.activePlayer).toBe('player');
+    expect(winningState.zones.battlefieldLeft[0]?.damage).toBe(0);
+    expect(winningState.log[0]?.suffix).toBe('You reach 20 victory points and win the game.');
+    expect(advanceToNextTurn(winningState)).toBe(winningState);
+  });
+
+  it('blocks rule-driven actions after the game has a winner', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit' }),
+    });
+    const state = {
+      ...buildInitialGameState(makeDeck(12), makeDeck(12)),
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      winner: 'player' as const,
+      zones: {
+        ...buildInitialGameState(makeDeck(12), makeDeck(12)).zones,
+        staging: [attacker],
+      },
+    };
+
+    expect(canManuallySupplyFromHand(state, 'opponent')).toBe(false);
+    expect(getBattlefieldAttackError(state, 'player', attacker.instanceId, 'battlefieldLeft')).toBe('The game is over.');
+    expect(applyBotTurnStep(state, 'supply')).toBe(state);
+    expect(runBotTurn(state)).toBe(state);
+    expect(scoreBattlefieldVictoryPoints(state, 'player')).toBe(state);
+  });
+
+  it('destroys defenders and captures when the staging attacker survives combat', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3, influence: 1 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.defenderDestroyed).toBe(true);
+    expect(result.attackerDestroyed).toBe(false);
+    expect(result.captured).toBe(true);
+    expect(result.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(result.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
+  });
+
+  it('leaves a surviving defender occupying the battlefield when the attacker dies', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 1, health: 1 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 2, health: 3 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.attackerDestroyed).toBe(true);
+    expect(result.defenderDestroyed).toBe(false);
+    expect(result.captured).toBe(false);
+    expect(result.state.zones.staging).toEqual([]);
+    expect(result.state.zones.battlefieldLeft[0]?.instanceId).toBe(defender.instanceId);
+    expect(result.state.zones.battlefieldLeft[0]?.ready).toBe(false);
+    expect(result.state.zones.graveyard[0]?.instanceId).toBe(attacker.instanceId);
+  });
+
+  it('exhausts a surviving ready defender after it deals combat damage', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 1, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 3 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.attackerDestroyed).toBe(false);
+    expect(result.defenderDestroyed).toBe(false);
+    expect(result.state.zones.staging[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      ready: false,
+    });
+    expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: defender.instanceId,
+      ready: false,
+      damage: 1,
+    });
+  });
+
+  it('does not let exhausted defenders deal combat damage', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 1, health: 1 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: false,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 5, health: 3 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.attackerDestroyed).toBe(false);
+    expect(result.defenderDestroyed).toBe(false);
+    expect(result.captured).toBe(false);
+    expect(result.state.zones.staging[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      damage: 0,
+    });
+    expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: defender.instanceId,
+      damage: 1,
+    });
+    expect(result.state.zones.graveyard).toHaveLength(0);
+  });
+
+  it('destroys units when new combat damage plus marked damage reaches health', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 1, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: false,
+      damage: 2,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 5, health: 3 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.defenderDestroyed).toBe(true);
+    expect(result.attackerDestroyed).toBe(false);
+    expect(result.captured).toBe(true);
+    expect(result.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
+    expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      damage: 0,
+    });
+  });
+
+  it('clears marked damage at end of turn before the next player starts', () => {
+    const damagedStagingUnit = makeInstance({
+      instanceId: 'damaged-staging-unit',
+      damage: 2,
+      card: createTestCard({ id: 'damaged-staging-unit', name: 'Damaged Unit', type: 'Unit', health: 3 }),
+    });
+    const damagedBattlefieldUnit = makeInstance({
+      instanceId: 'damaged-battlefield-unit',
+      owner: 'opponent',
+      damage: 1,
+      card: createTestCard({ id: 'damaged-battlefield-unit', name: 'Damaged Defender', type: 'Unit', health: 3 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const damagedState = {
+      ...state,
+      zones: {
+        ...state.zones,
+        staging: [damagedStagingUnit],
+        battlefieldLeft: [damagedBattlefieldUnit],
+      },
+    };
+
+    const cleanedState = clearEndOfTurnDamage(damagedState);
+
+    expect(cleanedState.zones.staging[0]?.damage).toBe(0);
+    expect(cleanedState.zones.battlefieldLeft[0]?.damage).toBe(0);
   });
 });

@@ -6,9 +6,9 @@ import {
   getImplementedAbilitiesForTrigger,
   getPrintedAbilityTriggers,
   getRegisteredCardAbilities,
-} from './playtest-abilities';
+} from './card-abilities';
 
-describe('playtest abilities', () => {
+describe('card abilities', () => {
   it('detects printed ability triggers from rules text', () => {
     const card = createTestCard({
       name: 'Triggered Unit',

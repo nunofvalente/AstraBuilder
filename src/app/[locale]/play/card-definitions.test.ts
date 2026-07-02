@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
-import { definePlaytestCard, getDefaultPlayDestination, getPlaytestCardType, hasPlaytestKeyword } from './playtest-card-definitions';
+import { defineCard, getDefaultPlayDestination, getCardType, hasCardKeyword } from './card-definitions';
 
-describe('playtest card definitions', () => {
-  it('classifies printed card types into playtest types', () => {
-    expect(getPlaytestCardType(createTestCard({ type: 'Renowned Unit' }))).toBe('unit');
-    expect(getPlaytestCardType(createTestCard({ type: 'Tactic' }))).toBe('tactic');
-    expect(getPlaytestCardType(createTestCard({ type: 'Territory' }))).toBe('territory');
-    expect(getPlaytestCardType(createTestCard({ type: 'Item Equipment' }))).toBe('item');
+describe('card definitions', () => {
+  it('classifies printed card types into simulator types', () => {
+    expect(getCardType(createTestCard({ type: 'Renowned Unit' }))).toBe('unit');
+    expect(getCardType(createTestCard({ type: 'Tactic' }))).toBe('tactic');
+    expect(getCardType(createTestCard({ type: 'Territory' }))).toBe('territory');
+    expect(getCardType(createTestCard({ type: 'Item Equipment' }))).toBe('item');
   });
 
   it('derives keywords from rules text', () => {
     const card = createTestCard({ rulesText: 'Blitz (This unit enters ready.) Provoke. Flanking. Swift.' });
 
-    expect(hasPlaytestKeyword(card, 'blitz')).toBe(true);
-    expect(hasPlaytestKeyword(card, 'provoke')).toBe(true);
-    expect(hasPlaytestKeyword(card, 'flanking')).toBe(true);
-    expect(hasPlaytestKeyword(card, 'swift')).toBe(true);
-    expect(hasPlaytestKeyword(card, 'flying')).toBe(false);
+    expect(hasCardKeyword(card, 'blitz')).toBe(true);
+    expect(hasCardKeyword(card, 'provoke')).toBe(true);
+    expect(hasCardKeyword(card, 'flanking')).toBe(true);
+    expect(hasCardKeyword(card, 'swift')).toBe(true);
+    expect(hasCardKeyword(card, 'flying')).toBe(false);
   });
 
   it('derives default play destinations', () => {
@@ -28,8 +28,8 @@ describe('playtest card definitions', () => {
     expect(getDefaultPlayDestination(createTestCard({ type: 'Tactic' }))).toBe('graveyard');
   });
 
-  it('defines core playtest facts for a card', () => {
-    const definition = definePlaytestCard(
+  it('defines core simulator facts for a card', () => {
+    const definition = defineCard(
       createTestCard({
         type: 'Unit',
         attack: 3,
