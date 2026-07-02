@@ -4,11 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Archive, ArrowDownToLine, Ban, Bot, ChevronsRight, Flag, Hand, Layers, Play, RotateCcw, Swords, Users } from 'lucide-react';
+import { Bot, ChevronsRight, Flag, Hand, Layers, Play, RotateCcw, Swords, Users } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
-import type { Card, DeckEntry } from '../create/deck-builder/types';
+import type { Card } from '../create/deck-builder/types';
 import {
   BOT_TURN_STEPS,
   BATTLEFIELD_ZONES,
@@ -16,42 +16,68 @@ import {
   advanceToNextTurn,
   applyBotTurnStep,
   buildInitialGameState,
+  canManuallySupplyFromHand,
   createLogEntry,
+  exhaustSupplyForCost,
+  getAttachedCards,
   getBattlefieldPlacementError,
+  getEquipmentAttachmentError,
+  getManualPlayCost,
+  getPlayCost,
+  getPlayCostError,
+  getReadySupplyCount,
+  getStagingUnitCards,
+  getStagingPlacementError,
+  isItemCard,
   isTerritoryCard,
   isUnitCard,
   placeCardIntoSupply,
   placeStartingSupply,
   prepareCardForZone,
+  markSuppliedThisTurn,
   rollFirstPlayer,
   shuffleCards,
   startGameAfterSetup,
+  stabilizeAttachmentState,
   splitBattlefieldReplacement,
+  triggerCardAbilities,
   type GameCardInstance,
   type GameState,
   type PrivateZones,
   type SavedDeck,
   type ZoneId,
-} from './playtest-rules';
+} from './game-rules';
+import {
+  BOT_TURN_STEP_DELAY_MS,
+  CARD_BACK_IMAGE_SRC,
+  MATCH_SESSION_STORAGE_KEY,
+  ZONE_LABELS,
+  getBattlefieldActions,
+  getHandActions,
+  mapDeckRows,
+  type BattlefieldAction,
+  type DeckRow,
+  type HandAction,
+  type MoveCardHandler,
+  type MoveCardOptions,
+} from './game-client-support';
+import {
+  ActionLogList,
+  AttachedEquipmentCards,
+  CardZoomPreview,
+  CompactZoneStack,
+  InfluenceScoreControl,
+  OpponentHandStrip,
+  RequiredActionToast,
+  getReadyStateClassName,
+  useCloseOnOutsidePointerDown,
+} from './game-client-ui';
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'auth' | 'error';
 type PlayMode = 'matchmaking' | 'lobby' | 'practice';
 type PlayQueue = 'ranked' | 'casual';
 
-type DeckCardRow = {
-  quantity?: number | null;
-  card_id?: string | null;
-  card_id_astra?: string | null;
-};
-
-type DeckRow = {
-  id: string | number;
-  title?: string | null;
-  created_at?: string | null;
-  deck_cards?: DeckCardRow[] | null;
-};
-
-export type PlaytestClientProps = {
+export type GameClientProps = {
   locale: Locale;
   initialCards: Card[];
   initialError: string | null;
@@ -64,312 +90,83 @@ type MatchSessionPayload = {
   mode?: 'practice' | 'multiplayer';
 };
 
-const ZONE_LABELS: Record<ZoneId, string> = {
-  deck: 'Deck',
-  hand: 'Hand',
-  staging: 'Staging',
-  supply: 'Supply',
-  graveyard: 'Graveyard',
-  banish: 'Banish',
-  battlefieldLeft: 'Battlefield 1',
-  battlefieldCenter: 'Battlefield 2',
-  battlefieldRight: 'Battlefield 3',
-};
-
-const MATCH_SESSION_STORAGE_KEY = 'astrabuilder-playtest-match';
-
-const CARD_BACK_IMAGE_SRC = '/images/card-back.png';
-const BOT_TURN_STEP_DELAY_MS = 900;
-
-function useCloseOnOutsidePointerDown(
-  isOpen: boolean,
-  refs: Array<{ current: HTMLElement | null }>,
-  onClose: () => void,
-) {
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target;
-
-      if (!(target instanceof Node)) {
-        return;
-      }
-
-      if (refs.some((ref) => ref.current?.contains(target))) {
-        return;
-      }
-
-      onClose();
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
-  }, [isOpen, refs, onClose]);
-}
-
-function CardZoomPreview({ card }: { card: Card | null }) {
-  if (!card) {
-    return null;
-  }
-
-  return (
-    <div className="pointer-events-none fixed right-5 top-20 z-50 hidden w-80 overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl shadow-black/40 lg:block">
-      <div className="relative aspect-[5/7] w-full bg-[color:var(--surface-muted)]">
-        {card.imageSrc ? (
-          <Image src={card.imageSrc} alt="" fill sizes="320px" className="object-cover" priority={false} />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function getReadyStateClassName(instance: GameCardInstance): string {
-  return instance.ready ? '' : 'rotate-90 opacity-85';
-}
-const DEFAULT_MOVE_TARGETS: ZoneId[] = [
-  'hand',
-  'staging',
-  'supply',
-  'battlefieldLeft',
-  'battlefieldCenter',
-  'battlefieldRight',
-  'graveyard',
-  'banish',
-  'deck',
-];
-
-function getVisibleMoveTargets(zone: ZoneId): ZoneId[] {
-  return DEFAULT_MOVE_TARGETS.filter((target) => target !== zone);
-}
-
-function resolveDeckCardId(entry: DeckCardRow | null | undefined): string | null {
-  if (!entry) {
-    return null;
-  }
-
-  if (typeof entry.card_id_astra === 'string' && entry.card_id_astra.trim().length > 0) {
-    return entry.card_id_astra.trim();
-  }
-
-  if (typeof entry.card_id === 'string' && entry.card_id.trim().length > 0) {
-    return entry.card_id.trim();
-  }
-
-  return null;
-}
-
-function mapDeckRows(rows: DeckRow[], cardMap: Map<string, Card>): SavedDeck[] {
-  return rows.map((row) => {
-    const cardTotals = new Map<string, number>();
-
-    for (const deckCard of row.deck_cards ?? []) {
-      const cardId = resolveDeckCardId(deckCard);
-      const quantity = Math.max(0, Number(deckCard?.quantity ?? 0));
-
-      if (!cardId || quantity <= 0 || !cardMap.has(cardId)) {
-        continue;
-      }
-
-      cardTotals.set(cardId, (cardTotals.get(cardId) ?? 0) + quantity);
-    }
-
-    const entries = Array.from(cardTotals.entries())
-      .map(([cardId, count]) => {
-        const card = cardMap.get(cardId);
-        return card ? { card, count } : null;
-      })
-      .filter((entry): entry is DeckEntry => Boolean(entry))
-      .sort((a, b) => {
-        if (a.card.cost !== b.card.cost) {
-          return a.card.cost - b.card.cost;
-        }
-
-        return a.card.name.localeCompare(b.card.name);
-      });
-
-    return {
-      id: String(row.id),
-      title: row.title ?? null,
-      cardCount: entries.reduce((sum, entry) => sum + entry.count, 0),
-      entries,
-    };
-  });
-}
-
-function ZoneIcon({ zone }: { zone: ZoneId }) {
-  const iconClassName = 'h-4 w-4';
-
-  if (zone === 'deck') {
-    return <Layers className={iconClassName} aria-hidden="true" />;
-  }
-
-  if (zone === 'hand') {
-    return <Hand className={iconClassName} aria-hidden="true" />;
-  }
-
-  if (zone === 'staging') {
-    return <Swords className={iconClassName} aria-hidden="true" />;
-  }
-
-  if (zone === 'supply') {
-    return <Archive className={iconClassName} aria-hidden="true" />;
-  }
-
-  if (zone === 'battlefieldLeft' || zone === 'battlefieldCenter' || zone === 'battlefieldRight') {
-    return <Flag className={iconClassName} aria-hidden="true" />;
-  }
-
-  if (zone === 'banish') {
-    return <Ban className={iconClassName} aria-hidden="true" />;
-  }
-
-  return <ArrowDownToLine className={iconClassName} aria-hidden="true" />;
-}
-
-function CardTile({
-  instance,
-  zone,
-  onMove,
-}: {
-  instance: GameCardInstance;
-  zone: ZoneId;
-  onMove: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
-}) {
-  const visibleTargets = getVisibleMoveTargets(zone);
-
-  return (
-    <article className="flex min-w-0 gap-3 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] p-2 shadow-sm">
-      <div className="relative h-20 w-14 flex-shrink-0 overflow-hidden rounded border border-black/20 bg-[color:var(--surface-muted)]">
-        {instance.card.imageSrc ? (
-          <Image src={instance.card.imageSrc} alt="" fill sizes="56px" className="object-cover" />
-        ) : null}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-semibold text-[color:var(--text-primary)]">{instance.card.name}</h3>
-          <p className="truncate text-xs text-[color:var(--text-secondary)]">
-            Cost {instance.card.cost} · {instance.card.type}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {visibleTargets.map((target) => (
-            <button
-              key={target}
-              type="button"
-              onClick={() => onMove(instance.instanceId, zone, target)}
-              className="rounded border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-1 text-[11px] font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-            >
-              {target === 'deck' ? 'To deck' : ZONE_LABELS[target]}
-            </button>
-          ))}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function MoveButtons({
-  instanceId,
-  zone,
-  targets = getVisibleMoveTargets(zone),
-  onMove,
-  className = '',
-}: {
-  instanceId: string;
-  zone: ZoneId;
-  targets?: ZoneId[];
-  onMove: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
-  className?: string;
-}) {
-  return (
-    <div className={`flex flex-wrap gap-1.5 ${className}`}>
-      {targets.map((target) => (
-        <button
-          key={target}
-          type="button"
-          onClick={() => onMove(instanceId, zone, target)}
-          className="rounded border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-1 text-[11px] font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-        >
-          {target === 'deck' ? 'To deck' : ZONE_LABELS[target]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ZonePanel({
-  zone,
-  cards,
-  onMove,
-}: {
-  zone: ZoneId;
-  cards: GameCardInstance[];
-  onMove: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
-}) {
-  const shouldShowCount = !BATTLEFIELD_ZONES.has(zone);
-
-  return (
-    <section className="flex min-h-0 flex-col rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]">
-      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--border)] px-4 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <ZoneIcon zone={zone} />
-          <h2 className="truncate text-sm font-semibold uppercase tracking-wide">{ZONE_LABELS[zone]}</h2>
-        </div>
-        {shouldShowCount ? (
-          <span className="rounded-full bg-[color:var(--surface-muted)] px-2.5 py-1 text-xs font-bold">{cards.length}</span>
-        ) : null}
-      </header>
-      <div className="deck-builder-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
-        {cards.length === 0 ? (
-          <p className="rounded-md border border-dashed border-[color:var(--border)] px-3 py-6 text-center text-sm text-[color:var(--text-secondary)]">
-            No cards here.
-          </p>
-        ) : (
-          cards.map((instance) => (
-            <CardTile key={instance.instanceId} instance={instance} zone={zone} onMove={onMove} />
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
 function BattlefieldPanel({
   zone,
   cards,
   onMove,
   disabled = false,
+  canFlipFaceUp = false,
+  readySupplyCount = 0,
 }: {
   zone: ZoneId;
   cards: GameCardInstance[];
-  onMove: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
+  onMove: MoveCardHandler;
   disabled?: boolean;
+  canFlipFaceUp?: boolean;
+  readySupplyCount?: number;
 }) {
-  const unit = cards.find((instance) => isUnitCard(instance.card) || !isTerritoryCard(instance.card)) ?? null;
+  const unit = cards.find((instance) => isUnitCard(instance.card)) ?? null;
   const playerTerritory = cards.find((instance) => instance.owner === 'player' && isTerritoryCard(instance.card)) ?? null;
   const opponentTerritory = cards.find((instance) => instance.owner === 'opponent' && isTerritoryCard(instance.card)) ?? null;
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
   const activeInstance = cards.find((instance) => instance.instanceId === activeInstanceId) ?? null;
-  const [previewCard, setPreviewCard] = useState<Card | null>(null);
+  const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const previewClearTimeoutRef = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const targets: ZoneId[] = ['staging', 'graveyard', 'banish', 'hand'];
+  const actions = activeInstance
+    ? getBattlefieldActions(zone, activeInstance, {
+        canFlipFaceUp: canFlipFaceUp && readySupplyCount >= getPlayCost(activeInstance.card),
+      })
+    : [];
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [triggerRef, menuRef], () => setActiveInstanceId(null));
 
-  function handleMove(instanceId: string, target: ZoneId) {
-    if (disabled) {
+  useEffect(() => {
+    return () => {
+      if (previewClearTimeoutRef.current !== null) {
+        window.clearTimeout(previewClearTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function cancelPreviewClear() {
+    if (previewClearTimeoutRef.current !== null) {
+      window.clearTimeout(previewClearTimeoutRef.current);
+      previewClearTimeoutRef.current = null;
+    }
+  }
+
+  function openPreview(instance: GameCardInstance) {
+    cancelPreviewClear();
+    setPreviewCards([instance, ...getAttachedCards(cards, instance.instanceId)]);
+  }
+
+  function openEquipmentPreview(instance: GameCardInstance) {
+    cancelPreviewClear();
+    setPreviewCards([instance]);
+  }
+
+  function schedulePreviewClear(instanceId: string) {
+    cancelPreviewClear();
+    previewClearTimeoutRef.current = window.setTimeout(() => {
+      setPreviewCards((current) => (current?.[0]?.instanceId === instanceId ? null : current));
+      previewClearTimeoutRef.current = null;
+    }, 120);
+  }
+
+  function handleMove(instanceId: string, action: BattlefieldAction) {
+    if (disabled || action.disabled) {
       setActiveInstanceId(null);
-      setPreviewCard(null);
+      cancelPreviewClear();
+      setPreviewCards(null);
       return;
     }
 
-    onMove(instanceId, zone, target);
+    onMove(instanceId, zone, action.target, action.options);
     setActiveInstanceId(null);
-    setPreviewCard(null);
+    cancelPreviewClear();
+    setPreviewCards(null);
   }
 
   function renderSlot(instance: GameCardInstance | null, label: string | null, size: 'unit' | 'territory') {
@@ -379,7 +176,6 @@ function BattlefieldPanel({
       size === 'unit'
         ? 'border-[color:var(--accent)]/45 bg-[color:var(--surface-muted)]/35'
         : 'border-[color:var(--border)]/75 bg-[color:var(--background)]/35';
-
     if (!instance) {
       return (
         <div className={`flex aspect-[5/7] ${sizeClassName} ${slotClassName} items-center justify-center rounded-md border border-dashed px-1 text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]`}>
@@ -393,19 +189,19 @@ function BattlefieldPanel({
         ref={isActive ? triggerRef : undefined}
         type="button"
         onClick={() => !disabled && setActiveInstanceId((current) => (current === instance.instanceId ? null : instance.instanceId))}
-        onMouseEnter={() => setPreviewCard(instance.card)}
-        onFocus={() => setPreviewCard(instance.card)}
-        onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-        onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-        className={`relative aspect-[5/7] ${sizeClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+        onMouseEnter={() => openPreview(instance)}
+        onFocus={() => openPreview(instance)}
+        onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
+        onBlur={() => schedulePreviewClear(instance.instanceId)}
+        className={`relative z-10 aspect-[5/7] ${sizeClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
         aria-expanded={isActive}
         aria-haspopup={disabled ? undefined : 'menu'}
         aria-disabled={disabled}
       >
         <span className="sr-only">Open {instance.card.name} actions in {ZONE_LABELS[zone]}</span>
         <span className="relative block h-full w-full">
-          {instance.card.imageSrc ? (
-            <Image src={instance.card.imageSrc} alt="" fill sizes={size === 'unit' ? '88px' : '56px'} className="object-cover" />
+          {instance.faceDown || instance.card.imageSrc ? (
+            <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes={size === 'unit' ? '88px' : '56px'} className="object-cover" />
           ) : null}
         </span>
       </button>
@@ -424,84 +220,60 @@ function BattlefieldPanel({
   }
 
   return (
-    <section className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]">
-      <CardZoomPreview card={previewCard} />
+    <section className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]">
+      <CardZoomPreview
+        cards={previewCards}
+        interactive
+        onMouseEnter={cancelPreviewClear}
+        onMouseLeave={() => {
+          cancelPreviewClear();
+          setPreviewCards(null);
+        }}
+      />
       <p className="truncate text-center text-[0.7rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
         {ZONE_LABELS[zone]}
       </p>
       <div className="grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
         {renderTerritoryColumn('Your territory', playerTerritory)}
         <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
-        <div className="flex min-h-0 items-center justify-center">
-          {renderSlot(unit, 'Unit', 'unit')}
+        <div className="flex min-h-0 items-center justify-center overflow-visible">
+          <div className="relative flex h-full items-center justify-center overflow-visible">
+            {unit ? (
+              <div className="absolute left-1/2 top-[5.2rem] z-0 -translate-x-1/2">
+                <AttachedEquipmentCards
+                  cards={getAttachedCards(cards, unit.instanceId)}
+                  cardHeight={166}
+                  offset={32}
+                  exposedHeight={116}
+                  interactive
+                  onCardMouseEnter={openEquipmentPreview}
+                  onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
+                />
+              </div>
+            ) : null}
+            {renderSlot(unit, 'Unit', 'unit')}
+          </div>
         </div>
         <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
         {renderTerritoryColumn('Enemy territory', opponentTerritory)}
       </div>
-      {activeInstance && !disabled ? (
+      {activeInstance && !disabled && actions.length > 0 ? (
         <div ref={menuRef} className="absolute left-1/2 top-2 z-40 w-36 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl">
-          {targets.map((target) => (
+          {actions.map((action) => (
             <button
-              key={target}
+              key={action.key}
               type="button"
               role="menuitem"
-              onClick={() => handleMove(activeInstance.instanceId, target)}
-              className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
+              onClick={() => handleMove(activeInstance.instanceId, action)}
+              disabled={action.disabled}
+              className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
             >
-              {`Move to ${ZONE_LABELS[target]}`}
+              {action.label}
             </button>
           ))}
         </div>
       ) : null}
     </section>
-  );
-}
-
-function CompactZoneStack({
-  label,
-  cards,
-  faceDown = false,
-  compact = false,
-}: {
-  label: string;
-  cards: GameCardInstance[];
-  faceDown?: boolean;
-  compact?: boolean;
-}) {
-  const topCard = cards[0] ?? null;
-  const showCardImage = cards.length > 0 && (faceDown || topCard?.card.imageSrc);
-
-  return (
-    <div className="grid min-h-0 w-full grid-rows-[1fr_auto] place-items-center px-2 py-1.5">
-      <div
-        className={`relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
-          compact ? 'h-[min(4.35rem,100%)]' : 'h-20'
-        }`}
-        title={label}
-      >
-        {showCardImage ? (
-          <>
-            <Image
-              src={faceDown ? CARD_BACK_IMAGE_SRC : topCard?.card.imageSrc || CARD_BACK_IMAGE_SRC}
-              alt=""
-              fill
-              sizes={compact ? '44px' : '56px'}
-              className="object-cover"
-            />
-            <span className="absolute inset-0 flex items-center justify-center">
-              <span className="rounded-full bg-black/70 px-2 py-0.5 text-sm font-bold text-white shadow-sm">
-                {cards.length}
-              </span>
-            </span>
-          </>
-        ) : (
-          <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[color:var(--text-secondary)]">
-            {cards.length}
-          </span>
-        )}
-      </div>
-      <span className="mt-1 text-center text-[9px] font-bold uppercase leading-none tracking-wide text-[color:var(--text-secondary)]">{label}</span>
-    </div>
   );
 }
 
@@ -523,15 +295,28 @@ function CombinedStagingSupplyPanel({
   deckCards: GameCardInstance[];
   compact?: boolean;
   mirror?: boolean;
-  onMove?: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
+  onMove?: MoveCardHandler;
   disabled?: boolean;
 }) {
+  const visibleStagingCards = stagingCards.filter(
+    (instance) =>
+      !instance.attachedToInstanceId ||
+      !stagingCards.some((candidate) => candidate.instanceId === instance.attachedToInstanceId)
+  );
   const [activeStagingCardId, setActiveStagingCardId] = useState<string | null>(null);
-  const [previewCard, setPreviewCard] = useState<Card | null>(null);
+  const [stagingMenuPosition, setStagingMenuPosition] = useState<{
+    left: number;
+    top: number;
+    placement: 'above' | 'below';
+  } | null>(null);
+  const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const previewClearTimeoutRef = useRef<number | null>(null);
   const activeStagingTriggerRef = useRef<HTMLButtonElement | null>(null);
   const stagingMenuRef = useRef<HTMLDivElement | null>(null);
-  const activeStagingCard = stagingCards.find((instance) => instance.instanceId === activeStagingCardId) ?? null;
-  const stagingTargets: ZoneId[] = ['hand', 'supply', 'battlefieldLeft', 'battlefieldCenter', 'battlefieldRight', 'graveyard', 'banish', 'deck'];
+  const activeStagingCard = visibleStagingCards.find((instance) => instance.instanceId === activeStagingCardId) ?? null;
+  const stagingTargets: ZoneId[] = activeStagingCard?.ready && isUnitCard(activeStagingCard.card)
+    ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']
+    : [];
   const rowsClassName = compact
     ? mirror
       ? 'grid-rows-[minmax(5.25rem,0.42fr)_minmax(9.5rem,0.82fr)]'
@@ -543,7 +328,45 @@ function CombinedStagingSupplyPanel({
   const panelToneClassName = 'border-[color:var(--accent)]/24 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.10),transparent_42%),linear-gradient(180deg,rgba(54,48,42,0.78),rgba(30,28,26,0.72))]';
   const stagingToneClassName = 'border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(255,226,183,0.045),rgba(0,0,0,0.13))]';
 
-  useCloseOnOutsidePointerDown(Boolean(onMove && !disabled && activeStagingCard), [activeStagingTriggerRef, stagingMenuRef], () => setActiveStagingCardId(null));
+  function closeStagingMenu() {
+    setActiveStagingCardId(null);
+    setStagingMenuPosition(null);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (previewClearTimeoutRef.current !== null) {
+        window.clearTimeout(previewClearTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function cancelPreviewClear() {
+    if (previewClearTimeoutRef.current !== null) {
+      window.clearTimeout(previewClearTimeoutRef.current);
+      previewClearTimeoutRef.current = null;
+    }
+  }
+
+  function openPreview(instance: GameCardInstance, attachedItems: GameCardInstance[]) {
+    cancelPreviewClear();
+    setPreviewCards([instance, ...attachedItems]);
+  }
+
+  function openEquipmentPreview(instance: GameCardInstance) {
+    cancelPreviewClear();
+    setPreviewCards([instance]);
+  }
+
+  function schedulePreviewClear(instanceId: string) {
+    cancelPreviewClear();
+    previewClearTimeoutRef.current = window.setTimeout(() => {
+      setPreviewCards((current) => (current?.[0]?.instanceId === instanceId ? null : current));
+      previewClearTimeoutRef.current = null;
+    }, 120);
+  }
+
+  useCloseOnOutsidePointerDown(Boolean(onMove && !disabled && activeStagingCard), [activeStagingTriggerRef, stagingMenuRef], closeStagingMenu);
 
   function handleStagingMove(instanceId: string, target: ZoneId) {
     if (!onMove || disabled) {
@@ -552,34 +375,100 @@ function CombinedStagingSupplyPanel({
 
     onMove(instanceId, 'staging', target);
     setActiveStagingCardId(null);
-    setPreviewCard(null);
+    setStagingMenuPosition(null);
+    cancelPreviewClear();
+    setPreviewCards(null);
   }
 
   return (
     <section className={`relative grid min-h-0 overflow-hidden rounded-lg border bg-[color:var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${panelToneClassName}`}>
-      <CardZoomPreview card={previewCard} />
+      <CardZoomPreview
+        cards={previewCards}
+        interactive
+        onMouseEnter={cancelPreviewClear}
+        onMouseLeave={() => {
+          cancelPreviewClear();
+          setPreviewCards(null);
+        }}
+      />
       <div className={`grid min-h-0 ${rowsClassName} gap-3`}>
         <div className={`grid min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] rounded-md border ${stagingToneClassName} ${mirror ? 'order-2' : 'order-1'}`}>
           <div className="deck-builder-scroll flex min-h-0 items-center gap-3 overflow-x-auto overflow-y-hidden px-3 py-1.5">
-            {stagingCards.length === 0 ? (
+            {visibleStagingCards.length === 0 ? (
               <p className="flex h-full w-full items-center justify-center text-center text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                 Staging
               </p>
             ) : (
-              stagingCards.map((instance) => (
+              visibleStagingCards.map((instance) => {
+                const attachedItems = getAttachedCards(stagingCards, instance.instanceId);
+
+                return (
                 <div
                   key={instance.instanceId}
-                  className={`relative flex h-full flex-none items-center justify-center ${instance.ready ? '' : compact ? 'w-[8rem]' : 'w-[10.75rem]'}`}
+                  className={`relative flex h-full flex-none items-center justify-center ${attachedItems.length > 0 ? compact ? 'pb-16' : 'pb-24' : ''} ${instance.ready ? '' : compact ? 'w-[8rem]' : 'w-[10.75rem]'}`}
                 >
+                  {attachedItems.length > 0 ? (
+                    <div className={`absolute left-1/2 z-0 -translate-x-1/2 ${compact ? 'top-[2.8rem]' : 'top-[3.9rem]'}`}>
+                      <AttachedEquipmentCards
+                        cards={attachedItems}
+                        cardHeight={compact ? 112 : 146}
+                        offset={compact ? 24 : 30}
+                        exposedHeight={compact ? 28 : 40}
+                        interactive
+                        onCardMouseEnter={openEquipmentPreview}
+                        onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
+                      />
+                    </div>
+                  ) : null}
                   <button
                     ref={activeStagingCardId === instance.instanceId ? activeStagingTriggerRef : undefined}
                     type="button"
-                    onClick={() => onMove && !disabled && setActiveStagingCardId((current) => (current === instance.instanceId ? null : instance.instanceId))}
-                    onMouseEnter={() => setPreviewCard(instance.card)}
-                    onFocus={() => setPreviewCard(instance.card)}
-                    onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-                    onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-                    className={`relative aspect-[5/7] ${stagingCardClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-lg transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.38)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+                    onClick={(event) => {
+                      if (!onMove || disabled) {
+                        return;
+                      }
+
+                      const nextCardId = activeStagingCardId === instance.instanceId ? null : instance.instanceId;
+                      if (!nextCardId) {
+                        closeStagingMenu();
+                        return;
+                      }
+
+                      if (!instance.ready) {
+                        closeStagingMenu();
+                        return;
+                      }
+
+                      const triggerRect = event.currentTarget.getBoundingClientRect();
+                      const menuWidth = 208;
+                      const menuHalfWidth = menuWidth / 2;
+                      const horizontalPadding = 12;
+                      const menuItemHeight = 36;
+                      const menuVerticalPadding = 8;
+                      const menuHeight = stagingTargets.length * menuItemHeight + menuVerticalPadding;
+                      const viewportWidth = window.innerWidth;
+                      const viewportHeight = window.innerHeight;
+                      const desiredLeft = triggerRect.left + triggerRect.width / 2;
+                      const clampedLeft = Math.min(
+                        Math.max(desiredLeft, menuHalfWidth + horizontalPadding),
+                        viewportWidth - menuHalfWidth - horizontalPadding
+                      );
+                      const canOpenAbove = triggerRect.top - 8 >= menuHeight + horizontalPadding;
+                      const canOpenBelow = viewportHeight - triggerRect.bottom - 8 >= menuHeight + horizontalPadding;
+                      const placement = canOpenAbove || !canOpenBelow ? 'above' : 'below';
+
+                      setActiveStagingCardId(nextCardId);
+                      setStagingMenuPosition({
+                        left: clampedLeft,
+                        top: placement === 'above' ? triggerRect.top - 8 : triggerRect.bottom + 8,
+                        placement,
+                      });
+                    }}
+                    onMouseEnter={() => openPreview(instance, attachedItems)}
+                    onFocus={() => openPreview(instance, attachedItems)}
+                    onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
+                    onBlur={() => schedulePreviewClear(instance.instanceId)}
+                    className={`relative z-10 aspect-[5/7] ${stagingCardClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-lg transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.38)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
                     aria-expanded={activeStagingCardId === instance.instanceId}
                     aria-haspopup={onMove && !disabled ? 'menu' : undefined}
                     aria-disabled={disabled}
@@ -589,7 +478,8 @@ function CombinedStagingSupplyPanel({
                     ) : null}
                   </button>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
           <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
@@ -618,10 +508,12 @@ function CombinedStagingSupplyPanel({
                 supplyCards.map((instance) => (
                   <div
                     key={instance.instanceId}
-                    className={`relative aspect-[5/7] h-20 flex-none ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}
+                    className="flex h-20 w-20 flex-none items-center justify-center"
                     aria-hidden="true"
                   >
-                    <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
+                    <div className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
+                      <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
+                    </div>
                   </div>
                 ))
               )}
@@ -633,8 +525,17 @@ function CombinedStagingSupplyPanel({
             </div>
           </div>
         </div>
-        {activeStagingCard && onMove && !disabled ? (
-          <div ref={stagingMenuRef} className="absolute left-1/2 top-6 z-50 w-52 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl">
+        {activeStagingCard && stagingMenuPosition && onMove && !disabled ? (
+          <div
+            ref={stagingMenuRef}
+            className={`fixed z-[80] w-52 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl ${
+              stagingMenuPosition.placement === 'above' ? '-translate-y-full' : ''
+            }`}
+            style={{
+              left: `${stagingMenuPosition.left}px`,
+              top: `${stagingMenuPosition.top}px`,
+            }}
+          >
             {stagingTargets.map((target) => (
               <button
                 key={target}
@@ -657,17 +558,27 @@ function HandStrip({
   cards,
   onMove,
   disabled = false,
+  canSupplyFromHand,
+  canPlayFromHand,
+  readySupplyCount,
+  stagingUnits,
 }: {
   cards: GameCardInstance[];
-  onMove: (instanceId: string, fromZone: ZoneId, toZone: ZoneId) => void;
+  onMove: MoveCardHandler;
   disabled?: boolean;
+  canSupplyFromHand: boolean;
+  canPlayFromHand: boolean;
+  readySupplyCount: number;
+  stagingUnits: GameCardInstance[];
 }) {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const activeHandTriggerRef = useRef<HTMLButtonElement | null>(null);
   const handMenuRef = useRef<HTMLDivElement | null>(null);
   const activeInstance = cards.find((instance) => instance.instanceId === activeCardId) ?? null;
-  const actionTargets: ZoneId[] = ['staging', 'supply'];
+  const handActions = activeInstance
+    ? getHandActions(activeInstance, { canSupplyFromHand, canPlayFromHand, readySupplyCount, stagingUnits })
+    : [];
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [activeHandTriggerRef, handMenuRef], closeHandMenu);
 
@@ -676,13 +587,13 @@ function HandStrip({
     setPreviewCard(null);
   }
 
-  function handleMove(instanceId: string, target: ZoneId) {
-    if (disabled) {
+  function handleMove(action: HandAction) {
+    if (!activeInstance || disabled || action.disabled) {
       closeHandMenu();
       return;
     }
 
-    onMove(instanceId, 'hand', target);
+    onMove(activeInstance.instanceId, 'hand', action.target, action.options);
     closeHandMenu();
   }
 
@@ -720,16 +631,19 @@ function HandStrip({
                 </div>
               ) : null}
               <div className="mt-4 grid grid-cols-2 gap-2">
-                {actionTargets.map((target) => (
-                  <button
-                    key={target}
-                    type="button"
-                    onClick={() => handleMove(activeInstance.instanceId, target)}
-                    className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)]/15 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-                  >
-                    {target === 'supply' ? 'Supply' : `Move to ${ZONE_LABELS[target]}`}
-                  </button>
-                ))}
+                {handActions.map((action) => {
+                  return (
+                    <button
+                      key={action.key}
+                      type="button"
+                      onClick={() => handleMove(action)}
+                      disabled={disabled || action.disabled}
+                      className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)]/15 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-[color:var(--border)] disabled:hover:bg-[color:var(--surface-muted)]"
+                    >
+                      {action.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -794,149 +708,7 @@ function HandStrip({
   );
 }
 
-function OpponentHandStrip({ cards }: { cards: GameCardInstance[] }) {
-  return (
-    <section className="pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pb-2 xl:left-[13.5rem] xl:right-4">
-      {cards.length === 0 ? (
-        <p className="mx-auto max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-          Opponent hand
-        </p>
-      ) : (
-        <div className="mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
-          {cards.map((instance, index) => {
-            const midpoint = (cards.length - 1) / 2;
-            const offsetFromCenter = index - midpoint;
-            const rotation = Math.max(-12, Math.min(12, offsetFromCenter * 3.2));
-            const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
-            const handCardStyle = {
-              '--opponent-hand-card-y': `${-36 - verticalOffset}px`,
-              '--opponent-hand-card-rotation': `${rotation}deg`,
-              transformOrigin: '50% -15%',
-            } as CSSProperties;
-
-            return (
-              <article
-                key={instance.instanceId}
-                className="relative flex w-16 flex-none justify-center"
-                style={{ zIndex: index + 1 }}
-              >
-                <div
-                  className="relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
-                  style={handCardStyle}
-                >
-                  <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="112px" className="object-cover" />
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function InfluenceScoreControl({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value?: number;
-  tone: 'player' | 'opponent';
-}) {
-  const toneClassName =
-    tone === 'player'
-      ? 'border-[color:var(--accent)]/45 bg-[linear-gradient(135deg,rgba(241,143,59,0.18),rgba(44,180,120,0.10),rgba(0,0,0,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_1rem_rgba(241,143,59,0.08)]'
-      : 'border-red-400/45 bg-[linear-gradient(135deg,rgba(239,68,68,0.18),rgba(127,29,29,0.12),rgba(0,0,0,0.12))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_1rem_rgba(239,68,68,0.08)]';
-  const topBarClassName = tone === 'player' ? 'bg-[color:var(--accent)]' : 'bg-red-400';
-
-  return (
-    <div className={`relative overflow-hidden rounded-md border p-2 ${toneClassName}`}>
-      <div className={`absolute inset-x-0 top-0 h-0.5 ${topBarClassName}`} aria-hidden="true" />
-      <div className="flex items-center justify-center">
-        <p className="truncate text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">{label}</p>
-      </div>
-      <div className="mt-2 grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-center gap-2">
-        <div className="h-px bg-[color:var(--border)]/80" aria-hidden="true" />
-        <div className="min-w-0 rounded-md border border-white/10 bg-black/20 py-1 text-center text-3xl font-black leading-none text-[color:var(--text-primary)] shadow-inner">
-          {value ?? 0}
-        </div>
-        <div className="h-px bg-[color:var(--border)]/80" aria-hidden="true" />
-      </div>
-    </div>
-  );
-}
-
-function RequiredActionToast({
-  message,
-  actions,
-}: {
-  message: string | null;
-  actions?: React.ReactNode;
-}) {
-  if (!message) {
-    return null;
-  }
-
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[24rem] z-50 flex justify-center px-4 xl:left-[13.5rem] xl:right-4">
-      <div className="max-w-lg rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)]/95 px-4 py-3 text-center text-sm font-bold text-[color:var(--text-primary)] shadow-2xl shadow-black/35 backdrop-blur">
-        {message}
-        {actions ? <div className="mt-3 flex justify-center gap-2">{actions}</div> : null}
-      </div>
-    </div>
-  );
-}
-
-function getLogGroupLabel(entry: GameState['log'][number]): string {
-  if (entry.phase === 'setup') {
-    return 'Setup';
-  }
-
-  if (typeof entry.turn === 'number') {
-    return `Turn ${entry.turn}`;
-  }
-
-  return 'Log';
-}
-
-function ActionLogList({ entries }: { entries: GameState['log'] }) {
-  const groups: Array<{ label: string; entries: GameState['log'] }> = [];
-
-  for (const entry of entries) {
-    const label = getLogGroupLabel(entry);
-    const currentGroup = groups[groups.length - 1];
-
-    if (currentGroup?.label === label) {
-      currentGroup.entries.push(entry);
-    } else {
-      groups.push({ label, entries: [entry] });
-    }
-  }
-
-  return (
-    <>
-      {groups.map((group) => (
-        <li key={`${group.label}-${group.entries[0]?.id}`} className="flex flex-col gap-2">
-          <h3 className="text-center text-xs font-black uppercase tracking-wide text-[color:var(--text-primary)] underline decoration-[color:var(--accent)] decoration-2 underline-offset-4">
-            {group.label}
-          </h3>
-          <ol className="flex flex-col gap-2">
-            {group.entries.map((entry) => (
-              <li key={entry.id} className="rounded-md bg-[color:var(--surface-muted)]/60 px-3 py-2">
-                {entry.prefix}
-                {entry.cardName ? <strong className="font-bold text-[color:var(--text-primary)]">{entry.cardName}</strong> : null}
-                {entry.suffix}
-              </li>
-            ))}
-          </ol>
-        </li>
-      ))}
-    </>
-  );
-}
-
-export function PlaytestClient({ locale, initialCards, initialError, initialMode = 'lobby' }: PlaytestClientProps) {
+export function GameClient({ locale, initialCards, initialError, initialMode = 'lobby' }: GameClientProps) {
   const router = useRouter();
   const [status, setStatus] = useState<LoadStatus>('idle');
   const [decks, setDecks] = useState<SavedDeck[]>([]);
@@ -1032,7 +804,7 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
 
       const { data, error } = await supabase
         .from('decks')
-        .select('id,title,created_at,deck_cards(*)')
+        .select('id,title,created_at,deck_cards(quantity,card_id)')
         .eq('user_id', userResult.user.id)
         .order('created_at', { ascending: false });
 
@@ -1185,7 +957,7 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
     });
   }
 
-  function moveCard(instanceId: string, fromZone: ZoneId, toZone: ZoneId) {
+  function moveCard(instanceId: string, fromZone: ZoneId, toZone: ZoneId, options: MoveCardOptions = {}) {
     setGameState((previous) => {
       if (!previous) {
         return previous;
@@ -1225,13 +997,25 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
       }
 
       if (fromZone === 'hand' && toZone === 'supply') {
+        if (!canManuallySupplyFromHand(previous, 'player')) {
+          return {
+            ...previous,
+            log: addLogEntry(previous, {
+              suffix:
+                previous.phase !== 'main' || previous.activePlayer !== 'player'
+                  ? 'You can only supply a card during your main turn.'
+                  : 'You have already supplied a card this turn.',
+            }),
+          };
+        }
+
         const suppliedCard = placeCardIntoSupply(previous.zones, instanceId);
 
         if (!suppliedCard) {
           return previous;
         }
 
-        return {
+        return markSuppliedThisTurn({
           ...previous,
           zones: {
             ...previous.zones,
@@ -1242,10 +1026,144 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
             cardName: suppliedCard.selectedCard.card.name,
             suffix: ` and drew ${suppliedCard.replacementDraw.length} card.`,
           }),
+        }, 'player');
+      }
+
+      if (fromZone !== 'hand' && toZone === 'supply') {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: 'Only cards from hand can be supplied manually.' }),
         };
       }
 
-      const destinationCards = previous.zones[toZone];
+      if (toZone === 'deck') {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: 'Cards cannot be moved to deck manually.' }),
+        };
+      }
+
+      if (fromZone === toZone && BATTLEFIELD_ZONES.has(fromZone) && isTerritoryCard(card.card)) {
+        if (!card.faceDown) {
+          return previous;
+        }
+
+        if (card.owner !== 'player') {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: 'Only your face-down territories can be flipped manually.' }),
+          };
+        }
+
+        if (previous.phase !== 'main' || previous.activePlayer !== 'player') {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: 'You can only flip a territory face up during your main turn.' }),
+          };
+        }
+
+        const costError = getPlayCostError(previous, 'player', card.card);
+
+        if (costError) {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: costError }),
+          };
+        }
+
+        const paidState = exhaustSupplyForCost(previous, 'player', getPlayCost(card.card));
+        const flippedCard = prepareCardForZone(card, fromZone, { faceDown: false });
+
+        return {
+          ...paidState,
+          zones: {
+            ...paidState.zones,
+            [fromZone]: paidState.zones[fromZone].map((instance) =>
+              instance.instanceId === instanceId ? flippedCard : instance
+            ),
+          },
+          log: addLogEntry(paidState, {
+            prefix: 'Flipped ',
+            cardName: card.card.name,
+            suffix: ` face up in ${ZONE_LABELS[fromZone]}.`,
+          }),
+        };
+      }
+
+      if (fromZone === 'hand' && toZone === 'staging') {
+        if (isUnitCard(card.card)) {
+          const placementError = getStagingPlacementError(card);
+
+          if (placementError) {
+            return {
+              ...previous,
+              log: addLogEntry(previous, { suffix: placementError }),
+            };
+          }
+        }
+
+        if (isItemCard(card.card)) {
+          const attachmentError = getEquipmentAttachmentError(previous.zones.staging, 'player', options.attachToInstanceId);
+
+          if (attachmentError) {
+            return {
+              ...previous,
+              log: addLogEntry(previous, { suffix: attachmentError }),
+            };
+          }
+        }
+      }
+
+      if (fromZone === 'hand' && BATTLEFIELD_ZONES.has(toZone) && !isTerritoryCard(card.card)) {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: `${ZONE_LABELS[toZone]} only accepts territories from hand.` }),
+        };
+      }
+
+      if (BATTLEFIELD_ZONES.has(fromZone) && toZone === 'hand') {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: 'Cards in a battlefield zone cannot be moved to hand manually.' }),
+        };
+      }
+
+      if (BATTLEFIELD_ZONES.has(fromZone) && toZone === 'staging' && !isUnitCard(card.card)) {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: 'Only units can retreat from a battlefield zone to staging.' }),
+        };
+      }
+
+      const isPaidPlayFromHand =
+        fromZone === 'hand' &&
+        (
+          (toZone === 'staging' && (isUnitCard(card.card) || isItemCard(card.card))) ||
+          (BATTLEFIELD_ZONES.has(toZone) && isTerritoryCard(card.card))
+        );
+
+      if (isPaidPlayFromHand) {
+        if (previous.phase !== 'main' || previous.activePlayer !== 'player') {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: 'You can only play cards during your main turn.' }),
+          };
+        }
+
+        const costError = getPlayCostError(previous, 'player', card.card);
+
+        if (costError) {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: costError }),
+          };
+        }
+      }
+
+      const paidState = isPaidPlayFromHand
+        ? exhaustSupplyForCost(previous, 'player', getManualPlayCost(card.card, toZone, { faceDown: options.faceDown }))
+        : previous;
+      const destinationCards = paidState.zones[toZone];
       const battlefieldPlacement = BATTLEFIELD_ZONES.has(toZone)
         ? splitBattlefieldReplacement(card, destinationCards)
         : { destinationCards, replacedTerritory: null };
@@ -1261,32 +1179,87 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
         }
       }
 
-      const sourceCards = previous.zones[fromZone].filter((instance) => instance.instanceId !== instanceId);
+      const attachedCards =
+        fromZone === 'staging' || BATTLEFIELD_ZONES.has(fromZone)
+          ? getAttachedCards(previous.zones[fromZone], instanceId)
+          : [];
+      const movedCardIds = new Set([instanceId, ...attachedCards.map((instance) => instance.instanceId)]);
+      const sourceCards = previous.zones[fromZone].filter((instance) => !movedCardIds.has(instance.instanceId));
       const graveyardCards = battlefieldPlacement.replacedTerritory
-        ? [battlefieldPlacement.replacedTerritory, ...(fromZone === 'graveyard' ? sourceCards : previous.zones.graveyard)]
+        ? [battlefieldPlacement.replacedTerritory, ...(fromZone === 'graveyard' ? sourceCards : paidState.zones.graveyard)]
         : fromZone === 'graveyard'
           ? sourceCards
-          : previous.zones.graveyard;
-      const movedCard = prepareCardForZone(card, toZone);
+          : paidState.zones.graveyard;
+      const movedCard = prepareCardForZone(card, toZone, {
+        faceDown: BATTLEFIELD_ZONES.has(toZone) && isTerritoryCard(card.card) ? options.faceDown : false,
+        enterExhausted: toZone === 'staging' ? options.enterExhausted || BATTLEFIELD_ZONES.has(fromZone) : false,
+        enterReady: fromZone === 'hand' && isItemCard(card.card) ? true : undefined,
+        attachToInstanceId: isItemCard(card.card) ? options.attachToInstanceId ?? card.attachedToInstanceId : null,
+      });
+      const movedAttachments = attachedCards.map((instance) =>
+        prepareCardForZone(instance, toZone, {
+          attachToInstanceId: movedCard.instanceId,
+        })
+      );
 
       const nextZones = {
-        ...previous.zones,
+        ...paidState.zones,
         [fromZone]: sourceCards,
         graveyard: graveyardCards,
-        [toZone]: toZone === 'deck' ? [...battlefieldPlacement.destinationCards, movedCard] : [movedCard, ...battlefieldPlacement.destinationCards],
+        [toZone]: [movedCard, ...movedAttachments, ...battlefieldPlacement.destinationCards],
       };
+      const stabilizedAttachments = stabilizeAttachmentState(nextZones);
 
-      return {
-        ...previous,
-        zones: nextZones,
+      const attachmentTargetName =
+        isItemCard(card.card) && toZone === 'staging' && options.attachToInstanceId
+          ? previous.zones.staging.find((instance) => instance.instanceId === options.attachToInstanceId)?.card.name ?? null
+          : null;
+
+      let movedState = {
+        ...paidState,
+        zones: stabilizedAttachments.zones,
         log: addLogEntry(previous, {
           prefix: 'Moved ',
           cardName: card.card.name,
-          suffix: battlefieldPlacement.replacedTerritory
-            ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, replacing ${battlefieldPlacement.replacedTerritory.card.name}.`
-            : ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
+          suffix: attachmentTargetName
+            ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, attaching to ${attachmentTargetName}.`
+            : battlefieldPlacement.replacedTerritory
+              ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, replacing ${battlefieldPlacement.replacedTerritory.card.name}.`
+              : ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
         }),
       };
+
+      if (stabilizedAttachments.orphanedAttachments.length > 0) {
+        const orphanedNames = stabilizedAttachments.orphanedAttachments.map((instance) => instance.card.name);
+        const orphanedLabel =
+          orphanedNames.length === 1
+            ? orphanedNames[0]
+            : `${orphanedNames.slice(0, -1).join(', ')}, and ${orphanedNames[orphanedNames.length - 1]}`;
+
+        movedState = {
+          ...movedState,
+          log: addLogEntry(movedState, {
+            suffix: `${orphanedLabel} ${orphanedNames.length === 1 ? 'was' : 'were'} sent to Graveyard because ${
+              orphanedNames.length === 1 ? 'it no longer has' : 'they no longer have'
+            } a legal unit to equip.`,
+          }),
+        };
+      }
+
+      const playTriggeredState =
+        fromZone === 'hand'
+          ? triggerCardAbilities(movedState, 'onPlay', {
+              source: movedCard,
+              zone: toZone,
+            })
+          : movedState;
+
+      return toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone)
+        ? triggerCardAbilities(playTriggeredState, 'onEnter', {
+            source: movedCard,
+            zone: toZone,
+          })
+        : playTriggeredState;
     });
   }
 
@@ -1603,6 +1576,15 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
       );
     }
     const canTakePlayerActions = gameState.phase === 'setup' || gameState.activePlayer === 'player';
+    const canPlayFromHand = gameState.phase === 'main' && gameState.activePlayer === 'player';
+    const readySupplyCount = getReadySupplyCount(gameState, 'player');
+    const playerStagingUnits = getStagingUnitCards(gameState.zones.staging, 'player');
+    const canFlipFaceUp = canPlayFromHand;
+    const canSupplyFromHand =
+      gameState.phase === 'setup'
+        ? !gameState.playerStartingSupplyPlaced
+        : canManuallySupplyFromHand(gameState, 'player');
+
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
@@ -1671,9 +1653,9 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
               mirror
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} disabled={!canTakePlayerActions} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} disabled={!canTakePlayerActions} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} disabled={!canTakePlayerActions} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} disabled={!canTakePlayerActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} disabled={!canTakePlayerActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} disabled={!canTakePlayerActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1770,7 +1752,15 @@ export function PlaytestClient({ locale, initialCards, initialError, initialMode
           }
         />
         <OpponentHandStrip cards={gameState.opponentZones.hand} />
-        <HandStrip cards={gameState.zones.hand} onMove={moveCard} disabled={!canTakePlayerActions} />
+        <HandStrip
+          cards={gameState.zones.hand}
+          onMove={moveCard}
+          disabled={!canTakePlayerActions}
+          canSupplyFromHand={canSupplyFromHand}
+          canPlayFromHand={canPlayFromHand}
+          readySupplyCount={readySupplyCount}
+          stagingUnits={playerStagingUnits}
+        />
       </div>
     );
   })();

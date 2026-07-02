@@ -19,6 +19,11 @@ export async function getStaticCards(): Promise<{ cards: Card[]; error: string |
   }
 
   const fallbackCards = typedCardsData.cards;
+  const useSupabaseCards = process.env.NEXT_PUBLIC_USE_SUPABASE_CARDS === "true";
+
+  if (!useSupabaseCards) {
+    return { cards: fallbackCards, error: null };
+  }
 
   const { rows, error } = await getSupabaseCardRows();
   if (rows.length === 0) {

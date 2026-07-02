@@ -23,6 +23,20 @@ describe('playtest abilities', () => {
     expect(getImplementedAbilitiesForTrigger('missing-card', 'onPlay')).toEqual([]);
   });
 
+  it('registers implemented card abilities by stable card id', () => {
+    expect(getRegisteredCardAbilities('IMP066')).toMatchObject({
+      cardId: 'IMP066',
+      abilities: [
+        {
+          id: 'IMP066-on-death-draw-card',
+          trigger: 'onDeath',
+          timing: 'automatic',
+        },
+      ],
+    });
+    expect(getImplementedAbilitiesForTrigger('IMP066', 'onDeath')).toHaveLength(1);
+  });
+
   it('creates a clear unimplemented ability message', () => {
     const card = createTestCard({ name: 'Aegis Defender' });
 

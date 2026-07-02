@@ -6,7 +6,7 @@ import { buildCanonicalMetadata } from '@/lib/metadata/locale';
 import { isPlaytestEnabled } from '@/lib/features';
 
 import { getStaticCards } from '../create/deck-builder/data';
-import { PlaytestClient } from '../play/playtest-client';
+import { GameClient } from '../play/game-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <PlaytestClient locale={locale} initialCards={cards} initialError={error} initialMode="match" />
+      <GameClient locale={locale} initialCards={cards} initialError={error} initialMode="match" />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { Card } from '../create/deck-builder/types';
-import type { GameCardInstance, GameState, Owner, ZoneId } from './playtest-rules';
+import type { GameCardInstance, GameState, Owner, ZoneId } from './game-rules';
 
 export type AbilityTrigger =
   | 'onPlay'
@@ -77,6 +77,46 @@ export type CardAbilityDefinition = {
   abilities: TriggeredAbilityDefinition[];
 };
 
+export function createDrawCardsAbility(count: number): AbilityHandler {
+  return ({ state, event }) => {
+    if (count <= 0) {
+      return { state, resolved: false };
+    }
+
+    if (event.controller === 'player') {
+      const drawn = state.zones.deck.slice(0, count);
+
+      return {
+        state: {
+          ...state,
+          zones: {
+            ...state.zones,
+            deck: state.zones.deck.slice(drawn.length),
+            hand: [...state.zones.hand, ...drawn],
+          },
+        },
+        resolved: drawn.length > 0,
+        message: `${event.source.card.name} drew ${drawn.length} ${drawn.length === 1 ? 'card' : 'cards'}.`,
+      };
+    }
+
+    const drawn = state.opponentZones.deck.slice(0, count);
+
+    return {
+      state: {
+        ...state,
+        opponentZones: {
+          ...state.opponentZones,
+          deck: state.opponentZones.deck.slice(drawn.length),
+          hand: [...state.opponentZones.hand, ...drawn],
+        },
+      },
+      resolved: drawn.length > 0,
+      message: `${event.source.card.name} drew ${drawn.length} ${drawn.length === 1 ? 'card' : 'cards'} for Bot.`,
+    };
+  };
+}
+
 export const TRIGGER_LABELS: Record<AbilityTrigger, string> = {
   onPlay: 'On Play',
   onEnter: 'On Enter',
@@ -105,7 +145,32 @@ const PRINTED_TRIGGER_PATTERNS: Array<{ trigger: AbilityTrigger; pattern: RegExp
   { trigger: 'static', pattern: /(?:^|\n)\s*(?:while|your|friendly|enemy|equipped|this unit can't|units in this zone|attacking units)\b/i },
 ];
 
-export const CARD_ABILITY_REGISTRY: Record<string, CardAbilityDefinition> = {};
+export const CARD_ABILITY_REGISTRY: Record<string, CardAbilityDefinition> = {
+  IMP066: {
+    cardId: 'IMP066',
+    abilities: [
+      {
+        id: 'IMP066-on-death-draw-card',
+        trigger: 'onDeath',
+        timing: 'automatic',
+        text: 'On Death: Draw a card.',
+        resolve: createDrawCardsAbility(1),
+      },
+    ],
+  },
+  IMP100: {
+    cardId: 'IMP100',
+    abilities: [
+      {
+        id: 'IMP100-on-death-draw-card',
+        trigger: 'onDeath',
+        timing: 'automatic',
+        text: 'On Death: Draw a card.',
+        resolve: createDrawCardsAbility(1),
+      },
+    ],
+  },
+};
 
 export function getPrintedAbilityTriggers(card: Card): AbilityTrigger[] {
   const triggers = PRINTED_TRIGGER_PATTERNS.filter(({ pattern }) => pattern.test(card.rulesText)).map(({ trigger }) => trigger);

@@ -38,6 +38,7 @@ export type GameCardInstance = {
   card: Card;
   ready: boolean;
   faceDown: boolean;
+  attachedToInstanceId: string | null;
 };
 
 export type LogEntry = {
@@ -65,6 +66,8 @@ export type GameState = {
   hasFirstPlayerSkippedDraw: boolean;
   playerStartingSupplyPlaced: boolean;
   opponentStartingSupplyPlaced: boolean;
+  playerSuppliedThisTurn: boolean;
+  opponentSuppliedThisTurn: boolean;
   playerInfluence: number;
   opponentInfluence: number;
   zones: Record<ZoneId, GameCardInstance[]>;
@@ -94,22 +97,245 @@ export function isUnitCard(card: Card): boolean {
   return type === 'unit' || type === 'token';
 }
 
+export function isItemCard(card: Card): boolean {
+  return getPlaytestCardType(card) === 'item';
+}
+
+export function hasSuppliedThisTurn(state: GameState, owner: Owner): boolean {
+  return owner === 'player' ? state.playerSuppliedThisTurn : state.opponentSuppliedThisTurn;
+}
+
+export function canManuallySupplyFromHand(state: GameState, owner: Owner): boolean {
+  return state.phase === 'main' && state.activePlayer === owner && !hasSuppliedThisTurn(state, owner);
+}
+
+export function markSuppliedThisTurn(state: GameState, owner: Owner): GameState {
+  return owner === 'player'
+    ? {
+        ...state,
+        playerSuppliedThisTurn: true,
+      }
+    : {
+        ...state,
+        opponentSuppliedThisTurn: true,
+      };
+}
+
+export function getReadySupplyCount(state: GameState, owner: Owner): number {
+  const supplyCards = owner === 'player' ? state.zones.supply : state.opponentZones.supply;
+  return supplyCards.filter((instance) => instance.ready).length;
+}
+
+export function getPlayCost(card: Card): number {
+  return Math.max(0, card.cost);
+}
+
+export function getManualPlayCost(card: Card, toZone: ZoneId, options: { faceDown?: boolean } = {}): number {
+  if (isTerritoryCard(card) && BATTLEFIELD_ZONES.has(toZone)) {
+    return options.faceDown ? 0 : getPlayCost(card);
+  }
+
+  return getPlayCost(card);
+}
+
+export function getPlayCostError(state: GameState, owner: Owner, card: Card): string | null {
+  const cost = getPlayCost(card);
+  const readySupplyCount = getReadySupplyCount(state, owner);
+
+  return readySupplyCount >= cost ? null : `Not enough ready supply. ${card.name} costs ${cost}, but you have ${readySupplyCount}.`;
+}
+
+export function exhaustSupplyForCost(state: GameState, owner: Owner, cost: number): GameState {
+  if (cost <= 0) {
+    return state;
+  }
+
+  if (owner === 'player') {
+    let remainingCost = cost;
+
+    return {
+      ...state,
+      zones: {
+        ...state.zones,
+        supply: state.zones.supply.map((instance) => {
+          if (remainingCost <= 0 || !instance.ready) {
+            return instance;
+          }
+
+          remainingCost -= 1;
+          return {
+            ...instance,
+            ready: false,
+          };
+        }),
+      },
+    };
+  }
+
+  let remainingCost = cost;
+
+  return {
+    ...state,
+    opponentZones: {
+      ...state.opponentZones,
+      supply: state.opponentZones.supply.map((instance) => {
+        if (remainingCost <= 0 || !instance.ready) {
+          return instance;
+        }
+
+        remainingCost -= 1;
+        return {
+          ...instance,
+          ready: false,
+        };
+      }),
+    },
+  };
+}
+
+function resetSuppliedThisTurn(state: GameState, owner: Owner): GameState {
+  return owner === 'player'
+    ? {
+        ...state,
+        playerSuppliedThisTurn: false,
+      }
+    : {
+        ...state,
+        opponentSuppliedThisTurn: false,
+      };
+}
+
 export function hasBlitz(card: Card): boolean {
   return hasPlaytestKeyword(card, 'blitz');
 }
 
-export function prepareCardForZone(instance: GameCardInstance, toZone: ZoneId): GameCardInstance {
+export function getStagingPlacementError(card: GameCardInstance): string | null {
+  return isUnitCard(card.card) ? null : 'Staging can only hold units.';
+}
+
+export function getStagingUnitCards(cards: GameCardInstance[], owner: Owner): GameCardInstance[] {
+  return cards.filter((instance) => instance.owner === owner && isUnitCard(instance.card));
+}
+
+export function getAttachedCards(cards: GameCardInstance[], hostInstanceId: string): GameCardInstance[] {
+  return cards.filter((instance) => instance.attachedToInstanceId === hostInstanceId);
+}
+
+export function getEquipmentHost(cards: GameCardInstance[], equipment: GameCardInstance): GameCardInstance | null {
+  if (!equipment.attachedToInstanceId) {
+    return null;
+  }
+
+  return cards.find((instance) => instance.instanceId === equipment.attachedToInstanceId) ?? null;
+}
+
+export function getEquipmentAttachmentError(
+  stagingCards: GameCardInstance[],
+  owner: Owner,
+  attachToInstanceId: string | null | undefined
+): string | null {
+  if (!attachToInstanceId) {
+    return 'Equipment must be attached to a unit in your staging area.';
+  }
+
+  const targetUnit = stagingCards.find(
+    (instance) => instance.instanceId === attachToInstanceId && instance.owner === owner && isUnitCard(instance.card)
+  );
+
+  return targetUnit ? null : 'Equipment must be attached to one of your units in the staging area.';
+}
+
+export function stabilizeAttachmentState(
+  zones: Record<ZoneId, GameCardInstance[]>
+): { zones: Record<ZoneId, GameCardInstance[]>; orphanedAttachments: GameCardInstance[] } {
+  const nextZones = { ...zones };
+  const orphanedAttachments: GameCardInstance[] = [];
+
+  for (const zoneId of ['staging', ...BATTLEFIELD_ZONE_IDS] satisfies ZoneId[]) {
+    const zoneCards = nextZones[zoneId];
+    const nextZoneCards: GameCardInstance[] = [];
+
+    for (const instance of zoneCards) {
+      if (!isItemCard(instance.card) || !instance.attachedToInstanceId) {
+        nextZoneCards.push(instance);
+        continue;
+      }
+
+      const host = getEquipmentHost(zoneCards, instance);
+      const hasValidHost = Boolean(host && host.owner === instance.owner && isUnitCard(host.card));
+
+      if (hasValidHost) {
+        nextZoneCards.push(instance);
+        continue;
+      }
+
+      orphanedAttachments.push(prepareCardForZone(instance, 'graveyard'));
+    }
+
+    nextZones[zoneId] = nextZoneCards;
+  }
+
+  if (orphanedAttachments.length === 0) {
+    return {
+      zones,
+      orphanedAttachments,
+    };
+  }
+
+  return {
+    zones: {
+      ...nextZones,
+      graveyard: [...orphanedAttachments, ...nextZones.graveyard],
+    },
+    orphanedAttachments,
+  };
+}
+
+export function prepareCardForZone(
+  instance: GameCardInstance,
+  toZone: ZoneId,
+  options: { faceDown?: boolean; enterExhausted?: boolean; enterReady?: boolean; attachToInstanceId?: string | null } = {}
+): GameCardInstance {
   if (toZone === 'staging' && isUnitCard(instance.card)) {
     return {
       ...instance,
-      ready: hasBlitz(instance.card),
+      ready: options.enterExhausted ? false : hasBlitz(instance.card),
       faceDown: false,
+      attachedToInstanceId: null,
+    };
+  }
+
+  if (toZone === 'staging' && isItemCard(instance.card)) {
+    return {
+      ...instance,
+      ready: options.enterReady ?? instance.ready,
+      faceDown: false,
+      attachedToInstanceId: options.attachToInstanceId ?? instance.attachedToInstanceId,
+    };
+  }
+
+  if (BATTLEFIELD_ZONES.has(toZone) && isItemCard(instance.card)) {
+    return {
+      ...instance,
+      ready: options.enterReady ?? instance.ready,
+      faceDown: false,
+      attachedToInstanceId: options.attachToInstanceId ?? instance.attachedToInstanceId,
+    };
+  }
+
+  if (BATTLEFIELD_ZONES.has(toZone)) {
+    return {
+      ...instance,
+      ready: true,
+      faceDown: options.faceDown ?? false,
+      attachedToInstanceId: null,
     };
   }
 
   return {
     ...instance,
-    faceDown: false,
+    faceDown: options.faceDown ?? false,
+    attachedToInstanceId: null,
   };
 }
 
@@ -131,7 +357,14 @@ export function triggerCardAbilities(state: GameState, trigger: AbilityTrigger, 
     });
 
     if (resolution) {
-      nextState = resolution.state;
+      nextState = resolution.resolved && resolution.message
+        ? {
+            ...resolution.state,
+            log: addLogEntry(resolution.state, {
+              suffix: resolution.message,
+            }),
+          }
+        : resolution.state;
     }
   }
 
@@ -204,6 +437,7 @@ export function buildDeckInstances(deck: SavedDeck, owner: Owner): GameCardInsta
       card: entry.card,
       ready: false,
       faceDown: false,
+      attachedToInstanceId: null,
     }))
   );
 }
@@ -242,6 +476,8 @@ export function buildInitialGameState(deck: SavedDeck, botDeck: SavedDeck | null
     hasFirstPlayerSkippedDraw: false,
     playerStartingSupplyPlaced: false,
     opponentStartingSupplyPlaced: Boolean(opponentSetup),
+    playerSuppliedThisTurn: false,
+    opponentSuppliedThisTurn: false,
     playerInfluence: 0,
     opponentInfluence: 0,
     zones: {
@@ -270,7 +506,11 @@ export function getBattlefieldPlacementError(card: GameCardInstance, destination
   }
 
   if (isUnitCard(card.card)) {
-    const hasUnit = destinationCards.some((instance) => isUnitCard(instance.card) || !isTerritoryCard(instance.card));
+    if (!card.ready) {
+      return 'requires a ready unit.';
+    }
+
+    const hasUnit = destinationCards.some((instance) => isUnitCard(instance.card));
     return hasUnit ? 'already has a unit.' : null;
   }
 
@@ -332,7 +572,7 @@ export function placeAutomaticStartingSupply(zones: PrivateZones) {
 }
 
 export function startGameAfterSetup(state: GameState, firstPlayer: Owner): GameState {
-  const startedState = {
+  const startedState = resetSuppliedThisTurn({
     ...state,
     turn: 1,
     phase: 'main' as const,
@@ -342,7 +582,7 @@ export function startGameAfterSetup(state: GameState, firstPlayer: Owner): GameS
     log: addLogEntry(state, {
       suffix: `${firstPlayer === 'player' ? 'You go' : 'Bot goes'} first. Turn 1 begins.`,
     }),
-  };
+  }, firstPlayer);
 
   return runTurnStart(readyCardsForOwner(startedState, firstPlayer));
 }
@@ -355,7 +595,7 @@ export function advanceToNextTurn(state: GameState): GameState {
   const nextActivePlayer: Owner = state.activePlayer === 'player' ? 'opponent' : 'player';
   const nextTurn = nextActivePlayer === state.firstPlayer ? state.turn + 1 : state.turn;
 
-  const advancedState = {
+  const advancedState = resetSuppliedThisTurn({
     ...state,
     activePlayer: nextActivePlayer,
     turn: nextTurn,
@@ -363,7 +603,7 @@ export function advanceToNextTurn(state: GameState): GameState {
     log: addLogEntry(state, {
       suffix: `${nextActivePlayer === 'player' ? 'Your' : 'Bot'} turn ${nextTurn}.`,
     }),
-  };
+  }, nextActivePlayer);
 
   return runTurnStart(readyCardsForOwner(advancedState, nextActivePlayer));
 }
@@ -398,6 +638,10 @@ export function applyBotTurnStep(state: GameState, step: BotTurnStep): GameState
 }
 
 function supplyFirstBotHandCard(state: GameState): GameState {
+  if (!canManuallySupplyFromHand(state, 'opponent')) {
+    return state;
+  }
+
   const selectedCard = state.opponentZones.hand[0];
 
   if (!selectedCard) {
@@ -410,7 +654,7 @@ function supplyFirstBotHandCard(state: GameState): GameState {
     return state;
   }
 
-  return {
+  return markSuppliedThisTurn({
     ...state,
     opponentZones: suppliedCard.zones,
     log: addLogEntry(state, {
@@ -418,24 +662,26 @@ function supplyFirstBotHandCard(state: GameState): GameState {
       cardName: suppliedCard.selectedCard.card.name,
       suffix: ` and drew ${suppliedCard.replacementDraw.length} ${suppliedCard.replacementDraw.length === 1 ? 'card' : 'cards'}.`,
     }),
-  };
+  }, 'opponent');
 }
 
 function stageFirstBotUnit(state: GameState): GameState {
-  const selectedUnit = state.opponentZones.hand.find((instance) => isUnitCard(instance.card));
+  const selectedUnit = state.opponentZones.hand.find((instance) => isUnitCard(instance.card) && !getPlayCostError(state, 'opponent', instance.card));
 
   if (!selectedUnit) {
     return state;
   }
 
+  const paidState = exhaustSupplyForCost(state, 'opponent', getPlayCost(selectedUnit.card));
+
   return {
-    ...state,
+    ...paidState,
     opponentZones: {
-      ...state.opponentZones,
-      hand: state.opponentZones.hand.filter((instance) => instance.instanceId !== selectedUnit.instanceId),
-      staging: [prepareCardForZone(selectedUnit, 'staging'), ...state.opponentZones.staging],
+      ...paidState.opponentZones,
+      hand: paidState.opponentZones.hand.filter((instance) => instance.instanceId !== selectedUnit.instanceId),
+      staging: [prepareCardForZone(selectedUnit, 'staging'), ...paidState.opponentZones.staging],
     },
-    log: addLogEntry(state, {
+    log: addLogEntry(paidState, {
       prefix: 'Bot staged ',
       cardName: selectedUnit.card.name,
       suffix: '.',
