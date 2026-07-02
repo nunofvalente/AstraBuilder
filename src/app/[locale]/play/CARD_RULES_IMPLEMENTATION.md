@@ -5,8 +5,8 @@ Card rules are implemented from canonical card text, not stored as executable da
 ## Sources of Truth
 
 - `src/data/cards.json` and Supabase `cards.rules_text` hold printed card text and card facts.
-- `playtest-card-definitions.ts` derives card type, keywords, default play destination, and printed triggers from that text.
-- `playtest-abilities.ts` maps stable card ids to executable ability handlers.
+- `card-definitions.ts` derives card type, keywords, default play destination, and printed triggers from that text.
+- `card-abilities.ts` maps stable card ids to executable ability handlers.
 - `game-rules.ts` owns deterministic game-state transitions and ability trigger resolution.
 
 ## Current Trigger Flow

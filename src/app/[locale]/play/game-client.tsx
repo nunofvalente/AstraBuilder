@@ -9,38 +9,31 @@ import { Bot, ChevronsRight, Flag, Hand, Layers, Play, RotateCcw, Swords, Users 
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import type { Card } from '../create/deck-builder/types';
+import { getBotBattlefieldAttackChoice } from './bot-policy';
+import { applyPlayerCardAction } from './game-actions';
+import { BOT_TURN_STEPS, applyBotTurnStep, playFirstBotCounter } from './game-bot';
 import {
-  BOT_TURN_STEPS,
   BATTLEFIELD_ZONES,
   addLogEntry,
   advanceToNextTurn,
-  applyBotTurnStep,
   buildInitialGameState,
   canManuallySupplyFromHand,
   createLogEntry,
-  exhaustSupplyForCost,
+  declareBattlefieldAttack,
   getAttachedCards,
-  getBattlefieldPlacementError,
-  getEquipmentAttachmentError,
-  getManualPlayCost,
+  getCounterPlayError,
   getPlayCost,
-  getPlayCostError,
   getReadySupplyCount,
   getStagingUnitCards,
-  getStagingPlacementError,
   isItemCard,
   isTerritoryCard,
   isUnitCard,
-  placeCardIntoSupply,
-  placeStartingSupply,
-  prepareCardForZone,
-  markSuppliedThisTurn,
+  passCounterPriority,
+  playCounterCard,
+  resolveBattlefieldAttack,
   rollFirstPlayer,
   shuffleCards,
   startGameAfterSetup,
-  stabilizeAttachmentState,
-  splitBattlefieldReplacement,
-  triggerCardAbilities,
   type GameCardInstance,
   type GameState,
   type PrivateZones,
@@ -66,7 +59,7 @@ import {
   AttachedEquipmentCards,
   CardZoomPreview,
   CompactZoneStack,
-  InfluenceScoreControl,
+  VictoryPointScoreControl,
   OpponentHandStrip,
   RequiredActionToast,
   getReadyStateClassName,
@@ -76,6 +69,55 @@ import {
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'auth' | 'error';
 type PlayMode = 'matchmaking' | 'lobby' | 'practice';
 type PlayQueue = 'ranked' | 'casual';
+type BattlefieldZoneId = 'battlefieldLeft' | 'battlefieldCenter' | 'battlefieldRight';
+type AttackBattlefieldHandler = (attackerInstanceId: string, targetZone: ZoneId) => void;
+type AttackArrowState = {
+  id: number;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+};
+
+function DamageBadge({ instance }: { instance: GameCardInstance }) {
+  const damage = Number(instance.damage);
+
+  if (!isUnitCard(instance.card) || !Number.isFinite(damage) || damage <= 0) {
+    return null;
+  }
+
+  return (
+    <span className="absolute right-1 top-1 z-20 grid h-5 min-w-5 place-items-center rounded-full border border-red-200/60 bg-red-700/95 px-1 text-[0.62rem] font-black leading-none text-white shadow-md">
+      {damage}
+    </span>
+  );
+}
+
+function AttackArrowOverlay({ arrow }: { arrow: AttackArrowState }) {
+  const markerId = `attack-arrow-head-${arrow.id}`;
+
+  return (
+    <svg className="pointer-events-none fixed inset-0 z-[85] h-screen w-screen" aria-hidden="true">
+      <defs>
+        <marker id={markerId} markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+          <path d="M2,2 L10,6 L2,10 Z" fill="rgb(248 113 113)" />
+        </marker>
+      </defs>
+      <line
+        x1={arrow.from.x}
+        y1={arrow.from.y}
+        x2={arrow.to.x}
+        y2={arrow.to.y}
+        stroke="rgb(248 113 113)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeDasharray="18 12"
+        markerEnd={`url(#${markerId})`}
+        opacity="0.95"
+      >
+        <animate attributeName="stroke-dashoffset" from="60" to="0" dur="0.7s" repeatCount="1" />
+      </line>
+    </svg>
+  );
+}
 
 export type GameClientProps = {
   locale: Locale;
@@ -188,6 +230,7 @@ function BattlefieldPanel({
       <button
         ref={isActive ? triggerRef : undefined}
         type="button"
+        data-card-instance-id={instance.instanceId}
         onClick={() => !disabled && setActiveInstanceId((current) => (current === instance.instanceId ? null : instance.instanceId))}
         onMouseEnter={() => openPreview(instance)}
         onFocus={() => openPreview(instance)}
@@ -203,6 +246,7 @@ function BattlefieldPanel({
           {instance.faceDown || instance.card.imageSrc ? (
             <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes={size === 'unit' ? '88px' : '56px'} className="object-cover" />
           ) : null}
+          <DamageBadge instance={instance} />
         </span>
       </button>
     );
@@ -220,7 +264,7 @@ function BattlefieldPanel({
   }
 
   return (
-    <section className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]">
+    <section className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]" data-battlefield-zone={zone}>
       <CardZoomPreview
         cards={previewCards}
         interactive
@@ -286,6 +330,8 @@ function CombinedStagingSupplyPanel({
   compact = false,
   mirror = false,
   onMove,
+  onAttack,
+  battlefieldCardsByZone,
   disabled = false,
 }: {
   stagingCards: GameCardInstance[];
@@ -296,6 +342,8 @@ function CombinedStagingSupplyPanel({
   compact?: boolean;
   mirror?: boolean;
   onMove?: MoveCardHandler;
+  onAttack?: AttackBattlefieldHandler;
+  battlefieldCardsByZone?: Record<BattlefieldZoneId, GameCardInstance[]>;
   disabled?: boolean;
 }) {
   const visibleStagingCards = stagingCards.filter(
@@ -310,11 +358,12 @@ function CombinedStagingSupplyPanel({
     placement: 'above' | 'below';
   } | null>(null);
   const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const [isGraveyardOpen, setIsGraveyardOpen] = useState(false);
   const previewClearTimeoutRef = useRef<number | null>(null);
   const activeStagingTriggerRef = useRef<HTMLButtonElement | null>(null);
   const stagingMenuRef = useRef<HTMLDivElement | null>(null);
   const activeStagingCard = visibleStagingCards.find((instance) => instance.instanceId === activeStagingCardId) ?? null;
-  const stagingTargets: ZoneId[] = activeStagingCard?.ready && isUnitCard(activeStagingCard.card)
+  const stagingTargets: BattlefieldZoneId[] = activeStagingCard?.ready && isUnitCard(activeStagingCard.card) && onAttack
     ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']
     : [];
   const rowsClassName = compact
@@ -366,14 +415,14 @@ function CombinedStagingSupplyPanel({
     }, 120);
   }
 
-  useCloseOnOutsidePointerDown(Boolean(onMove && !disabled && activeStagingCard), [activeStagingTriggerRef, stagingMenuRef], closeStagingMenu);
+  useCloseOnOutsidePointerDown(Boolean((onMove || onAttack) && !disabled && activeStagingCard), [activeStagingTriggerRef, stagingMenuRef], closeStagingMenu);
 
-  function handleStagingMove(instanceId: string, target: ZoneId) {
-    if (!onMove || disabled) {
+  function handleStagingAttack(instanceId: string, target: ZoneId) {
+    if (!onAttack || disabled) {
       return;
     }
 
-    onMove(instanceId, 'staging', target);
+    onAttack(instanceId, target);
     setActiveStagingCardId(null);
     setStagingMenuPosition(null);
     cancelPreviewClear();
@@ -423,8 +472,9 @@ function CombinedStagingSupplyPanel({
                   <button
                     ref={activeStagingCardId === instance.instanceId ? activeStagingTriggerRef : undefined}
                     type="button"
+                    data-card-instance-id={instance.instanceId}
                     onClick={(event) => {
-                      if (!onMove || disabled) {
+                      if ((!onMove && !onAttack) || disabled) {
                         return;
                       }
 
@@ -470,12 +520,13 @@ function CombinedStagingSupplyPanel({
                     onBlur={() => schedulePreviewClear(instance.instanceId)}
                     className={`relative z-10 aspect-[5/7] ${stagingCardClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-lg transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.38)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
                     aria-expanded={activeStagingCardId === instance.instanceId}
-                    aria-haspopup={onMove && !disabled ? 'menu' : undefined}
+                    aria-haspopup={(onMove || onAttack) && !disabled ? 'menu' : undefined}
                     aria-disabled={disabled}
                   >
                     {instance.card.imageSrc ? (
                       <Image src={instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                     ) : null}
+                    <DamageBadge instance={instance} />
                   </button>
                 </div>
                 );
@@ -521,11 +572,11 @@ function CombinedStagingSupplyPanel({
             </div>
             <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
             <div className="flex min-h-0 w-20 items-center justify-center px-0">
-              <CompactZoneStack label="Graveyard" cards={graveyardCards} />
+              <CompactZoneStack label="Graveyard" cards={graveyardCards} onClick={() => setIsGraveyardOpen(true)} />
             </div>
           </div>
         </div>
-        {activeStagingCard && stagingMenuPosition && onMove && !disabled ? (
+        {activeStagingCard && stagingMenuPosition && onAttack && !disabled ? (
           <div
             ref={stagingMenuRef}
             className={`fixed z-[80] w-52 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl ${
@@ -536,20 +587,73 @@ function CombinedStagingSupplyPanel({
               top: `${stagingMenuPosition.top}px`,
             }}
           >
-            {stagingTargets.map((target) => (
-              <button
-                key={target}
-                type="button"
-                role="menuitem"
-                onClick={() => handleStagingMove(activeStagingCard.instanceId, target)}
-                className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
-              >
-                {target === 'deck' ? 'To deck' : `Move to ${ZONE_LABELS[target]}`}
-              </button>
-            ))}
+            <div className="border-b border-[color:var(--border)]/70 px-3 py-1.5 text-[0.62rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
+              Attack target
+            </div>
+            {stagingTargets.map((target) => {
+              const defender = battlefieldCardsByZone?.[target]?.find((instance) => isUnitCard(instance.card) && instance.owner !== activeStagingCard.owner) ?? null;
+              const friendlyOccupant = battlefieldCardsByZone?.[target]?.find((instance) => isUnitCard(instance.card) && instance.owner === activeStagingCard.owner) ?? null;
+
+              return (
+                <button
+                  key={target}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleStagingAttack(activeStagingCard.instanceId, target)}
+                  disabled={Boolean(friendlyOccupant)}
+                  className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  <span className="block">Attack {ZONE_LABELS[target]}</span>
+                  <span className="mt-0.5 block truncate text-[0.65rem] font-medium text-[color:var(--text-secondary)]">
+                    {friendlyOccupant ? `Occupied by ${friendlyOccupant.card.name}` : defender ? `Defender: ${defender.card.name}` : 'Open battlefield'}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         ) : null}
       </div>
+      {isGraveyardOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation">
+          <div role="dialog" aria-modal="true" aria-labelledby="graveyard-title" className="grid max-h-full w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl">
+            <header className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
+              <div>
+                <h2 id="graveyard-title" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">Graveyard</h2>
+                <p className="mt-0.5 text-xs text-[color:var(--text-secondary)]">{graveyardCards.length} {graveyardCards.length === 1 ? 'card' : 'cards'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGraveyardOpen(false)}
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+              >
+                Close
+              </button>
+            </header>
+            <div className="deck-builder-scroll min-h-0 overflow-y-auto p-4">
+              {graveyardCards.length === 0 ? (
+                <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed border-[color:var(--border)] text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  Graveyard is empty
+                </div>
+              ) : (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
+                  {graveyardCards.map((instance) => (
+                    <article key={instance.instanceId} className="min-w-0">
+                      <div className="relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface-muted)] shadow-md">
+                        {instance.card.imageSrc ? (
+                          <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                        ) : null}
+                      </div>
+                      <p className="mt-1 truncate text-center text-[0.65rem] font-semibold text-[color:var(--text-secondary)]" title={instance.card.name}>
+                        {instance.card.name}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -719,6 +823,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
   const [isPassTurnDialogOpen, setIsPassTurnDialogOpen] = useState(false);
+  const [attackArrow, setAttackArrow] = useState<AttackArrowState | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [matchSetupError, setMatchSetupError] = useState<string | null>(null);
   const botTurnTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -744,13 +849,87 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     botTurnTimersRef.current = [];
   }
 
+  function getElementCenter(element: Element): { x: number; y: number } {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  }
+
+  function showAttackArrow(attackerInstanceId: string, targetZone: ZoneId, state: GameState): number | null {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return null;
+    }
+
+    const attackerElement = document.querySelector(`[data-card-instance-id="${CSS.escape(attackerInstanceId)}"]`);
+    const defender = state.zones[targetZone]?.find((instance) => isUnitCard(instance.card) && instance.instanceId !== attackerInstanceId) ?? null;
+    const targetElement = defender
+      ? document.querySelector(`[data-card-instance-id="${CSS.escape(defender.instanceId)}"]`)
+      : document.querySelector(`[data-battlefield-zone="${CSS.escape(targetZone)}"]`);
+
+    if (!attackerElement || !targetElement) {
+      return null;
+    }
+
+    const arrowId = Date.now();
+    setAttackArrow({
+      id: arrowId,
+      from: getElementCenter(attackerElement),
+      to: getElementCenter(targetElement),
+    });
+
+    return arrowId;
+  }
+
+  function clearAttackArrow(arrowId: number | null) {
+    if (arrowId === null) {
+      return;
+    }
+
+    setAttackArrow((current) => (current?.id === arrowId ? null : current));
+  }
+
   function playAutomaticBotTurn(botTurnState: GameState) {
     clearBotTurnTimers();
     setGameState(botTurnState);
 
     for (const [index, step] of BOT_TURN_STEPS.entries()) {
       const timerId = setTimeout(() => {
-        setGameState((previous) => (previous ? applyBotTurnStep(previous, step) : previous));
+        setGameState((previous) => {
+          if (!previous) {
+            return previous;
+          }
+
+          if (step !== 'attackBattlefield') {
+            return applyBotTurnStep(previous, step);
+          }
+
+          const choice = getBotBattlefieldAttackChoice(previous);
+
+          if (!choice) {
+            return previous;
+          }
+
+          const arrowId = showAttackArrow(choice.attackerInstanceId, choice.targetZone, previous);
+          window.setTimeout(() => {
+            setGameState((current) => {
+              if (!current) {
+                return current;
+              }
+
+              const nextState = applyBotTurnStep(current, step);
+
+              if (!nextState.pendingCombat) {
+                clearAttackArrow(arrowId);
+              }
+
+              return nextState;
+            });
+          }, 700);
+
+          return previous;
+        });
       }, BOT_TURN_STEP_DELAY_MS * (index + 1));
 
       botTurnTimersRef.current.push(timerId);
@@ -765,7 +944,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         return advanceToNextTurn(previous);
       });
       botTurnTimersRef.current = [];
-    }, BOT_TURN_STEP_DELAY_MS * (BOT_TURN_STEPS.length + 1));
+    }, BOT_TURN_STEP_DELAY_MS * (BOT_TURN_STEPS.length + 2));
 
     botTurnTimersRef.current.push(passTurnTimerId);
   }
@@ -773,14 +952,60 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   useEffect(() => clearBotTurnTimers, []);
 
   useEffect(() => {
+    if (gameState?.winner) {
+      clearBotTurnTimers();
+      setAttackArrow(null);
+      setIsPassTurnDialogOpen(false);
+    }
+  }, [gameState?.winner]);
+
+  useEffect(() => {
+    if (!gameState?.pendingCombat || gameState.pendingCombat.priorityOwner !== 'opponent') {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      setGameState((previous) => {
+        if (!previous?.pendingCombat || previous.pendingCombat.priorityOwner !== 'opponent') {
+          return previous;
+        }
+
+        const counterState = playFirstBotCounter(previous);
+
+        if (counterState) {
+          return counterState;
+        }
+
+        const result = passCounterPriority(previous, 'opponent');
+
+        if ('error' in result) {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: result.error }),
+          };
+        }
+
+        if (result.resolvedCombat) {
+          setAttackArrow(null);
+          return result.state.activePlayer === 'opponent' ? advanceToNextTurn(result.state) : result.state;
+        }
+
+        return result.state;
+      });
+    }, 600);
+
+    return () => window.clearTimeout(timerId);
+  }, [gameState?.pendingCombat]);
+
+  useEffect(() => {
     if (!isMatchRoute) {
       return;
     }
 
-    document.body.classList.add('playtest-route-active');
+    document.body.classList.add('simulator-route-active');
 
     return () => {
-      document.body.classList.remove('playtest-route-active');
+      document.body.classList.remove('simulator-route-active');
     };
   }, [isMatchRoute]);
 
@@ -813,7 +1038,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       }
 
       if (error) {
-        console.error('Failed to load playtest decks', error);
+        console.error('Failed to load simulator decks', error);
         setErrorMessage(error.message);
         setStatus('error');
         setDecks([]);
@@ -911,7 +1136,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   }
 
   function requestPassTurn() {
-    if (!gameState || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+    if (!gameState || gameState.winner || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
       return;
     }
 
@@ -919,7 +1144,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   }
 
   function confirmPassTurn() {
-    if (!gameState || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+    if (!gameState || gameState.winner || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
       setIsPassTurnDialogOpen(false);
       return;
     }
@@ -937,7 +1162,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
   function drawCards(count: number) {
     setGameState((previous) => {
-      if (!previous || previous.zones.deck.length === 0) {
+      if (!previous || previous.winner || previous.zones.deck.length === 0) {
         return previous;
       }
 
@@ -963,309 +1188,119 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         return previous;
       }
 
-      const card = previous.zones[fromZone].find((instance) => instance.instanceId === instanceId);
-      if (!card) {
+      const setupFirstPlayer =
+        fromZone === 'hand' &&
+        toZone === 'supply' &&
+        !previous.playerStartingSupplyPlaced &&
+        previous.sessionMode === 'multiplayer'
+          ? rollFirstPlayer()
+          : undefined;
+
+      return applyPlayerCardAction(previous, {
+        instanceId,
+        fromZone,
+        toZone,
+        options: {
+          ...options,
+          setupFirstPlayer,
+        },
+      }).state;
+    });
+  }
+
+  function attackBattlefield(attackerInstanceId: string, targetZone: ZoneId) {
+    setGameState((previous) => {
+      if (!previous || previous.winner) {
         return previous;
       }
 
-      if (fromZone === 'hand' && toZone === 'supply' && !previous.playerStartingSupplyPlaced) {
-        const setupSupply = placeStartingSupply(previous.zones, instanceId);
+      const defender = previous.zones[targetZone].find((instance) => isUnitCard(instance.card) && instance.owner !== 'player') ?? null;
+      const arrowId = showAttackArrow(attackerInstanceId, targetZone, previous);
 
-        if (!setupSupply) {
-          return previous;
-        }
+      if (!defender) {
+        window.setTimeout(() => {
+          setGameState((current) => {
+            if (!current) {
+              return current;
+            }
 
-        const setupState = {
-          ...previous,
-          playerStartingSupplyPlaced: true,
-          zones: {
-            ...previous.zones,
-            ...setupSupply.zones,
-          },
-          log: addLogEntry(previous, {
-            prefix: 'Placed ',
-            cardName: setupSupply.selectedCard.card.name,
-            suffix: ` as starting supply and drew ${setupSupply.replacementDraw.length} replacement card.`,
-          }),
-        };
+            const nextResult = resolveBattlefieldAttack(current, 'player', attackerInstanceId, targetZone);
 
-        if (setupState.sessionMode === 'multiplayer') {
-          return startGameAfterSetup(setupState, rollFirstPlayer());
-        }
+            if ('error' in nextResult) {
+              return {
+                ...current,
+                log: addLogEntry(current, { suffix: nextResult.error }),
+              };
+            }
 
-        return setupState;
+            return nextResult.state;
+          });
+          clearAttackArrow(arrowId);
+        }, 700);
+
+        return previous;
       }
 
-      if (fromZone === 'hand' && toZone === 'supply') {
-        if (!canManuallySupplyFromHand(previous, 'player')) {
-          return {
-            ...previous,
-            log: addLogEntry(previous, {
-              suffix:
-                previous.phase !== 'main' || previous.activePlayer !== 'player'
-                  ? 'You can only supply a card during your main turn.'
-                  : 'You have already supplied a card this turn.',
-            }),
-          };
-        }
+      const result = declareBattlefieldAttack(previous, 'player', attackerInstanceId, targetZone);
 
-        const suppliedCard = placeCardIntoSupply(previous.zones, instanceId);
-
-        if (!suppliedCard) {
-          return previous;
-        }
-
-        return markSuppliedThisTurn({
-          ...previous,
-          zones: {
-            ...previous.zones,
-            ...suppliedCard.zones,
-          },
-          log: addLogEntry(previous, {
-            prefix: 'Supplied ',
-            cardName: suppliedCard.selectedCard.card.name,
-            suffix: ` and drew ${suppliedCard.replacementDraw.length} card.`,
-          }),
-        }, 'player');
-      }
-
-      if (fromZone !== 'hand' && toZone === 'supply') {
+      if ('error' in result) {
+        clearAttackArrow(arrowId);
         return {
           ...previous,
-          log: addLogEntry(previous, { suffix: 'Only cards from hand can be supplied manually.' }),
+          log: addLogEntry(previous, { suffix: result.error }),
         };
       }
 
-      if (toZone === 'deck') {
+      return result.state;
+    });
+  }
+
+  function passPlayerCounterPriority() {
+    setGameState((previous) => {
+      if (!previous || previous.winner) {
+        return previous;
+      }
+
+      const result = passCounterPriority(previous, 'player');
+
+      if ('error' in result) {
         return {
           ...previous,
-          log: addLogEntry(previous, { suffix: 'Cards cannot be moved to deck manually.' }),
+          log: addLogEntry(previous, { suffix: result.error }),
         };
       }
 
-      if (fromZone === toZone && BATTLEFIELD_ZONES.has(fromZone) && isTerritoryCard(card.card)) {
-        if (!card.faceDown) {
-          return previous;
-        }
-
-        if (card.owner !== 'player') {
-          return {
-            ...previous,
-            log: addLogEntry(previous, { suffix: 'Only your face-down territories can be flipped manually.' }),
-          };
-        }
-
-        if (previous.phase !== 'main' || previous.activePlayer !== 'player') {
-          return {
-            ...previous,
-            log: addLogEntry(previous, { suffix: 'You can only flip a territory face up during your main turn.' }),
-          };
-        }
-
-        const costError = getPlayCostError(previous, 'player', card.card);
-
-        if (costError) {
-          return {
-            ...previous,
-            log: addLogEntry(previous, { suffix: costError }),
-          };
-        }
-
-        const paidState = exhaustSupplyForCost(previous, 'player', getPlayCost(card.card));
-        const flippedCard = prepareCardForZone(card, fromZone, { faceDown: false });
-
-        return {
-          ...paidState,
-          zones: {
-            ...paidState.zones,
-            [fromZone]: paidState.zones[fromZone].map((instance) =>
-              instance.instanceId === instanceId ? flippedCard : instance
-            ),
-          },
-          log: addLogEntry(paidState, {
-            prefix: 'Flipped ',
-            cardName: card.card.name,
-            suffix: ` face up in ${ZONE_LABELS[fromZone]}.`,
-          }),
-        };
+      if (result.resolvedCombat) {
+        setAttackArrow(null);
+        return result.state.activePlayer === 'opponent' ? advanceToNextTurn(result.state) : result.state;
       }
 
-      if (fromZone === 'hand' && toZone === 'staging') {
-        if (isUnitCard(card.card)) {
-          const placementError = getStagingPlacementError(card);
+      return result.state;
+    });
+  }
 
-          if (placementError) {
-            return {
-              ...previous,
-              log: addLogEntry(previous, { suffix: placementError }),
-            };
-          }
-        }
-
-        if (isItemCard(card.card)) {
-          const attachmentError = getEquipmentAttachmentError(previous.zones.staging, 'player', options.attachToInstanceId);
-
-          if (attachmentError) {
-            return {
-              ...previous,
-              log: addLogEntry(previous, { suffix: attachmentError }),
-            };
-          }
-        }
+  function playPlayerCounter(instanceId: string) {
+    setGameState((previous) => {
+      if (!previous || previous.winner) {
+        return previous;
       }
 
-      if (fromZone === 'hand' && BATTLEFIELD_ZONES.has(toZone) && !isTerritoryCard(card.card)) {
+      const result = playCounterCard(previous, 'player', instanceId);
+
+      if ('error' in result) {
         return {
           ...previous,
-          log: addLogEntry(previous, { suffix: `${ZONE_LABELS[toZone]} only accepts territories from hand.` }),
+          log: addLogEntry(previous, { suffix: result.error }),
         };
       }
 
-      if (BATTLEFIELD_ZONES.has(fromZone) && toZone === 'hand') {
-        return {
-          ...previous,
-          log: addLogEntry(previous, { suffix: 'Cards in a battlefield zone cannot be moved to hand manually.' }),
-        };
-      }
-
-      if (BATTLEFIELD_ZONES.has(fromZone) && toZone === 'staging' && !isUnitCard(card.card)) {
-        return {
-          ...previous,
-          log: addLogEntry(previous, { suffix: 'Only units can retreat from a battlefield zone to staging.' }),
-        };
-      }
-
-      const isPaidPlayFromHand =
-        fromZone === 'hand' &&
-        (
-          (toZone === 'staging' && (isUnitCard(card.card) || isItemCard(card.card))) ||
-          (BATTLEFIELD_ZONES.has(toZone) && isTerritoryCard(card.card))
-        );
-
-      if (isPaidPlayFromHand) {
-        if (previous.phase !== 'main' || previous.activePlayer !== 'player') {
-          return {
-            ...previous,
-            log: addLogEntry(previous, { suffix: 'You can only play cards during your main turn.' }),
-          };
-        }
-
-        const costError = getPlayCostError(previous, 'player', card.card);
-
-        if (costError) {
-          return {
-            ...previous,
-            log: addLogEntry(previous, { suffix: costError }),
-          };
-        }
-      }
-
-      const paidState = isPaidPlayFromHand
-        ? exhaustSupplyForCost(previous, 'player', getManualPlayCost(card.card, toZone, { faceDown: options.faceDown }))
-        : previous;
-      const destinationCards = paidState.zones[toZone];
-      const battlefieldPlacement = BATTLEFIELD_ZONES.has(toZone)
-        ? splitBattlefieldReplacement(card, destinationCards)
-        : { destinationCards, replacedTerritory: null };
-
-      if (BATTLEFIELD_ZONES.has(toZone)) {
-        const placementError = getBattlefieldPlacementError(card, battlefieldPlacement.destinationCards);
-
-        if (placementError) {
-          return {
-            ...previous,
-            log: addLogEntry(previous, { suffix: `${ZONE_LABELS[toZone]} ${placementError}` }),
-          };
-        }
-      }
-
-      const attachedCards =
-        fromZone === 'staging' || BATTLEFIELD_ZONES.has(fromZone)
-          ? getAttachedCards(previous.zones[fromZone], instanceId)
-          : [];
-      const movedCardIds = new Set([instanceId, ...attachedCards.map((instance) => instance.instanceId)]);
-      const sourceCards = previous.zones[fromZone].filter((instance) => !movedCardIds.has(instance.instanceId));
-      const graveyardCards = battlefieldPlacement.replacedTerritory
-        ? [battlefieldPlacement.replacedTerritory, ...(fromZone === 'graveyard' ? sourceCards : paidState.zones.graveyard)]
-        : fromZone === 'graveyard'
-          ? sourceCards
-          : paidState.zones.graveyard;
-      const movedCard = prepareCardForZone(card, toZone, {
-        faceDown: BATTLEFIELD_ZONES.has(toZone) && isTerritoryCard(card.card) ? options.faceDown : false,
-        enterExhausted: toZone === 'staging' ? options.enterExhausted || BATTLEFIELD_ZONES.has(fromZone) : false,
-        enterReady: fromZone === 'hand' && isItemCard(card.card) ? true : undefined,
-        attachToInstanceId: isItemCard(card.card) ? options.attachToInstanceId ?? card.attachedToInstanceId : null,
-      });
-      const movedAttachments = attachedCards.map((instance) =>
-        prepareCardForZone(instance, toZone, {
-          attachToInstanceId: movedCard.instanceId,
-        })
-      );
-
-      const nextZones = {
-        ...paidState.zones,
-        [fromZone]: sourceCards,
-        graveyard: graveyardCards,
-        [toZone]: [movedCard, ...movedAttachments, ...battlefieldPlacement.destinationCards],
-      };
-      const stabilizedAttachments = stabilizeAttachmentState(nextZones);
-
-      const attachmentTargetName =
-        isItemCard(card.card) && toZone === 'staging' && options.attachToInstanceId
-          ? previous.zones.staging.find((instance) => instance.instanceId === options.attachToInstanceId)?.card.name ?? null
-          : null;
-
-      let movedState = {
-        ...paidState,
-        zones: stabilizedAttachments.zones,
-        log: addLogEntry(previous, {
-          prefix: 'Moved ',
-          cardName: card.card.name,
-          suffix: attachmentTargetName
-            ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, attaching to ${attachmentTargetName}.`
-            : battlefieldPlacement.replacedTerritory
-              ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, replacing ${battlefieldPlacement.replacedTerritory.card.name}.`
-              : ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
-        }),
-      };
-
-      if (stabilizedAttachments.orphanedAttachments.length > 0) {
-        const orphanedNames = stabilizedAttachments.orphanedAttachments.map((instance) => instance.card.name);
-        const orphanedLabel =
-          orphanedNames.length === 1
-            ? orphanedNames[0]
-            : `${orphanedNames.slice(0, -1).join(', ')}, and ${orphanedNames[orphanedNames.length - 1]}`;
-
-        movedState = {
-          ...movedState,
-          log: addLogEntry(movedState, {
-            suffix: `${orphanedLabel} ${orphanedNames.length === 1 ? 'was' : 'were'} sent to Graveyard because ${
-              orphanedNames.length === 1 ? 'it no longer has' : 'they no longer have'
-            } a legal unit to equip.`,
-          }),
-        };
-      }
-
-      const playTriggeredState =
-        fromZone === 'hand'
-          ? triggerCardAbilities(movedState, 'onPlay', {
-              source: movedCard,
-              zone: toZone,
-            })
-          : movedState;
-
-      return toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone)
-        ? triggerCardAbilities(playTriggeredState, 'onEnter', {
-            source: movedCard,
-            zone: toZone,
-          })
-        : playTriggeredState;
+      return result.state;
     });
   }
 
   function shuffleLibrary() {
     setGameState((previous) => {
-      if (!previous) {
+      if (!previous || previous.winner) {
         return previous;
       }
 
@@ -1314,7 +1349,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     if (status === 'auth') {
       return (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
-          <p className="text-sm text-[color:var(--text-secondary)]">Sign in to playtest your saved decks.</p>
+          <p className="text-sm text-[color:var(--text-secondary)]">Sign in to simulate games with your saved decks.</p>
           <Link
             href={signInHref}
             className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
@@ -1336,7 +1371,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     if (decks.length === 0) {
       return (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
-          <p className="text-sm text-[color:var(--text-secondary)]">Save a deck before starting a playtest session.</p>
+          <p className="text-sm text-[color:var(--text-secondary)]">Save a deck before starting a simulator session.</p>
           <Link
             href={`/${locale}/create`}
             className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
@@ -1502,11 +1537,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         </div>
                       </div>
                       <div className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
-                        <label htmlFor="playtest-bot-deck" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                        <label htmlFor="simulator-bot-deck" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                           Bot deck
                         </label>
                         <select
-                          id="playtest-bot-deck"
+                          id="simulator-bot-deck"
                           value={selectedBotDeckId}
                           onChange={(event) => setSelectedBotDeckId(event.target.value)}
                           className="mt-2 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
@@ -1575,8 +1610,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         </div>
       );
     }
-    const canTakePlayerActions = gameState.phase === 'setup' || gameState.activePlayer === 'player';
-    const canPlayFromHand = gameState.phase === 'main' && gameState.activePlayer === 'player';
+    const pendingCombat = gameState.pendingCombat;
+    const playablePlayerCounters =
+      pendingCombat?.priorityOwner === 'player'
+        ? gameState.zones.hand.filter((instance) => !getCounterPlayError(gameState, 'player', instance.instanceId))
+        : [];
+    const canTakePlayerActions = !gameState.winner && (gameState.phase === 'setup' || gameState.activePlayer === 'player');
+    const canUseBoardActions = canTakePlayerActions && !pendingCombat;
+    const canPlayFromHand = gameState.phase === 'main' && gameState.activePlayer === 'player' && !pendingCombat;
     const readySupplyCount = getReadySupplyCount(gameState, 'player');
     const playerStagingUnits = getStagingUnitCards(gameState.zones.staging, 'player');
     const canFlipFaceUp = canPlayFromHand;
@@ -1587,6 +1628,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4">
+        {attackArrow ? <AttackArrowOverlay arrow={attackArrow} /> : null}
         <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
           <div className="flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
             <section className="rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
@@ -1606,20 +1648,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </p>
               </div>
               <div className="mb-3 grid gap-2">
-                <InfluenceScoreControl label="Your influence" value={gameState.playerInfluence} tone="player" />
-                <InfluenceScoreControl label="Enemy influence" value={gameState.opponentInfluence} tone="opponent" />
+                <VictoryPointScoreControl label="Your victory points" value={gameState.playerVictoryPoints} tone="player" />
+                <VictoryPointScoreControl label="Enemy victory points" value={gameState.opponentVictoryPoints} tone="opponent" />
               </div>
-              {!gameState.playerStartingSupplyPlaced ? (
-                <div className="mb-3 rounded-md border border-[color:var(--accent)]/45 bg-[color:var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)]">
-                  Choose 1 card from hand to place as starting supply. A replacement card will be drawn automatically.
-                </div>
-              ) : null}
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => drawCards(1)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
+                <button type="button" onClick={() => drawCards(1)} disabled={Boolean(gameState.winner)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
                   <Hand className="h-3.5 w-3.5" aria-hidden="true" />
                   Draw 1
                 </button>
-                <button type="button" onClick={() => drawCards(7)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
+                <button type="button" onClick={() => drawCards(7)} disabled={Boolean(gameState.winner)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
                   <Layers className="h-3.5 w-3.5" aria-hidden="true" />
                   Draw 7
                 </button>
@@ -1627,7 +1664,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                   Concede
                 </button>
-                <button type="button" onClick={requestPassTurn} disabled={gameState.phase === 'setup' || gameState.activePlayer !== 'player'} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={requestPassTurn} disabled={Boolean(gameState.winner) || gameState.phase === 'setup' || gameState.activePlayer !== 'player' || Boolean(pendingCombat)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
                   <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
                   Turn
                 </button>
@@ -1642,7 +1679,62 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               </ol>
             </aside>
           </div>
-          <div className="grid min-h-[42rem] grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
+          <div className="relative grid min-h-[42rem] grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
+            {pendingCombat ? (
+              <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/45 px-4" role="presentation">
+                <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">
+                  <p id="counter-window-title" className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">Counter window</p>
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Counter stack</p>
+                    {pendingCombat.counterStack.length > 0 ? (
+                      <ol className="mt-2 grid max-h-40 gap-2 overflow-y-auto">
+                        {[...pendingCombat.counterStack].reverse().map((counter, index) => (
+                          <li key={counter.instanceId} className="flex min-w-0 items-center gap-2 rounded-md border border-[color:var(--border)] bg-black/15 p-2">
+                            <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-sm border border-white/10 bg-black/20">
+                              {counter.card.imageSrc ? <Image src={counter.card.imageSrc} alt="" fill sizes="36px" className="object-cover" /> : null}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">{counter.card.name}</p>
+                              <p className="text-[0.65rem] text-[color:var(--text-secondary)]">
+                                {index === 0 ? 'Resolves next' : `Stack position ${pendingCombat.counterStack.length - index}`}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="mt-2 text-sm text-[color:var(--text-secondary)]">No counters played.</p>
+                    )}
+                  </div>
+                  {pendingCombat.priorityOwner === 'player' && playablePlayerCounters.length > 0 ? (
+                    <div className="mt-4 border-t border-[color:var(--border)] pt-3">
+                      <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Available counters</p>
+                      <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto">
+                        {playablePlayerCounters.map((counter) => (
+                          <button
+                            key={counter.instanceId}
+                            type="button"
+                            onClick={() => playPlayerCounter(counter.instanceId)}
+                            className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                          >
+                            <span className="truncate text-sm font-semibold">{counter.card.name}</span>
+                            <span className="shrink-0 text-xs text-[color:var(--text-secondary)]">Cost {getPlayCost(counter.card)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={passPlayerCounterPriority}
+                    disabled={pendingCombat.priorityOwner !== 'player'}
+                    className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--accent)]/55 bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {pendingCombat.priorityOwner === 'player' ? 'Pass counter' : 'Waiting for bot'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <CombinedStagingSupplyPanel
               stagingCards={gameState.opponentZones.staging}
               supplyCards={gameState.opponentZones.supply}
@@ -1653,9 +1745,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               mirror
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} disabled={!canTakePlayerActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} disabled={!canTakePlayerActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} disabled={!canTakePlayerActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1664,10 +1756,53 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               banishCards={gameState.zones.banish}
               deckCards={gameState.zones.deck}
               onMove={moveCard}
-              disabled={!canTakePlayerActions}
+              onAttack={attackBattlefield}
+              battlefieldCardsByZone={{
+                battlefieldLeft: gameState.zones.battlefieldLeft,
+                battlefieldCenter: gameState.zones.battlefieldCenter,
+                battlefieldRight: gameState.zones.battlefieldRight,
+              }}
+              disabled={!canUseBoardActions}
             />
           </div>
         </div>
+        {gameState.winner ? (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="game-result-title" className="w-full max-w-sm rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 text-center shadow-2xl shadow-black/50">
+              <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">Game over</p>
+              <h2 id="game-result-title" className="mt-2 text-2xl font-black text-[color:var(--text-primary)]">
+                {gameState.winner === 'player' ? 'You won!' : 'You lost'}
+              </h2>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-[color:var(--accent)]/40 bg-black/15 p-3">
+                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">You</p>
+                  <p className="mt-1 text-3xl font-black">{gameState.playerVictoryPoints}</p>
+                </div>
+                <div className="rounded-md border border-red-400/40 bg-black/15 p-3">
+                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Bot</p>
+                  <p className="mt-1 text-3xl font-black">{gameState.opponentVictoryPoints}</p>
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={returnToLobby}
+                  className="inline-flex items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Lobby
+                </button>
+                <button
+                  type="button"
+                  onClick={resetGame}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--accent)] px-3 py-2 text-sm font-bold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  Rematch
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {isConcedeDialogOpen ? (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-4" role="presentation">
             <div role="dialog" aria-modal="true" aria-labelledby="concede-title" className="w-full max-w-sm rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-2xl">
@@ -1755,7 +1890,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         <HandStrip
           cards={gameState.zones.hand}
           onMove={moveCard}
-          disabled={!canTakePlayerActions}
+          disabled={!canUseBoardActions}
           canSupplyFromHand={canSupplyFromHand}
           canPlayFromHand={canPlayFromHand}
           readySupplyCount={readySupplyCount}

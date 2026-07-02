@@ -1,4 +1,5 @@
 import type { Card, DeckEntry } from '../create/deck-builder/types';
+import type { MoveCardOptions } from './game-actions';
 import {
   getManualPlayCost,
   isItemCard,
@@ -22,11 +23,7 @@ export type DeckRow = {
   deck_cards?: DeckCardRow[] | null;
 };
 
-export type MoveCardOptions = {
-  faceDown?: boolean;
-  enterExhausted?: boolean;
-  attachToInstanceId?: string;
-};
+export type { MoveCardOptions } from './game-actions';
 
 export type MoveCardHandler = (instanceId: string, fromZone: ZoneId, toZone: ZoneId, options?: MoveCardOptions) => void;
 
@@ -58,9 +55,9 @@ export const ZONE_LABELS: Record<ZoneId, string> = {
   battlefieldRight: 'Battlefield 3',
 };
 
-export const MATCH_SESSION_STORAGE_KEY = 'astrabuilder-playtest-match';
+export const MATCH_SESSION_STORAGE_KEY = 'astrabuilder-simulator-match';
 export const CARD_BACK_IMAGE_SRC = '/images/card-back.png';
-export const BOT_TURN_STEP_DELAY_MS = 900;
+export const BOT_TURN_STEP_DELAY_MS = 1500;
 
 const DEFAULT_MOVE_TARGETS: ZoneId[] = [
   'hand',

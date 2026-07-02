@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { isLocale } from '@/i18n/config';
 import { buildCanonicalMetadata } from '@/lib/metadata/locale';
-import { isPlaytestEnabled } from '@/lib/features';
+import { isSimulatorEnabled } from '@/lib/features';
 
 import { getStaticCards } from '../create/deck-builder/data';
 import { GameClient } from '../play/game-client';
@@ -21,7 +21,7 @@ type MatchPageProps = {
 export async function generateMetadata({ params }: MatchPageProps): Promise<Metadata> {
   const { locale } = await params;
 
-  if (!isLocale(locale) || !isPlaytestEnabled()) {
+  if (!isLocale(locale) || !isSimulatorEnabled()) {
     notFound();
   }
 
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: MatchPageProps): Promise<Meta
 export default async function MatchPage({ params }: MatchPageProps) {
   const { locale } = await params;
 
-  if (!isLocale(locale) || !isPlaytestEnabled()) {
+  if (!isLocale(locale) || !isSimulatorEnabled()) {
     notFound();
   }
 

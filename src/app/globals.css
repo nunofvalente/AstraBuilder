@@ -100,11 +100,11 @@ h2,
   padding-bottom: max(env(safe-area-inset-bottom), 0px);
 }
 
-body.playtest-route-active footer {
+body.simulator-route-active footer {
   display: none;
 }
 
-body.playtest-route-active .app-top-bar {
+body.simulator-route-active .app-top-bar {
   display: none;
 }
 
