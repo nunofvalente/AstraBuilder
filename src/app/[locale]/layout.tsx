@@ -6,7 +6,7 @@ import { TopBar } from '@/components/top-bar';
 import { LangAttribute } from '@/i18n/LangAttribute';
 import { SUPPORTED_LOCALES, isLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/get-dictionary';
-import { canAccessSimulator } from '@/lib/features';
+import { isSimulatorEnabled } from '@/lib/features';
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }));
@@ -32,13 +32,12 @@ export default async function LocaleLayout({
   }
 
   const dictionary = await getDictionary(locale);
-  const showPlay = await canAccessSimulator();
 
   return (
     <>
       <LangAttribute locale={locale} />
       <div className="app-shell flex flex-col overflow-hidden bg-[color:var(--background)] transition-colors">
-        <TopBar locale={locale} labels={dictionary.topBar} showPlay={showPlay} />
+        <TopBar locale={locale} labels={dictionary.topBar} showPlay={isSimulatorEnabled()} />
         <main className="app-scroll flex flex-1 min-h-0 flex-col overflow-y-auto">{children}</main>
         <Footer />
       </div>

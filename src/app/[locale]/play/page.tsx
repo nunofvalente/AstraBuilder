@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { isLocale } from '@/i18n/config';
 import { buildCanonicalMetadata } from '@/lib/metadata/locale';
-import { canAccessSimulator } from '@/lib/features';
+import { isSimulatorEnabled } from '@/lib/features';
 
 import { getStaticCards } from '../create/deck-builder/data';
 import { GameClient } from './game-client';
@@ -21,7 +21,7 @@ type SimulatorPageProps = {
 export async function generateMetadata({ params }: SimulatorPageProps): Promise<Metadata> {
   const { locale } = await params;
 
-  if (!isLocale(locale) || !(await canAccessSimulator())) {
+  if (!isLocale(locale) || !isSimulatorEnabled()) {
     notFound();
   }
 
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: SimulatorPageProps): Promise<
 export default async function SimulatorPage({ params }: SimulatorPageProps) {
   const { locale } = await params;
 
-  if (!isLocale(locale) || !(await canAccessSimulator())) {
+  if (!isLocale(locale) || !isSimulatorEnabled()) {
     notFound();
   }
 
