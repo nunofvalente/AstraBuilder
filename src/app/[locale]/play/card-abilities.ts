@@ -1,5 +1,15 @@
 import type { Card } from '../create/deck-builder/types';
-import type { GameCardInstance, GameState, Owner, ZoneId } from './game-rules';
+import { createCaelumCardAbilityRegistry } from './caelum-card-abilities';
+import {
+  recordCardsDrawn,
+  type GameCardInstance,
+  type GameState,
+  type Owner,
+  type ZoneId,
+} from './game-rules';
+import { createNoxAbilityHandlers } from './nox-card-ability-handlers';
+import { createNoxCardAbilityRegistry } from './nox-card-abilities';
+import { createSolaraCardAbilityRegistry } from './solara-card-abilities';
 
 export type AbilityTrigger =
   | 'onPlay'
@@ -58,6 +68,7 @@ export type AbilityResolution = {
   state: GameState;
   resolved: boolean;
   pendingTargets?: AbilityTargetRequirement[];
+  followUpEvents?: AbilityEvent[];
   message?: string;
 };
 
@@ -87,14 +98,14 @@ export function createDrawCardsAbility(count: number): AbilityHandler {
       const drawn = state.zones.deck.slice(0, count);
 
       return {
-        state: {
+        state: recordCardsDrawn({
           ...state,
           zones: {
             ...state.zones,
             deck: state.zones.deck.slice(drawn.length),
             hand: [...state.zones.hand, ...drawn],
           },
-        },
+        }, event.controller, drawn.length),
         resolved: drawn.length > 0,
         message: `${event.source.card.name} drew ${drawn.length} ${drawn.length === 1 ? 'card' : 'cards'}.`,
       };
@@ -103,14 +114,14 @@ export function createDrawCardsAbility(count: number): AbilityHandler {
     const drawn = state.opponentZones.deck.slice(0, count);
 
     return {
-      state: {
+      state: recordCardsDrawn({
         ...state,
         opponentZones: {
           ...state.opponentZones,
           deck: state.opponentZones.deck.slice(drawn.length),
           hand: [...state.opponentZones.hand, ...drawn],
         },
-      },
+      }, event.controller, drawn.length),
       resolved: drawn.length > 0,
       message: `${event.source.card.name} drew ${drawn.length} ${drawn.length === 1 ? 'card' : 'cards'} for Bot.`,
     };
@@ -145,31 +156,12 @@ const PRINTED_TRIGGER_PATTERNS: Array<{ trigger: AbilityTrigger; pattern: RegExp
   { trigger: 'static', pattern: /(?:^|\n)\s*(?:while|your|friendly|enemy|equipped|this unit can't|units in this zone|attacking units)\b/i },
 ];
 
+const noxHandlers = createNoxAbilityHandlers();
+
 export const CARD_ABILITY_REGISTRY: Record<string, CardAbilityDefinition> = {
-  IMP066: {
-    cardId: 'IMP066',
-    abilities: [
-      {
-        id: 'IMP066-on-death-draw-card',
-        trigger: 'onDeath',
-        timing: 'automatic',
-        text: 'On Death: Draw a card.',
-        resolve: createDrawCardsAbility(1),
-      },
-    ],
-  },
-  IMP100: {
-    cardId: 'IMP100',
-    abilities: [
-      {
-        id: 'IMP100-on-death-draw-card',
-        trigger: 'onDeath',
-        timing: 'automatic',
-        text: 'On Death: Draw a card.',
-        resolve: createDrawCardsAbility(1),
-      },
-    ],
-  },
+  ...createNoxCardAbilityRegistry(noxHandlers),
+  ...createCaelumCardAbilityRegistry(createDrawCardsAbility(1)),
+  ...createSolaraCardAbilityRegistry(createDrawCardsAbility(1)),
 };
 
 export function getPrintedAbilityTriggers(card: Card): AbilityTrigger[] {

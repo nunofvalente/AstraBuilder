@@ -4,6 +4,7 @@ import {
   getManualPlayCost,
   isItemCard,
   isTerritoryCard,
+  isTacticCard,
   isUnitCard,
   type GameCardInstance,
   type SavedDeck,
@@ -57,7 +58,7 @@ export const ZONE_LABELS: Record<ZoneId, string> = {
 
 export const MATCH_SESSION_STORAGE_KEY = 'astrabuilder-simulator-match';
 export const CARD_BACK_IMAGE_SRC = '/images/card-back.png';
-export const BOT_TURN_STEP_DELAY_MS = 1500;
+export const BOT_TURN_STEP_DELAY_MS = 500;
 
 const DEFAULT_MOVE_TARGETS: ZoneId[] = [
   'hand',
@@ -170,25 +171,64 @@ export function getHandActions(
   {
     canSupplyFromHand,
     canPlayFromHand,
+    graveyardCards,
+    handCards,
+    friendlyUnitsInPlay,
     readySupplyCount,
     stagingUnits,
+    demonicAdvanceActive = false,
+    battlefieldCardsByZone,
   }: {
     canSupplyFromHand: boolean;
     canPlayFromHand: boolean;
+    graveyardCards: GameCardInstance[];
+    handCards: GameCardInstance[];
+    friendlyUnitsInPlay: GameCardInstance[];
     readySupplyCount: number;
     stagingUnits: GameCardInstance[];
+    demonicAdvanceActive?: boolean;
+    battlefieldCardsByZone?: Partial<Record<ZoneId, GameCardInstance[]>>;
   }
 ): HandAction[] {
   const actions: HandAction[] = [];
   const canPayForStagingPlay = readySupplyCount >= getManualPlayCost(instance.card, 'staging');
+  const hasSacrificeTarget = friendlyUnitsInPlay.length > 0;
+  const hasDiscardTarget = handCards.some((candidate) => candidate.instanceId !== instance.instanceId);
+  const hasReanimateTarget = graveyardCards.some(
+    (candidate) => isUnitCard(candidate.card) && !candidate.card.type.toLowerCase().includes('renowned')
+  );
+  const tacticPlayCost = Math.max(
+    0,
+    getManualPlayCost(instance.card, 'graveyard') -
+      (friendlyUnitsInPlay.some((unit) => unit.card.id === 'IMP003') ? 1 : 0)
+  );
 
   if (isUnitCard(instance.card)) {
     actions.push({
       key: 'play-unit-staging',
       label: 'Play to Staging',
       target: 'staging',
-      disabled: !canPlayFromHand || !canPayForStagingPlay,
+      disabled:
+        !canPlayFromHand ||
+        !canPayForStagingPlay ||
+        (instance.card.id === 'IMP004' && !hasSacrificeTarget) ||
+        (instance.card.id === 'IMP005' && !hasDiscardTarget) ||
+        (instance.card.id === 'IMP006' && !hasReanimateTarget),
     });
+
+    if (demonicAdvanceActive) {
+      for (const zone of ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] satisfies ZoneId[]) {
+        actions.push({
+          key: `demonic-advance-${zone}`,
+          label: `Play ready to ${ZONE_LABELS[zone]}`,
+          target: zone,
+          disabled:
+            !canPlayFromHand ||
+            !canPayForStagingPlay ||
+            Boolean(battlefieldCardsByZone?.[zone]?.some((card) => isUnitCard(card.card))),
+        });
+      }
+    }
   }
 
   if (isTerritoryCard(instance.card)) {
@@ -233,6 +273,15 @@ export function getHandActions(
         });
       }
     }
+  }
+
+  if (isTacticCard(instance.card)) {
+    actions.push({
+      key: 'play-tactic',
+      label: 'Play tactic',
+      target: 'graveyard',
+      disabled: !canPlayFromHand || readySupplyCount < tacticPlayCost,
+    });
   }
 
   actions.push({

@@ -40,12 +40,14 @@ export function CardZoomPreview({
   card = null,
   cards = null,
   interactive = false,
+  zIndexClassName = 'z-50',
   onMouseEnter,
   onMouseLeave,
 }: {
   card?: Card | null;
   cards?: GameCardInstance[] | null;
   interactive?: boolean;
+  zIndexClassName?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
 }) {
@@ -53,7 +55,7 @@ export function CardZoomPreview({
     cards && cards.length > 0
       ? cards
       : card
-        ? [{ instanceId: `preview-${card.id}`, owner: 'player' as const, card, ready: true, faceDown: false, attachedToInstanceId: null, damage: 0 }]
+        ? [{ instanceId: `preview-${card.id}`, owner: 'player' as const, card, ready: true, faceDown: false, attachedToInstanceId: null, damage: 0, retreatLockedUntilNextTurn: false }]
         : [];
 
   if (previewCards.length === 0) {
@@ -65,7 +67,8 @@ export function CardZoomPreview({
 
   return (
     <div
-      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} fixed right-5 top-20 z-50 hidden w-80 lg:block`}
+      data-card-zoom-preview
+      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} fixed right-5 top-20 ${zIndexClassName} hidden w-80 lg:block`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -326,6 +329,28 @@ function getLogGroupLabel(entry: GameState['log'][number]): string {
   return 'Log';
 }
 
+function LogEntryMessage({ entry }: { entry: GameState['log'][number] }) {
+  const message = `${entry.prefix ?? ''}${entry.cardName ?? ''}${entry.suffix}`;
+  const cardNames = [...new Set([
+    ...(entry.cardNames ?? []),
+    ...(entry.cardName ? [entry.cardName] : []),
+  ])].filter((name) => name.length > 0).sort((left, right) => right.length - left.length);
+
+  if (cardNames.length === 0) {
+    return message;
+  }
+
+  const escapedNames = cardNames.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const cardNamePattern = new RegExp(`(${escapedNames.join('|')})`, 'g');
+  const cardNameSet = new Set(cardNames);
+
+  return message.split(cardNamePattern).map((part, index) => (
+    cardNameSet.has(part)
+      ? <strong key={`${part}-${index}`} className="font-bold text-[color:var(--text-primary)]">{part}</strong>
+      : part
+  ));
+}
+
 export function ActionLogList({ entries }: { entries: GameState['log'] }) {
   const groups: Array<{ label: string; entries: GameState['log'] }> = [];
 
@@ -350,9 +375,7 @@ export function ActionLogList({ entries }: { entries: GameState['log'] }) {
           <ol className="flex flex-col gap-2">
             {group.entries.map((entry) => (
               <li key={entry.id} className="rounded-md bg-[color:var(--surface-muted)]/60 px-3 py-2">
-                {entry.prefix}
-                {entry.cardName ? <strong className="font-bold text-[color:var(--text-primary)]">{entry.cardName}</strong> : null}
-                {entry.suffix}
+                <LogEntryMessage entry={entry} />
               </li>
             ))}
           </ol>

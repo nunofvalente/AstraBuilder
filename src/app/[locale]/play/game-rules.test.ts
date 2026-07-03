@@ -8,6 +8,7 @@ import {
   runBotTurn,
 } from './game-bot';
 import {
+  addLogEntry,
   adjustVictoryPoints,
   buildDeckInstances,
   buildInitialGameState,
@@ -22,6 +23,7 @@ import {
   getEquipmentHost,
   getAttachedCards,
   getManualPlayCost,
+  getModifiedPlayCost,
   getPlayCostError,
   getReadySupplyCount,
   getStagingUnitCards,
@@ -35,6 +37,7 @@ import {
   prepareCardForZone,
   passCounterPriority,
   playCounterCard,
+  resolvePendingChoice,
   resolveBattlefieldAttack,
   rollFirstPlayer,
   runTurnStart,
@@ -73,10 +76,26 @@ function makeInstance(overrides: Partial<GameCardInstance> = {}): GameCardInstan
     faceDown: overrides.faceDown ?? false,
     attachedToInstanceId: overrides.attachedToInstanceId ?? null,
     damage: overrides.damage ?? 0,
+    retreatLockedUntilNextTurn: overrides.retreatLockedUntilNextTurn ?? false,
+    banishOnDeath: overrides.banishOnDeath ?? false,
+    loseVictoryPointOnDeathThisTurnCount: overrides.loseVictoryPointOnDeathThisTurnCount ?? 0,
+    discardCardOnDeathThisTurnCount: overrides.discardCardOnDeathThisTurnCount ?? 0,
   };
 }
 
 describe('game rules', () => {
+  it('records every card name contained in a log message', () => {
+    const state = buildInitialGameState(makeDeck(10), null);
+    const firstName = state.zones.hand[0]!.card.name;
+    const secondName = state.zones.deck[0]!.card.name;
+
+    const log = addLogEntry(state, {
+      suffix: `${firstName} fought ${secondName}, then ${firstName} readied.`,
+    });
+
+    expect(log[0]?.cardNames?.sort()).toEqual([firstName, secondName].sort());
+  });
+
   it('sets up each player with 6 cards in hand and no automatic starting supply', () => {
     const deckCards = buildDeckInstances(makeDeck(10), 'player');
     const zones = createPrivateZones(deckCards);
@@ -444,6 +463,27 @@ describe('game rules', () => {
     expect(getManualPlayCost(territory, 'battlefieldLeft', { faceDown: true })).toBe(0);
     expect(getManualPlayCost(territory, 'battlefieldLeft', { faceDown: false })).toBe(3);
     expect(getManualPlayCost(unit, 'staging')).toBe(2);
+  });
+
+  it('reduces tactic costs by 1 while IMP003 is in play for its controller', () => {
+    const calico = makeInstance({
+      instanceId: 'calico',
+      ready: true,
+      card: createTestCard({ id: 'IMP003', name: 'Calico, the Blood Witch', type: 'Renowned Unit', rulesText: 'Your tactics cost {1} less to play.' }),
+    });
+    const tactic = createTestCard({ id: 'tactic-1', name: 'Test Tactic', type: 'Tactic', cost: 2 });
+    const unit = createTestCard({ id: 'unit-1', name: 'Test Unit', type: 'Unit', cost: 2 });
+    const baseState = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        staging: [calico],
+      },
+    };
+
+    expect(getModifiedPlayCost(state, 'player', tactic)).toBe(1);
+    expect(getModifiedPlayCost(state, 'player', unit)).toBe(2);
   });
 
   it('lets the bot supply, draw, and stage its first unit during its turn', () => {
@@ -942,6 +982,103 @@ describe('game rules', () => {
     );
   });
 
+  it('triggers Hellfire Ravager on attack declaration by marking the defending unit immediately', () => {
+    const attacker = makeInstance({
+      instanceId: 'hellfire-ravager',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP008',
+        name: 'Hellfire Ravager',
+        type: 'Unit Demon',
+        attack: 5,
+        health: 5,
+        rulesText: 'On Attack: When target defending unit dies this turn, its controller loses 1 victory point.',
+      }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 2, health: 6 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(declared.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: defender.instanceId,
+      loseVictoryPointOnDeathThisTurnCount: 1,
+    });
+  });
+
+  it('makes the defending unit controller lose 1 victory point when a Hellfire Ravager target dies in combat that turn', () => {
+    const attacker = makeInstance({
+      instanceId: 'hellfire-ravager',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP008',
+        name: 'Hellfire Ravager',
+        type: 'Unit Demon',
+        attack: 5,
+        health: 5,
+        rulesText: 'On Attack: When target defending unit dies this turn, its controller loses 1 victory point.',
+      }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 2, health: 4 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      opponentVictoryPoints: 3,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    const opponentPassed = passCounterPriority(declared.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed || !playerPassed.resolvedCombat) {
+      return;
+    }
+
+    expect(playerPassed.state.opponentVictoryPoints).toBe(2);
+  });
+
   it('does not open counter priority when attacking an empty battlefield', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
@@ -1095,6 +1232,71 @@ describe('game rules', () => {
     expect(getCounterPlayError(played.state, 'opponent', counter.instanceId)).toBe(
       'Waiting for you to pass counter priority.'
     );
+  });
+
+  it('reduces tactic counter costs by 1 while IMP003 is in play', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const calico = makeInstance({
+      instanceId: 'calico',
+      ready: true,
+      card: createTestCard({ id: 'IMP003', name: 'Calico, the Blood Witch', type: 'Renowned Unit', rulesText: 'Your tactics cost {1} less to play.' }),
+    });
+    const counter = makeInstance({
+      instanceId: 'counter',
+      card: createTestCard({ id: 'counter-1', name: 'Cheap Counter', type: 'Tactic', subtype: 'Counter', cost: 1 }),
+    });
+    const supply = makeInstance({ instanceId: 'player-supply', ready: true });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        hand: [counter],
+        staging: [attacker, calico],
+        supply: [supply],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    const playerPriorityState = {
+      ...declared.state,
+      pendingCombat: declared.state.pendingCombat
+        ? {
+            ...declared.state.pendingCombat,
+            priorityOwner: 'player' as const,
+          }
+        : null,
+    };
+
+    expect(getCounterPlayError(playerPriorityState, 'player', counter.instanceId)).toBeNull();
+    const played = playCounterCard(playerPriorityState, 'player', counter.instanceId);
+
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) {
+      return;
+    }
+
+    expect(played.state.zones.supply[0]?.ready).toBe(true);
+    expect(played.state.pendingCombat?.counterStack.map((entry) => entry.instanceId)).toEqual([counter.instanceId]);
   });
 
   it('resolves counters top-first before combat and moves them to their owner graveyards', () => {
@@ -1391,6 +1593,244 @@ describe('game rules', () => {
     expect(nextState.activePlayer).toBe('opponent');
   });
 
+  it('pauses turn advancement for a Lucille score choice instead of sacrificing automatically', () => {
+    const lucille = makeInstance({
+      instanceId: 'lucille',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP010',
+        name: 'Lucille, Blood Baroness',
+        type: 'Renowned Unit Vampire',
+        influence: 1,
+        rulesText: 'On Enter: Create a 2/2 Experiment unit token with 0 influence.\n\nOn Score: You may sacrifice any number of units in your staging area to gain that many victory points.',
+      }),
+    });
+    const unitOne = makeInstance({ instanceId: 'unit-one', ready: true });
+    const unitTwo = makeInstance({ instanceId: 'unit-two', ready: true });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      firstPlayer: 'player' as const,
+      hasFirstPlayerSkippedDraw: true,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [lucille],
+        staging: [unitOne, unitTwo],
+      },
+    };
+
+    const nextState = advanceToNextTurn(activeState);
+
+    expect(nextState.playerVictoryPoints).toBe(1);
+    expect(nextState.activePlayer).toBe('player');
+    expect(nextState.pendingChoice).toMatchObject({
+      kind: 'lucilleScore',
+      sourceInstanceId: lucille.instanceId,
+      availableUnitInstanceIds: [unitOne.instanceId, unitTwo.instanceId],
+      resumeTurnAdvance: true,
+    });
+    expect(nextState.zones.staging.map((instance) => instance.instanceId)).toEqual([unitOne.instanceId, unitTwo.instanceId]);
+  });
+
+  it('lets the player choose zero units for Lucille and then finishes advancing the turn', () => {
+    const lucille = makeInstance({
+      instanceId: 'lucille',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP010',
+        name: 'Lucille, Blood Baroness',
+        type: 'Renowned Unit Vampire',
+        influence: 1,
+        rulesText: 'On Enter: Create a 2/2 Experiment unit token with 0 influence.\n\nOn Score: You may sacrifice any number of units in your staging area to gain that many victory points.',
+      }),
+    });
+    const unitOne = makeInstance({ instanceId: 'unit-one', ready: true });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      firstPlayer: 'player' as const,
+      hasFirstPlayerSkippedDraw: true,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [lucille],
+        staging: [unitOne],
+      },
+    };
+
+    const pendingState = advanceToNextTurn(activeState);
+    const resolvedState = resolvePendingChoice(pendingState, []);
+
+    expect('error' in resolvedState ? resolvedState.error : null).toBeNull();
+    if ('error' in resolvedState) {
+      return;
+    }
+
+    expect(resolvedState.playerVictoryPoints).toBe(1);
+    expect(resolvedState.activePlayer).toBe('opponent');
+    expect(resolvedState.pendingChoice).toBeNull();
+    expect(resolvedState.zones.staging[0]?.instanceId).toBe(unitOne.instanceId);
+  });
+
+  it('lets the player choose specific Lucille sacrifices and gains only that many victory points', () => {
+    const lucille = makeInstance({
+      instanceId: 'lucille',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP010',
+        name: 'Lucille, Blood Baroness',
+        type: 'Renowned Unit Vampire',
+        influence: 1,
+        rulesText: 'On Enter: Create a 2/2 Experiment unit token with 0 influence.\n\nOn Score: You may sacrifice any number of units in your staging area to gain that many victory points.',
+      }),
+    });
+    const unitOne = makeInstance({ instanceId: 'unit-one', ready: true });
+    const unitTwo = makeInstance({ instanceId: 'unit-two', ready: true });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      firstPlayer: 'player' as const,
+      hasFirstPlayerSkippedDraw: true,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [lucille],
+        staging: [unitOne, unitTwo],
+      },
+    };
+
+    const pendingState = advanceToNextTurn(activeState);
+    const resolvedState = resolvePendingChoice(pendingState, [unitTwo.instanceId]);
+
+    expect('error' in resolvedState ? resolvedState.error : null).toBeNull();
+    if ('error' in resolvedState) {
+      return;
+    }
+
+    expect(resolvedState.playerVictoryPoints).toBe(2);
+    expect(resolvedState.activePlayer).toBe('opponent');
+    expect(resolvedState.pendingChoice).toBeNull();
+    expect(resolvedState.zones.staging.map((instance) => instance.instanceId)).toEqual([unitOne.instanceId]);
+    expect(resolvedState.zones.graveyard[0]?.instanceId).toBe(unitTwo.instanceId);
+  });
+
+  it('resolves Nerezza by sacrificing a chosen unit and then stealing a chosen enemy combat-zone unit', () => {
+    const nerezza = makeInstance({
+      instanceId: 'nerezza',
+      ready: false,
+      card: createTestCard({
+        id: 'IMP011',
+        name: 'Nerezza, Umbrasco Scion',
+        type: 'Renowned Unit Vampire',
+        rulesText: 'On Play: You may sacrifice another unit. If you do, take control of target enemy unit in a combat zone and move it into your staging area exhausted.',
+      }),
+    });
+    const ally = makeInstance({ instanceId: 'ally', ready: true });
+    const enemy = makeInstance({ instanceId: 'enemy', owner: 'opponent', ready: true });
+    const baseState = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const stagedState = triggerCardAbilities({
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        staging: [nerezza, ally],
+        battlefieldLeft: [enemy],
+      },
+      log: [],
+    }, 'onPlay', {
+      source: nerezza,
+      controller: 'player',
+      zone: 'staging',
+    });
+
+    const afterSacrifice = resolvePendingChoice(stagedState, [ally.instanceId]);
+    expect('error' in afterSacrifice ? afterSacrifice.error : null).toBeNull();
+    if ('error' in afterSacrifice) {
+      return;
+    }
+
+    expect(afterSacrifice.pendingChoice).toMatchObject({
+      kind: 'nerezzaSteal',
+      availableUnitInstanceIds: [enemy.instanceId],
+    });
+
+    const afterSteal = resolvePendingChoice(afterSacrifice, [enemy.instanceId]);
+    expect('error' in afterSteal ? afterSteal.error : null).toBeNull();
+    if ('error' in afterSteal) {
+      return;
+    }
+
+    expect(afterSteal.zones.battlefieldLeft).toEqual([]);
+    expect(afterSteal.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instanceId: nerezza.instanceId }),
+        expect.objectContaining({ instanceId: enemy.instanceId, owner: 'player', ready: false }),
+      ])
+    );
+    expect(afterSteal.zones.graveyard[0]?.instanceId).toBe(ally.instanceId);
+  });
+
+  it('resolves Nocturne Agent by marking a unit, then forcing its controller to discard when it dies this turn', () => {
+    const agent = makeInstance({
+      instanceId: 'agent',
+      ready: false,
+      card: createTestCard({
+        id: 'IMP012',
+        name: 'Nocturne Agent',
+        type: 'Unit Human',
+        rulesText: 'On Enter: If target enemy unit dies this turn, its controller discards a card.',
+      }),
+    });
+    const playerUnit = makeInstance({ instanceId: 'player-unit', ready: true });
+    const discardCard = makeInstance({ instanceId: 'discard-card', card: createTestCard({ id: 'discard', name: 'Discard Me', type: 'Tactic' }) });
+    const enemyAttacker = makeInstance({ instanceId: 'enemy-attacker', owner: 'opponent', ready: true, card: createTestCard({ id: 'enemy-attacker', name: 'Enemy Attacker', type: 'Unit', attack: 3, health: 3 }) });
+    const baseState = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const markedState = triggerCardAbilities({
+      ...baseState,
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      zones: {
+        ...baseState.zones,
+        hand: [discardCard],
+        battlefieldLeft: [playerUnit],
+      },
+      opponentZones: {
+        ...baseState.opponentZones,
+        staging: [agent, enemyAttacker],
+      },
+      log: [],
+    }, 'onEnter', {
+      source: agent,
+      controller: 'opponent',
+      zone: 'staging',
+    });
+
+    expect(markedState.zones.battlefieldLeft[0]?.discardCardOnDeathThisTurnCount).toBe(1);
+
+    const combatResult = resolveBattlefieldAttack(markedState, 'opponent', enemyAttacker.instanceId, 'battlefieldLeft');
+    expect('error' in combatResult ? combatResult.error : null).toBeNull();
+    if ('error' in combatResult) {
+      return;
+    }
+
+    expect(combatResult.state.pendingChoice).toMatchObject({
+      kind: 'forcedDiscard',
+      availableCardInstanceIds: [discardCard.instanceId],
+    });
+
+    const discardedState = resolvePendingChoice(combatResult.state, [discardCard.instanceId]);
+    expect('error' in discardedState ? discardedState.error : null).toBeNull();
+    if ('error' in discardedState) {
+      return;
+    }
+
+    expect(discardedState.zones.hand).toEqual([]);
+    expect(discardedState.zones.graveyard.map((instance) => instance.instanceId)).toContain(discardCard.instanceId);
+  });
+
   it('never lets victory points fall below zero', () => {
     const state = buildInitialGameState(makeDeck(12), makeDeck(12));
     const gainedState = adjustVictoryPoints(state, 'player', 3);
@@ -1505,7 +1945,99 @@ describe('game rules', () => {
     expect(result.attackerDestroyed).toBe(false);
     expect(result.captured).toBe(true);
     expect(result.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(result.state.zones.battlefieldLeft[0]?.ready).toBe(false);
+    expect(result.state.zones.battlefieldLeft[0]?.retreatLockedUntilNextTurn).toBe(true);
     expect(result.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
+  });
+
+  it('fires IMP002 on death when destroyed in combat', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const cadaverSupplier = makeInstance({
+      instanceId: 'cadaver-supplier',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP002',
+        name: 'Cadaver Supplier',
+        type: 'Unit',
+        attack: 1,
+        health: 2,
+        influence: 1,
+        rulesText: 'On Death: Create a 2/2 Experiment unit token with 0 influence.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [cadaverSupplier],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.state.opponentZones.staging[0]).toMatchObject({
+      owner: 'opponent',
+      card: expect.objectContaining({ id: 'IMP000', name: 'Experiment' }),
+      ready: false,
+    });
+    expect(result.state.opponentZones.graveyard[0]?.instanceId).toBe(cadaverSupplier.instanceId);
+  });
+
+  it('banishes IMP007 instead of sending it to graveyard when it dies after being played from graveyard', () => {
+    const attacker = makeInstance({
+      instanceId: 'guinea-pig',
+      ready: true,
+      banishOnDeath: true,
+      card: createTestCard({
+        id: 'IMP007',
+        name: 'Guinea Pig',
+        type: 'Unit',
+        attack: 1,
+        health: 1,
+        rulesText: 'You may play this card from your graveyard. If you do, it gains "On Death: Banish this instead."',
+      }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.state.zones.graveyard).toEqual([]);
+    expect(result.state.zones.banish[0]?.instanceId).toBe(attacker.instanceId);
   });
 
   it('leaves a surviving defender occupying the battlefield when the attacker dies', () => {
