@@ -9,6 +9,7 @@ import {
   getCardController,
   getCurrentUnitInfluence,
   getPlayCost,
+  isItemCard,
   isTerritoryCard,
   isUnitCard,
   type GameCardInstance,
@@ -36,6 +37,7 @@ export type BattlefieldZoneId = 'battlefieldLeft' | 'battlefieldCenter' | 'battl
 type AttackBattlefieldHandler = (attackerInstanceId: string, targetZone: ZoneId) => void;
 type ActivateAbilityHandler = (source: GameCardInstance) => void;
 type CardsDrawnThisTurnByOwner = Record<Owner, number>;
+export type CurrentCombatStatsByInstanceId = Record<string, { attack: number; health: number }>;
 export type AttackArrowState = {
   id: number;
   from: { x: number; y: number };
@@ -55,44 +57,88 @@ export function DamageBadge({ instance }: { instance: GameCardInstance }) {
   );
 }
 
-export function InfluenceBonusBadge({ instance }: { instance: GameCardInstance }) {
-  const bonus = Number(instance.temporaryInfluenceBonus ?? 0);
-
-  if (!isUnitCard(instance.card) || !Number.isFinite(bonus) || bonus <= 0) {
+export function CombatStatsBadge({
+  instance,
+  currentStats,
+}: {
+  instance: GameCardInstance;
+  currentStats?: { attack: number; health: number };
+}) {
+  if (instance.faceDown || (!isUnitCard(instance.card) && !isItemCard(instance.card))) {
     return null;
   }
 
+  const attack = currentStats?.attack ?? instance.card.attack;
+  const health = currentStats?.health ?? instance.card.health;
+  const modified = attack !== instance.card.attack || health !== instance.card.health;
+
   return (
     <span
-      className="absolute left-1 top-1 z-20 rounded-full border border-emerald-200/70 bg-emerald-700/95 px-1.5 py-0.5 text-[0.56rem] font-black leading-none text-white shadow-md"
-      title={`+${bonus} influence`}
+      className={`absolute bottom-1 right-1 z-20 inline-flex h-5 min-w-[2.8rem] items-center justify-center gap-1 rounded border bg-black/80 px-1 text-[0.58rem] font-black leading-none shadow-md ${
+        modified ? 'border-amber-300/90' : 'border-white/35'
+      }`}
+      title={`Current stats: ${attack} attack, ${health} health${modified ? ` (printed ${instance.card.attack}/${instance.card.health})` : ''}`}
+      aria-label={`${instance.card.name} has ${attack} attack and ${health} health${modified ? ', modified' : ''}`}
+      data-combat-stats-modified={modified ? 'true' : 'false'}
     >
-      +{bonus} INF
+      <span className="text-red-300">{attack}</span>
+      <span className="text-white/60">/</span>
+      <span className="text-emerald-300">{health}</span>
     </span>
+  );
+}
+
+export function QuarantineProgressBadge({ instance }: { instance: GameCardInstance }) {
+  if (instance.card.id !== 'IMP063' || instance.faceDown) {
+    return null;
+  }
+
+  const progress = Math.min(2, Math.max(0, Number(instance.progressCounters ?? 0)));
+  const turnsLeft = Math.max(0, 2 - progress);
+  const turnLabel = `${turnsLeft} ${turnsLeft === 1 ? 'turn' : 'turns'} left`;
+
+  return (
+    <>
+      <span
+        className="absolute left-1 top-1 z-20 grid h-6 min-w-8 place-items-center rounded border border-amber-100/70 bg-amber-700/95 px-1 text-[0.62rem] font-black leading-none text-white shadow-md"
+        title={`${progress} of 2 progress counters`}
+      >
+        {progress}/2
+      </span>
+      <span
+        className="absolute inset-x-1 bottom-1 z-20 rounded border border-amber-100/60 bg-black/85 px-1 py-0.5 text-center text-[0.56rem] font-black uppercase leading-none text-white shadow-md"
+        aria-label={`Quarantine Zone has ${progress} of 2 progress counters and ${turnLabel}`}
+      >
+        {turnLabel}
+      </span>
+    </>
   );
 }
 
 export function CurrentInfluenceBadge({
   instance,
-  attachedCards,
-  cardsDrawnThisTurnByOwner,
+  attachedCards = [],
+  cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
 }: {
   instance: GameCardInstance;
-  attachedCards: GameCardInstance[];
-  cardsDrawnThisTurnByOwner: CardsDrawnThisTurnByOwner;
+  attachedCards?: GameCardInstance[];
+  cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
 }) {
-  if (!isUnitCard(instance.card) || instance.card.id !== 'IMP019') {
+  if (instance.faceDown || (!isUnitCard(instance.card) && !isItemCard(instance.card))) {
     return null;
   }
 
-  const influence = getCurrentUnitInfluence(instance, attachedCards, cardsDrawnThisTurnByOwner[getCardController(instance)]);
+  const influence = isUnitCard(instance.card)
+    ? getCurrentUnitInfluence(instance, attachedCards, cardsDrawnThisTurnByOwner[getCardController(instance)])
+    : Math.max(0, instance.card.influence ?? 0);
 
   return (
     <span
-      className="absolute bottom-1 left-1 z-20 rounded-full border border-sky-100/70 bg-sky-700/95 px-1.5 py-0.5 text-[0.56rem] font-black leading-none text-white shadow-md"
+      className="absolute bottom-1 left-1 z-20 inline-flex h-5 min-w-5 items-center justify-center rounded border border-yellow-300/80 bg-black/80 px-1 text-[0.58rem] font-black leading-none text-yellow-300 shadow-md"
       title={`Current influence: ${influence}`}
+      aria-label={`${instance.card.name} has ${influence} influence`}
     >
-      INF {influence}
+      {influence}
     </span>
   );
 }
@@ -133,6 +179,7 @@ export function BattlefieldPanel({
   disabled = false,
   canFlipFaceUp = false,
   readySupplyCount = 0,
+  currentCombatStatsByInstanceId = {},
   cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
 }: {
   zone: ZoneId;
@@ -142,10 +189,12 @@ export function BattlefieldPanel({
   disabled?: boolean;
   canFlipFaceUp?: boolean;
   readySupplyCount?: number;
+  currentCombatStatsByInstanceId?: CurrentCombatStatsByInstanceId;
   cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
 }) {
   const unit = cards.find((instance) => isUnitCard(instance.card)) ?? null;
-  const zoneControlLabel = unit ? (getCardController(unit) === 'player' ? 'Captured' : 'Lost') : null;
+  const zoneController = unit ? getCardController(unit) : null;
+  const zoneControlLabel = zoneController === 'player' ? 'CAPTURED' : zoneController === 'opponent' ? 'LOST' : null;
   const playerTerritory = cards.find((instance) => instance.owner === 'player' && isTerritoryCard(instance.card)) ?? null;
   const opponentTerritory = cards.find((instance) => instance.owner === 'opponent' && isTerritoryCard(instance.card)) ?? null;
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
@@ -256,13 +305,17 @@ export function BattlefieldPanel({
           {instance.faceDown || instance.card.imageSrc ? (
             <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes={size === 'unit' ? '88px' : '56px'} className="object-cover" />
           ) : null}
-          <InfluenceBonusBadge instance={instance} />
           <CurrentInfluenceBadge
             instance={instance}
             attachedCards={getAttachedCards(cards, instance.instanceId)}
             cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
           />
           <DamageBadge instance={instance} />
+          <CombatStatsBadge
+            instance={instance}
+            currentStats={currentCombatStatsByInstanceId[instance.instanceId]}
+          />
+          <QuarantineProgressBadge instance={instance} />
         </span>
       </button>
     );
@@ -291,7 +344,16 @@ export function BattlefieldPanel({
         }}
       />
       <p className="truncate text-center text-[0.7rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-        {ZONE_LABELS[zone]}{zoneControlLabel ? ` (${zoneControlLabel})` : ''}
+        {ZONE_LABELS[zone]}
+        {zoneControlLabel ? (
+          <>
+            {' ('}
+            <span className={zoneController === 'player' ? 'text-emerald-400' : 'text-red-400'}>
+              {zoneControlLabel}
+            </span>
+            {')'}
+          </>
+        ) : null}
       </p>
       <div className="grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
         {renderTerritoryColumn('Your territory', playerTerritory)}
@@ -364,6 +426,8 @@ export function CombinedStagingSupplyPanel({
   onActivate,
   battlefieldCardsByZone,
   disabled = false,
+  temporarySupplyCount = 0,
+  currentCombatStatsByInstanceId = {},
   cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
 }: {
   stagingCards: GameCardInstance[];
@@ -378,6 +442,8 @@ export function CombinedStagingSupplyPanel({
   onActivate?: ActivateAbilityHandler;
   battlefieldCardsByZone?: Record<BattlefieldZoneId, GameCardInstance[]>;
   disabled?: boolean;
+  temporarySupplyCount?: number;
+  currentCombatStatsByInstanceId?: CurrentCombatStatsByInstanceId;
   cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
 }) {
   const visibleStagingCards = stagingCards.filter(
@@ -418,6 +484,8 @@ export function CombinedStagingSupplyPanel({
   const stagingCardClassName = compact ? 'h-[min(8rem,100%)]' : 'h-[min(10.75rem,100%)]';
   const panelToneClassName = 'border-[color:var(--accent)]/24 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.10),transparent_42%),linear-gradient(180deg,rgba(54,48,42,0.78),rgba(30,28,26,0.72))]';
   const stagingToneClassName = 'border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(255,226,183,0.045),rgba(0,0,0,0.13))]';
+  const visibleTemporarySupplyCount = Math.max(0, Math.floor(temporarySupplyCount));
+  const totalSupplyCount = supplyCards.length + visibleTemporarySupplyCount;
 
   function closeStagingMenu() {
     setActiveStagingCardId(null);
@@ -580,13 +648,16 @@ export function CombinedStagingSupplyPanel({
                     {instance.card.imageSrc ? (
                       <Image src={instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                     ) : null}
-                    <InfluenceBonusBadge instance={instance} />
                     <CurrentInfluenceBadge
                       instance={instance}
                       attachedCards={attachedItems}
                       cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
                     />
                     <DamageBadge instance={instance} />
+                    <CombatStatsBadge
+                      instance={instance}
+                      currentStats={currentCombatStatsByInstanceId[instance.instanceId]}
+                    />
                   </button>
                 </div>
                 );
@@ -596,37 +667,66 @@ export function CombinedStagingSupplyPanel({
           <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
           <div className="grid min-h-0 w-20 grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center">
             <div className="flex min-h-0 w-20 items-center justify-center">
-              <CompactZoneStack label="Banish" cards={banishCards} />
+              <CompactZoneStack
+                label={mirror ? 'Deck' : 'Banish'}
+                cards={mirror ? deckCards : banishCards}
+                faceDown={mirror}
+              />
             </div>
             <div className="mx-2 h-px bg-[color:var(--border)]/70" aria-hidden="true" />
             <div className="flex min-h-0 w-20 items-center justify-center">
-              <CompactZoneStack label="Deck" cards={deckCards} faceDown />
+              <CompactZoneStack
+                label={mirror ? 'Banish' : 'Deck'}
+                cards={mirror ? banishCards : deckCards}
+                faceDown={!mirror}
+              />
             </div>
           </div>
         </div>
         <div className={`relative flex min-h-0 flex-col rounded-md border border-[color:var(--border)]/70 bg-black/10 ${mirror ? 'order-1' : 'order-2'}`}>
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_1px_auto] py-3 pl-3 pr-0">
             <div className="relative min-h-0 pr-3">
-              <span className="absolute right-5 top-0 z-10 rounded-full bg-black/55 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
-                {supplyCards.length}
+              <span
+                className="absolute right-5 top-0 z-10 rounded-full bg-black/55 px-2 py-0.5 text-xs font-bold text-white shadow-sm"
+                aria-label={`${totalSupplyCount} total supply${visibleTemporarySupplyCount > 0 ? `, including ${visibleTemporarySupplyCount} temporary` : ''}`}
+              >
+                {totalSupplyCount}
               </span>
               <div className="deck-builder-scroll flex h-full min-h-0 items-center gap-2 overflow-x-auto overflow-y-hidden pr-10">
-              {supplyCards.length === 0 ? (
+              {totalSupplyCount === 0 ? (
                 <p className="flex h-full w-full items-center justify-center text-center text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                   Supply
                 </p>
               ) : (
-                supplyCards.map((instance) => (
-                  <div
-                    key={instance.instanceId}
-                    className="flex h-20 w-20 flex-none items-center justify-center"
-                    aria-hidden="true"
-                  >
-                    <div className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
-                      <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
+                <>
+                  {Array.from({ length: visibleTemporarySupplyCount }, (_, index) => (
+                    <div
+                      key={`fortuna-temporary-supply-${index}`}
+                      className="flex h-20 w-20 flex-none items-center justify-center"
+                      data-temporary-supply
+                    >
+                      <div
+                        className="relative flex aspect-[5/7] h-20 flex-col items-center justify-center overflow-hidden rounded-md border-2 border-amber-200/80 bg-amber-600 text-white shadow-md shadow-amber-950/30"
+                        title="Temporary supply from Fortuna Bank"
+                        aria-label={`Fortuna temporary supply ${index + 1} of ${visibleTemporarySupplyCount}`}
+                      >
+                        <span className="text-lg font-black leading-none">+1</span>
+                        <span className="mt-1 text-[0.48rem] font-black uppercase leading-none">Fortuna</span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  {supplyCards.map((instance) => (
+                    <div
+                      key={instance.instanceId}
+                      className="flex h-20 w-20 flex-none items-center justify-center"
+                      aria-hidden="true"
+                    >
+                      <div className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
+                        <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
               </div>
             </div>
@@ -736,6 +836,8 @@ export function CombinedStagingSupplyPanel({
                             {instance.card.imageSrc ? (
                               <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                             ) : null}
+                            <CurrentInfluenceBadge instance={instance} />
+                            <CombatStatsBadge instance={instance} />
                           </div>
                           <p className="mt-1 truncate text-center text-[0.65rem] font-semibold text-[color:var(--text-secondary)]" title={instance.card.name}>
                             {instance.card.name}
@@ -747,6 +849,8 @@ export function CombinedStagingSupplyPanel({
                             {instance.card.imageSrc ? (
                               <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                             ) : null}
+                            <CurrentInfluenceBadge instance={instance} />
+                            <CombatStatsBadge instance={instance} />
                           </div>
                           <p className="mt-1 truncate text-center text-[0.65rem] font-semibold text-[color:var(--text-secondary)]" title={instance.card.name}>
                             {instance.card.name}
@@ -926,6 +1030,8 @@ export function HandStrip({
                   {instance.card.imageSrc ? (
                     <Image src={instance.card.imageSrc} alt="" fill sizes="112px" className="object-cover" />
                   ) : null}
+                  <CurrentInfluenceBadge instance={instance} />
+                  <CombatStatsBadge instance={instance} />
                 </span>
               </button>
             </article>

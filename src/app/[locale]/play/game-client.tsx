@@ -15,6 +15,7 @@ import { BOT_TURN_STEPS, applyBotTurnStep, playFirstBotCounter } from './game-bo
 import {
   AttackArrowOverlay,
   BattlefieldPanel,
+  CombatStatsBadge,
   CombinedStagingSupplyPanel,
   DamageBadge,
   HandStrip,
@@ -32,10 +33,13 @@ import {
   getCardController,
   getCounterPlayError,
   getCounterTargetOptions,
+  getCurrentUnitAttack,
+  getCurrentUnitHealth,
   getFriendlyUnitsInPlay,
   getModifiedPlayCost,
   getReadySupplyCount,
   getStagingUnitCards,
+  getUnitsInPlay,
   isItemCard,
   isUnitCard,
   passCounterPriority,
@@ -53,6 +57,7 @@ import {
   type ZoneId,
 } from './game-rules';
 import {
+  BOT_POST_COMBAT_REVIEW_DELAY_MS,
   BOT_TURN_STEP_DELAY_MS,
   CARD_BACK_IMAGE_SRC,
   MATCH_SESSION_STORAGE_KEY,
@@ -173,6 +178,21 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     setAttackArrow((current) => (current?.id === arrowId ? null : current));
   }
 
+  function scheduleBotTurnAdvance(delayMs = BOT_POST_COMBAT_REVIEW_DELAY_MS) {
+    const timerId = setTimeout(() => {
+      setGameState((previous) => {
+        if (!previous || previous.phase !== 'main' || previous.activePlayer !== 'opponent' || previous.pendingCombat || previous.pendingChoice) {
+          return previous;
+        }
+
+        return advanceToNextTurn(previous);
+      });
+      botTurnTimersRef.current = botTurnTimersRef.current.filter((currentTimerId) => currentTimerId !== timerId);
+    }, delayMs);
+
+    botTurnTimersRef.current.push(timerId);
+  }
+
   function playAutomaticBotTurn(botTurnState: GameState) {
     clearBotTurnTimers();
     setGameState(botTurnState);
@@ -227,7 +247,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         return advanceToNextTurn(previous);
       });
       botTurnTimersRef.current = [];
-    }, BOT_TURN_STEP_DELAY_MS * (BOT_TURN_STEPS.length + 2));
+    }, BOT_TURN_STEP_DELAY_MS * (BOT_TURN_STEPS.length + 2) + BOT_POST_COMBAT_REVIEW_DELAY_MS);
 
     botTurnTimersRef.current.push(passTurnTimerId);
   }
@@ -298,7 +318,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
         if (result.resolvedCombat) {
           setAttackArrow(null);
-          return result.state.activePlayer === 'opponent' ? advanceToNextTurn(result.state) : result.state;
+          if (result.state.activePlayer === 'opponent') {
+            scheduleBotTurnAdvance();
+          }
+          return result.state;
         }
 
         return result.state;
@@ -690,7 +713,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
       if (result.resolvedCombat) {
         setAttackArrow(null);
-        return result.state.activePlayer === 'opponent' ? advanceToNextTurn(result.state) : result.state;
+        if (result.state.activePlayer === 'opponent') {
+          scheduleBotTurnAdvance();
+        }
+        return result.state;
       }
 
       return result.state;
@@ -1055,6 +1081,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     const readySupplyCount = getReadySupplyCount(gameState, 'player');
     const playerStagingUnits = getStagingUnitCards(gameState.zones.staging, 'player');
     const friendlyUnitsInPlay = getFriendlyUnitsInPlay(gameState, 'player');
+    const currentCombatStatsByInstanceId = Object.fromEntries(
+      getUnitsInPlay(gameState).map((instance) => [
+        instance.instanceId,
+        {
+          attack: getCurrentUnitAttack(gameState, instance),
+          health: getCurrentUnitHealth(gameState, instance),
+        },
+      ])
+    );
     const pendingAbilitySource =
       friendlyUnitsInPlay.find((instance) => instance.instanceId === pendingAbilitySourceId) ?? null;
     const pendingAbilityTargets = pendingAbilitySource
@@ -1095,12 +1130,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             )
           : pendingChoice?.kind === 'forcedDiscard'
             ? gameState.zones.hand.filter((instance) => pendingChoice.availableCardInstanceIds.includes(instance.instanceId))
-            : pendingChoice?.kind === 'noxTarget'
+            : pendingChoice?.kind === 'noxTarget' || pendingChoice?.kind === 'luxTarget'
               ? [
+                  ...gameState.zones.deck,
                   ...gameState.zones.hand,
                   ...gameState.zones.staging,
                   ...gameState.zones.graveyard,
                   ...gameState.opponentZones.staging,
+                  ...gameState.opponentZones.graveyard,
                   ...gameState.zones.battlefieldLeft,
                   ...gameState.zones.battlefieldCenter,
                   ...gameState.zones.battlefieldRight,
@@ -1271,6 +1308,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               graveyardCards={gameState.opponentZones.graveyard}
               banishCards={gameState.opponentZones.banish}
               deckCards={gameState.opponentZones.deck}
+              temporarySupplyCount={gameState.opponentTemporarySupply}
+              currentCombatStatsByInstanceId={currentCombatStatsByInstanceId}
               compact
               mirror
               cardsDrawnThisTurnByOwner={{
@@ -1279,9 +1318,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               }}
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1289,6 +1328,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               graveyardCards={gameState.zones.graveyard}
               banishCards={gameState.zones.banish}
               deckCards={gameState.zones.deck}
+              temporarySupplyCount={gameState.playerTemporarySupply}
+              currentCombatStatsByInstanceId={currentCombatStatsByInstanceId}
               onMove={moveCard}
               onAttack={attackBattlefield}
               onActivate={requestAbilityActivation}
@@ -1320,7 +1361,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                     ? 'Nerezza, Umbrasco Scion'
                     : pendingChoice.kind === 'nocturneMark'
                       ? 'Nocturne Agent'
-                      : pendingChoice.kind === 'noxTarget'
+                      : pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget'
                         ? pendingChoice.sourceName
                       : 'Discard a card'}
               </h2>
@@ -1335,6 +1376,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         ? 'Choose an enemy unit in a combat zone. If it dies this turn, its controller discards a card.'
                         : pendingChoice.kind === 'noxTarget'
                           ? 'Choose a valid target to resolve this card ability.'
+                          : pendingChoice.kind === 'luxTarget'
+                            ? pendingChoice.prompt
                         : 'Choose exactly one card to discard.'}
               </p>
               {pendingChoiceTargets.length > 0 ? (
@@ -1347,7 +1390,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         key={target.instanceId}
                         type="button"
                         onClick={() => {
-                          if (pendingChoice.kind === 'lucilleScore') {
+                          if (
+                            pendingChoice.kind === 'lucilleScore' ||
+                            (pendingChoice.kind === 'luxTarget' && (pendingChoice.maxSelections ?? 1) > 1)
+                          ) {
                             togglePendingLucilleSacrifice(target.instanceId);
                             return;
                           }
@@ -1365,6 +1411,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                           ) : null}
                           <DamageBadge instance={target} />
+                          <CombatStatsBadge
+                            instance={target}
+                            currentStats={currentCombatStatsByInstanceId[target.instanceId]}
+                          />
                         </span>
                         <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
                         <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
@@ -1376,15 +1426,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </div>
               ) : (
                 <p className="mt-4 rounded-md border border-dashed border-[color:var(--border)] p-4 text-center text-sm text-[color:var(--text-secondary)]">
-                  {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget'
+                  {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget'
                     ? pendingChoice.kind === 'forcedDiscard'
                       ? 'No cards are available to discard.'
                       : 'No valid targets are available.'
                     : 'No valid choices are available.'}
                 </p>
               )}
-              <div className={`mt-4 grid gap-2 ${pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || (pendingChoice.kind === 'noxTarget' && pendingChoice.optional) ? 'sm:grid-cols-2' : ''}`}>
-                {pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || (pendingChoice.kind === 'noxTarget' && pendingChoice.optional) ? (
+              <div className={`mt-4 grid gap-2 ${pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget') && pendingChoice.optional) ? 'sm:grid-cols-2' : ''}`}>
+                {pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget') && pendingChoice.optional) ? (
                   <button
                     type="button"
                     onClick={() => confirmPendingLucilleChoice(true)}
@@ -1398,7 +1448,12 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   onClick={() => confirmPendingLucilleChoice(false)}
                   disabled={
                     (pendingChoice.kind === 'nerezzaSteal' || pendingChoice.kind === 'nocturneMark' || pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget') &&
-                    pendingLucilleSacrificeIds.length !== 1
+                    pendingLucilleSacrificeIds.length !== 1 ||
+                    pendingChoice.kind === 'luxTarget' &&
+                    (
+                      (!pendingChoice.optional && pendingLucilleSacrificeIds.length === 0) ||
+                      pendingLucilleSacrificeIds.length > (pendingChoice.maxSelections ?? 1)
+                    )
                   }
                   className="inline-flex w-full items-center justify-center rounded-md bg-[color:var(--accent)] px-3 py-2 text-sm font-bold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
@@ -1435,6 +1490,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                       ) : null}
                       <DamageBadge instance={target} />
+                      <CombatStatsBadge
+                        instance={target}
+                        currentStats={currentCombatStatsByInstanceId[target.instanceId]}
+                      />
                     </span>
                     <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
                     <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
@@ -1481,6 +1540,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                         ) : null}
                         <DamageBadge instance={target} />
+                        <CombatStatsBadge
+                          instance={target}
+                          currentStats={currentCombatStatsByInstanceId[target.instanceId]}
+                        />
                       </span>
                       <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
                     </button>
@@ -1533,6 +1596,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                         ) : null}
                         <DamageBadge instance={target} />
+                        <CombatStatsBadge
+                          instance={target}
+                          currentStats={currentCombatStatsByInstanceId[target.instanceId]}
+                        />
                       </span>
                       <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
                     </button>

@@ -7,6 +7,11 @@ import {
   type AbilityTrigger,
 } from './card-abilities';
 import { resolveNoxTargetChoice } from './nox-card-ability-handlers';
+import {
+  applyHallowedSanctumDeath,
+  applyLuxEndTurnAbilities,
+  resolveLuxTargetChoice,
+} from './lux-card-ability-handlers';
 import { addLogEntry, createLogEntry } from './game-log';
 import type {
   ActivateCardAbilityResult,
@@ -106,7 +111,8 @@ export function markSuppliedThisTurn(state: GameState, owner: Owner): GameState 
 
 export function getReadySupplyCount(state: GameState, owner: Owner): number {
   const supplyCards = owner === 'player' ? state.zones.supply : state.opponentZones.supply;
-  return supplyCards.filter((instance) => instance.ready).length;
+  const temporarySupply = owner === 'player' ? state.playerTemporarySupply : state.opponentTemporarySupply;
+  return supplyCards.filter((instance) => instance.ready).length + temporarySupply;
 }
 
 export function getPlayCost(card: Card): number {
@@ -147,10 +153,12 @@ export function exhaustSupplyForCost(state: GameState, owner: Owner, cost: numbe
   }
 
   if (owner === 'player') {
-    let remainingCost = cost;
+    const temporarySupplySpent = Math.min(state.playerTemporarySupply, cost);
+    let remainingCost = cost - temporarySupplySpent;
 
     return {
       ...state,
+      playerTemporarySupply: state.playerTemporarySupply - temporarySupplySpent,
       zones: {
         ...state.zones,
         supply: state.zones.supply.map((instance) => {
@@ -168,10 +176,12 @@ export function exhaustSupplyForCost(state: GameState, owner: Owner, cost: numbe
     };
   }
 
-  let remainingCost = cost;
+  const temporarySupplySpent = Math.min(state.opponentTemporarySupply, cost);
+  let remainingCost = cost - temporarySupplySpent;
 
   return {
     ...state,
+    opponentTemporarySupply: state.opponentTemporarySupply - temporarySupplySpent,
     opponentZones: {
       ...state.opponentZones,
       supply: state.opponentZones.supply.map((instance) => {
@@ -349,6 +359,16 @@ export function prepareCardForZone(
 
 export function triggerCardAbilities(state: GameState, trigger: AbilityTrigger, input: TriggerAbilitiesInput): GameState {
   const controller = input.controller ?? getCardController(input.source);
+  const sourceZoneIsQuarantined =
+    input.zone &&
+    BATTLEFIELD_ZONES.has(input.zone) &&
+    state.zones[input.zone].some((instance) => instance.card.id === 'IMP063' && !instance.faceDown);
+  if (
+    isUnitCard(input.source.card) &&
+    (isUnitInQuarantineZone(state, input.source.instanceId) || sourceZoneIsQuarantined)
+  ) {
+    return state;
+  }
   const implementedAbilities = getImplementedAbilitiesForTrigger(input.source.card.id, trigger);
   let nextState = state;
 
@@ -505,11 +525,56 @@ export function getUnitsInPlay(state: GameState): GameCardInstance[] {
   ].filter((instance) => isUnitCard(instance.card));
 }
 
-function getCardInstanceById(state: GameState, instanceId: string): GameCardInstance | null {
+export function isUnitInQuarantineZone(state: GameState, instanceId: string): boolean {
+  return BATTLEFIELD_ZONE_IDS.some((zone) =>
+    state.zones[zone].some((instance) => instance.instanceId === instanceId) &&
+    state.zones[zone].some((instance) => instance.card.id === 'IMP063' && !instance.faceDown)
+  );
+}
+
+function getUnitZone(state: GameState, instanceId: string): ZoneId | null {
+  if (state.zones.staging.some((instance) => instance.instanceId === instanceId)) return 'staging';
+  if (state.opponentZones.staging.some((instance) => instance.instanceId === instanceId)) return 'staging';
+  return BATTLEFIELD_ZONE_IDS.find((zone) =>
+    state.zones[zone].some((instance) => instance.instanceId === instanceId)
+  ) ?? null;
+}
+
+export function getCardInstanceById(state: GameState, instanceId: string): GameCardInstance | null {
   return [
     ...Object.values(state.zones).flat(),
     ...Object.values(state.opponentZones).flat(),
   ].find((instance) => instance.instanceId === instanceId) ?? null;
+}
+
+export function readyUnitInPlay(state: GameState, instanceId: string): GameState {
+  const source = getCardInstanceById(state, instanceId);
+  if (!source || !isUnitCard(source.card) || source.ready) return state;
+  const readyCards = (cards: GameCardInstance[]) =>
+    cards.map((card) => card.instanceId === instanceId ? { ...card, ready: true } : card);
+  let nextState: GameState = {
+    ...state,
+    zones: {
+      ...state.zones,
+      staging: readyCards(state.zones.staging),
+      battlefieldLeft: readyCards(state.zones.battlefieldLeft),
+      battlefieldCenter: readyCards(state.zones.battlefieldCenter),
+      battlefieldRight: readyCards(state.zones.battlefieldRight),
+    },
+    opponentZones: {
+      ...state.opponentZones,
+      staging: readyCards(state.opponentZones.staging),
+    },
+  };
+  const readiedSource = getCardInstanceById(nextState, instanceId);
+  if (readiedSource) {
+    nextState = triggerCardAbilities(nextState, 'onReady', {
+      source: readiedSource,
+      controller: getCardController(readiedSource),
+      zone: getUnitZone(nextState, instanceId),
+    });
+  }
+  return nextState;
 }
 
 export function getCounterTargetOptions(state: GameState, counter: GameCardInstance): GameCardInstance[] {
@@ -520,13 +585,46 @@ export function getCounterTargetOptions(state: GameState, counter: GameCardInsta
     ? getUnitsInPlay(state).find((unit) => unit.instanceId === state.pendingCombat?.attackerInstanceId) ?? null
     : null;
   const combatUnits = attacker ? [...battlefieldUnits, attacker] : battlefieldUnits;
+  const counterController = getCardController(counter);
+  const legalCombatTargets = combatUnits.filter(
+    (unit) =>
+      !(
+        unit.card.id === 'IMP035' &&
+        state.pendingCombat &&
+        getCardController(unit) !== counterController &&
+        !isUnitInQuarantineZone(state, unit.instanceId)
+      )
+  );
 
   if (counter.card.id === 'IMP026') {
-    return combatUnits;
+    return legalCombatTargets;
   }
 
   if (counter.card.id === 'IMP027') {
-    return combatUnits.filter((unit) => unit.card.cost <= 2);
+    return legalCombatTargets.filter((unit) => unit.card.cost <= 2);
+  }
+
+  if (counter.card.id === 'IMP045') {
+    const defender = state.pendingCombat?.defenderInstanceId
+      ? getCardInstanceById(state, state.pendingCombat.defenderInstanceId)
+      : null;
+    return defender && getCardController(defender) === counterController ? [defender] : [];
+  }
+
+  if (counter.card.id === 'IMP057') {
+    const staging = counterController === 'player' ? state.zones.staging : state.opponentZones.staging;
+    return [
+      ...staging,
+      ...BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]),
+    ].filter(
+      (card) =>
+        getCardController(card) === counterController &&
+        (isUnitCard(card.card) || isItemCard(card.card))
+    );
+  }
+
+  if (counter.card.id === 'IMP058') {
+    return getFriendlyUnitsInPlay(state, counterController).filter((unit) => !unit.ready);
   }
 
   return [];
@@ -586,8 +684,14 @@ export function removeUnitFromPlay(
   nextState = triggerCardAbilities(nextState, 'onDeath', {
     source: unit,
     controller,
-    zone: unit.banishOnDeath ? 'banish' : 'graveyard',
+    zone: battlefieldZone ?? 'staging',
   });
+  if (
+    battlefieldZone &&
+    getOwnerZoneMap(nextState, unit.owner).graveyard.some((card) => card.instanceId === unit.instanceId)
+  ) {
+    nextState = applyHallowedSanctumDeath(nextState, unit, battlefieldZone);
+  }
 
   const explosiveAugmentCount = battlefieldZone
     ? removedCards.filter((instance) => instance.card.id === 'IMP029').length
@@ -610,7 +714,7 @@ export function removeUnitFromPlay(
     };
 
     const casualties = nextState.zones[battlefieldZone].filter(
-      (instance) => isUnitCard(instance.card) && instance.damage >= instance.card.health
+      (instance) => isUnitCard(instance.card) && instance.damage >= getCurrentUnitHealth(nextState, instance)
     );
     for (const casualty of casualties) {
       const casualtyResult = removeUnitFromPlay(nextState, casualty.instanceId);
@@ -775,12 +879,60 @@ export function getCurrentUnitInfluence(
   return Math.max(0, baseInfluence + equipmentInfluence + (instance.temporaryInfluenceBonus ?? 0));
 }
 
+function getUnitAttachmentsInPlay(state: GameState, instanceId: string): GameCardInstance[] {
+  return [
+    ...state.zones.staging,
+    ...state.opponentZones.staging,
+    ...BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]),
+  ].filter((card) => card.attachedToInstanceId === instanceId);
+}
+
+export function getCurrentUnitAttack(state: GameState, instance: GameCardInstance): number {
+  const attachments = getUnitAttachmentsInPlay(state, instance.instanceId);
+  const selena = getFriendlyUnitsInPlay(state, getCardController(instance)).find(
+    (unit) =>
+      unit.card.id === 'IMP046' &&
+      unit.instanceId !== instance.instanceId &&
+      !isUnitInQuarantineZone(state, unit.instanceId)
+  );
+  const selenaBonus = selena?.ready ? 1 : 0;
+  return Math.max(
+    0,
+    instance.card.attack +
+      attachments.reduce((total, attachment) => total + attachment.card.attack, 0) +
+      (instance.temporaryAttackBonus ?? 0) +
+      (instance.combatAttackBonus ?? 0) +
+      selenaBonus
+  );
+}
+
+export function getCurrentUnitHealth(state: GameState, instance: GameCardInstance): number {
+  const attachments = getUnitAttachmentsInPlay(state, instance.instanceId);
+  const selena = getFriendlyUnitsInPlay(state, getCardController(instance)).find(
+    (unit) =>
+      unit.card.id === 'IMP046' &&
+      unit.instanceId !== instance.instanceId &&
+      !isUnitInQuarantineZone(state, unit.instanceId)
+  );
+  const selenaBonus = selena && !selena.ready ? 1 : 0;
+  return Math.max(
+    0,
+    instance.card.health +
+      attachments.reduce((total, attachment) => total + attachment.card.health, 0) +
+      (instance.temporaryHealthBonus ?? 0) +
+      selenaBonus
+  );
+}
+
 export function scoreBattlefieldVictoryPoints(state: GameState, owner: Owner): GameState {
   if (state.winner) {
     return state;
   }
 
   const scoringUnits = BATTLEFIELD_ZONE_IDS.flatMap((zone) =>
+    state.zones[zone].some((instance) => instance.card.id === 'IMP063' && !instance.faceDown)
+      ? []
+      :
     state.zones[zone]
       .filter((instance) => {
         if (getCardController(instance) !== owner || !isUnitCard(instance.card)) {
@@ -854,6 +1006,9 @@ export function scoreBattlefieldVictoryPoints(state: GameState, owner: Owner): G
       };
       return nextState;
     }
+    if (nextState.pendingChoice) {
+      return nextState;
+    }
   }
 
   if (nextState.winner === owner) {
@@ -914,6 +1069,20 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   const selectedIdSet = new Set(selectedInstanceIds);
   const ownerZones = getOwnerZoneMap(state, pendingChoice.owner);
+
+  if (pendingChoice.kind === 'luxTarget') {
+    const resolved = resolveLuxTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (
+      !('error' in resolved) &&
+      pendingChoice.resumeTurnAdvance &&
+      !resolved.pendingChoice
+    ) {
+      return pendingChoice.effect === 'seraphielReturn'
+        ? finishAdvanceToNextTurnAfterScoring(resolved)
+        : advanceToNextTurn(resolved);
+    }
+    return resolved;
+  }
 
   if (pendingChoice.kind === 'noxTarget') {
     const resolved = resolveNoxTargetChoice(state, pendingChoice, selectedInstanceIds);
@@ -1275,6 +1444,10 @@ export function clearEndOfTurnDamage(state: GameState): GameState {
     instance.discardCardOnDeathThisTurnCount ||
     instance.preventNextCombatDamageThisTurn ||
     (
+      (instance.temporaryAttackBonus || instance.temporaryHealthBonus) &&
+      state.turn >= (instance.temporaryStatsExpireAfterTurn ?? Number.POSITIVE_INFINITY)
+    ) ||
+    (
       instance.temporaryInfluenceBonus &&
       getCardController(instance) === state.activePlayer &&
       state.turn >= (instance.temporaryInfluenceExpiresAfterTurn ?? Number.POSITIVE_INFINITY)
@@ -1284,6 +1457,15 @@ export function clearEndOfTurnDamage(state: GameState): GameState {
           loseVictoryPointOnDeathThisTurnCount: 0,
           discardCardOnDeathThisTurnCount: 0,
           preventNextCombatDamageThisTurn: false,
+          ...(
+            state.turn >= (instance.temporaryStatsExpireAfterTurn ?? Number.POSITIVE_INFINITY)
+              ? {
+                  temporaryAttackBonus: 0,
+                  temporaryHealthBonus: 0,
+                  temporaryStatsExpireAfterTurn: undefined,
+                }
+              : null
+          ),
           ...(
             getCardController(instance) === state.activePlayer &&
             state.turn >= (instance.temporaryInfluenceExpiresAfterTurn ?? Number.POSITIVE_INFINITY)
@@ -1300,6 +1482,9 @@ export function clearEndOfTurnDamage(state: GameState): GameState {
 
   return {
     ...state,
+    ...(state.activePlayer === 'player'
+      ? { playerTemporarySupply: 0 }
+      : { opponentTemporarySupply: 0 }),
     zones: {
       ...state.zones,
       hand: clearEndOfTurnCardState(state.zones.hand),
@@ -1473,6 +1658,42 @@ export function getBattlefieldAttackError(
     return `${targetZone} is already occupied by your unit.`;
   }
 
+  if (state.zones[targetZone].some((instance) => instance.card.id === 'IMP063' && !instance.faceDown)) {
+    return 'Units cannot attack a Quarantine Zone.';
+  }
+
+  const hasProvoke = (unit: GameCardInstance, zoneCards: GameCardInstance[]) =>
+    !isUnitInQuarantineZone(state, unit.instanceId) &&
+    (
+      ['IMP034', 'IMP035', 'IMP037'].includes(unit.card.id) ||
+      zoneCards.some(
+        (card) => card.card.id === 'IMP060' && card.attachedToInstanceId === unit.instanceId
+      )
+    );
+  const enemyProvokeUnits = BATTLEFIELD_ZONE_IDS.flatMap((zone) =>
+    state.zones[zone]
+      .filter(
+        (unit) =>
+          isUnitCard(unit.card) &&
+          getCardController(unit) !== owner &&
+          hasProvoke(unit, state.zones[zone])
+      )
+  );
+  if (
+    enemyProvokeUnits.length > 0 &&
+    (!occupyingUnit || !hasProvoke(occupyingUnit, state.zones[targetZone]))
+  ) {
+    return 'You must attack an enemy unit with Provoke.';
+  }
+
+  if (
+    occupyingUnit?.card.id === 'IMP050' &&
+    !isUnitInQuarantineZone(state, occupyingUnit.instanceId) &&
+    getCurrentUnitAttack(state, attacker) <= 2
+  ) {
+    return `${attacker.card.name} needs more than 2 attack to attack ${occupyingUnit.card.name}.`;
+  }
+
   return null;
 }
 
@@ -1527,6 +1748,12 @@ export function declareBattlefieldAttack(
     zone: targetZone,
     targets: [{ type: 'card', instanceId: defender.instanceId }],
   });
+  nextState = triggerCardAbilities(nextState, 'onDefend', {
+    source: defender,
+    controller: getCardController(defender),
+    zone: targetZone,
+    targets: [{ type: 'card', instanceId: attacker.instanceId }],
+  });
 
   if (attacker.card.id === 'IMP008') {
     nextState = {
@@ -1576,6 +1803,13 @@ export function getCounterPlayError(state: GameState, owner: Owner, instanceId: 
     if (renownedLimitError) {
       return renownedLimitError;
     }
+  }
+
+  if (
+    ['IMP026', 'IMP027', 'IMP045', 'IMP057', 'IMP058'].includes(counter.card.id) &&
+    getCounterTargetOptions(state, counter).length === 0
+  ) {
+    return `${counter.card.name} has no valid target.`;
   }
 
   return getPlayCostError(state, owner, counter.card);
@@ -1684,6 +1918,7 @@ function resolveCounterCard(state: GameState, counter: GameCardInstance): GameSt
       source: stagedCounter,
       controller: owner,
       zone: 'staging',
+      targets: counter.selectedAbilityTargetInstanceIds?.map((instanceId) => ({ type: 'card' as const, instanceId })),
     });
   } else {
     const graveyardCounter = prepareCardForZone(counter, 'graveyard');
@@ -1778,6 +2013,25 @@ export function passCounterPriority(state: GameState, owner: Owner): CounterPrio
   };
 }
 
+function clearCombatAttackBonuses(state: GameState): GameState {
+  const clearCards = (cards: GameCardInstance[]) =>
+    cards.map((card) => card.combatAttackBonus ? { ...card, combatAttackBonus: undefined } : card);
+  return {
+    ...state,
+    zones: {
+      ...state.zones,
+      staging: clearCards(state.zones.staging),
+      battlefieldLeft: clearCards(state.zones.battlefieldLeft),
+      battlefieldCenter: clearCards(state.zones.battlefieldCenter),
+      battlefieldRight: clearCards(state.zones.battlefieldRight),
+    },
+    opponentZones: {
+      ...state.opponentZones,
+      staging: clearCards(state.opponentZones.staging),
+    },
+  };
+}
+
 export function resolveBattlefieldAttack(
   state: GameState,
   owner: Owner,
@@ -1809,13 +2063,13 @@ export function resolveBattlefieldAttack(
         return { error: 'Only units in your staging area can attack.' };
       }
 
-      const nextState = {
+      const nextState = clearCombatAttackBonuses({
         ...state,
         pendingCombat: null,
         log: addLogEntry(state, {
           suffix: `${removedAttacker.card.name} was removed before combat damage, so combat ends without damage.`,
         }),
-      };
+      });
 
       return {
         state: nextState,
@@ -1834,27 +2088,18 @@ export function resolveBattlefieldAttack(
   const attackerAttachments = getAttachedCards(getOwnerStagingCards(state, owner), attacker.instanceId);
   const defender = state.zones[targetZone].find((instance) => isUnitCard(instance.card) && getCardController(instance) !== owner) ?? null;
   const defenderAttachments = defender ? getAttachedCards(state.zones[targetZone], defender.instanceId) : [];
-  const attackerAttack = attacker.card.attack + attackerAttachments.reduce(
-    (total, attachment) => total + attachment.card.attack,
-    0
-  );
-  const attackerHealth = attacker.card.health + attackerAttachments.reduce(
-    (total, attachment) => total + attachment.card.health,
-    0
-  );
-  const defenderAttack = defender
-    ? defender.card.attack + defenderAttachments.reduce(
-        (total, attachment) => total + attachment.card.attack,
-        0
-      )
-    : 0;
-  const defenderHealth = defender
-    ? defender.card.health + defenderAttachments.reduce(
-        (total, attachment) => total + attachment.card.health,
-        0
-      )
-    : 0;
-  const attackerDamageTaken = defender ? defenderAttack : 0;
+  const attackerAttack = attacker.ready ? getCurrentUnitAttack(state, attacker) : 0;
+  const attackerHealth = getCurrentUnitHealth(state, attacker);
+  const defenderAttack = defender?.ready ? getCurrentUnitAttack(state, defender) : 0;
+  const defenderHealth = defender ? getCurrentUnitHealth(state, defender) : 0;
+  const attackerDamageTaken =
+    defender &&
+    !(
+      attacker.card.id === 'IMP040' &&
+      !isUnitInQuarantineZone(state, attacker.instanceId)
+    )
+      ? defenderAttack
+      : 0;
   const defenderDamageTaken = defender
     ? defender.preventNextCombatDamageThisTurn
       ? 0
@@ -1962,15 +2207,6 @@ export function resolveBattlefieldAttack(
     nextState = resolveUnitTakesControlOfZone(nextState, targetZone);
   }
 
-  if (defender) {
-    nextState = triggerCardAbilities(nextState, 'onDefend', {
-    source: defender,
-    controller: getCardController(defender),
-    zone: targetZone,
-    targets: [{ type: 'card', instanceId: attacker.instanceId }],
-  });
-  }
-
   for (const destroyedUnit of [attackerDestroyed ? attacker : null, defenderDestroyed ? defender : null]) {
     if (!destroyedUnit) {
       continue;
@@ -1979,8 +2215,13 @@ export function resolveBattlefieldAttack(
     nextState = triggerCardAbilities(nextState, 'onDeath', {
       source: destroyedUnit,
       controller: getCardController(destroyedUnit),
-      zone: 'graveyard',
+      zone: targetZone,
     });
+    if (getOwnerZoneMap(nextState, destroyedUnit.owner).graveyard.some(
+      (card) => card.instanceId === destroyedUnit.instanceId
+    )) {
+      nextState = applyHallowedSanctumDeath(nextState, destroyedUnit, targetZone);
+    }
   }
 
   const explosiveAugmentCount = [
@@ -2027,7 +2268,7 @@ export function resolveBattlefieldAttack(
     };
 
     const explosionCasualties = getUnitsInPlay(nextState).filter(
-      (instance) => instance.damage >= instance.card.health
+      (instance) => instance.damage >= getCurrentUnitHealth(nextState, instance)
     );
     for (const casualty of explosionCasualties) {
       const removed = removeUnitFromPlay(nextState, casualty.instanceId);
@@ -2060,6 +2301,8 @@ export function resolveBattlefieldAttack(
       }),
     };
   }
+
+  nextState = clearCombatAttackBonuses(nextState);
 
   return {
     state: nextState,
@@ -2116,7 +2359,11 @@ export function advanceToNextTurn(state: GameState): GameState {
   }
 
   const scoringOwner = state.activePlayer;
-  const scoredState = scoringOwner ? scoreBattlefieldVictoryPoints(state, scoringOwner) : state;
+  const endTurnState = scoringOwner ? applyLuxEndTurnAbilities(state, scoringOwner) : state;
+  if (endTurnState.pendingChoice) {
+    return endTurnState;
+  }
+  const scoredState = scoringOwner ? scoreBattlefieldVictoryPoints(endTurnState, scoringOwner) : endTurnState;
   if (scoredState.pendingChoice) {
     return {
       ...scoredState,
@@ -2126,7 +2373,12 @@ export function advanceToNextTurn(state: GameState): GameState {
               ...scoredState.pendingChoice,
               resumeTurnAdvance: true,
             }
-          : scoredState.pendingChoice,
+          : scoredState.pendingChoice.kind === 'luxTarget'
+            ? {
+                ...scoredState.pendingChoice,
+                resumeTurnAdvance: true,
+              }
+            : scoredState.pendingChoice,
     };
   }
 
@@ -2261,17 +2513,49 @@ export function runTurnStart(state: GameState): GameState {
     return state;
   }
 
-  if (activePlayer === state.firstPlayer && !state.hasFirstPlayerSkippedDraw) {
+  let turnStartState = state;
+  for (const zone of BATTLEFIELD_ZONE_IDS) {
+    const quarantine = turnStartState.zones[zone].find(
+      (card) =>
+        card.card.id === 'IMP063' &&
+        !card.faceDown &&
+        getCardController(card) === activePlayer
+    );
+    if (!quarantine) continue;
+    const progressCounters = (quarantine.progressCounters ?? 0) + 1;
+    if (progressCounters >= 2) {
+      turnStartState = {
+        ...turnStartState,
+        zones: {
+          ...turnStartState.zones,
+          [zone]: turnStartState.zones[zone].filter((card) => card.instanceId !== quarantine.instanceId),
+        },
+      };
+      turnStartState = moveCardsToOwnerGraveyards(turnStartState, [quarantine]);
+    } else {
+      turnStartState = {
+        ...turnStartState,
+        zones: {
+          ...turnStartState.zones,
+          [zone]: turnStartState.zones[zone].map((card) =>
+            card.instanceId === quarantine.instanceId ? { ...card, progressCounters } : card
+          ),
+        },
+      };
+    }
+  }
+
+  if (activePlayer === turnStartState.firstPlayer && !turnStartState.hasFirstPlayerSkippedDraw) {
     return {
-      ...state,
+      ...turnStartState,
       hasFirstPlayerSkippedDraw: true,
-      log: addLogEntry(state, {
+      log: addLogEntry(turnStartState, {
         suffix: `${activePlayer === 'player' ? 'You skip' : 'Bot skips'} the first draw.`,
       }),
     };
   }
 
-  return drawForOwner(state, activePlayer, 1);
+  return drawForOwner(turnStartState, activePlayer, 1);
 }
 
 function readyCards(cards: GameCardInstance[]): GameCardInstance[] {
@@ -2283,6 +2567,7 @@ function readyCards(cards: GameCardInstance[]): GameCardInstance[] {
 }
 
 export function readyCardsForOwner(state: GameState, owner: Owner): GameState {
+  const readyTriggerSources = getFriendlyUnitsInPlay(state, owner).filter((unit) => !unit.ready);
   const readyBattlefields = Object.fromEntries(
     BATTLEFIELD_ZONE_IDS.map((zone) => [
       zone,
@@ -2294,8 +2579,9 @@ export function readyCardsForOwner(state: GameState, owner: Owner): GameState {
     ])
   ) as Pick<Record<ZoneId, GameCardInstance[]>, (typeof BATTLEFIELD_ZONE_IDS)[number]>;
 
+  let nextState: GameState;
   if (owner === 'player') {
-    return {
+    nextState = {
       ...state,
       zones: {
         ...state.zones,
@@ -2307,21 +2593,33 @@ export function readyCardsForOwner(state: GameState, owner: Owner): GameState {
         ...readyBattlefields,
       },
     };
+  } else {
+    nextState = {
+      ...state,
+      zones: {
+        ...state.zones,
+        ...readyBattlefields,
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: readyCards(state.opponentZones.hand),
+        staging: readyCards(state.opponentZones.staging),
+        supply: readyCards(state.opponentZones.supply),
+        graveyard: state.opponentZones.graveyard,
+        banish: state.opponentZones.banish,
+      },
+    };
   }
 
-  return {
-    ...state,
-    zones: {
-      ...state.zones,
-      ...readyBattlefields,
-    },
-    opponentZones: {
-      ...state.opponentZones,
-      hand: readyCards(state.opponentZones.hand),
-      staging: readyCards(state.opponentZones.staging),
-      supply: readyCards(state.opponentZones.supply),
-      graveyard: state.opponentZones.graveyard,
-      banish: state.opponentZones.banish,
-    },
-  };
+  for (const source of readyTriggerSources) {
+    const readiedSource = getCardInstanceById(nextState, source.instanceId);
+    if (!readiedSource) continue;
+    nextState = triggerCardAbilities(nextState, 'onReady', {
+      source: readiedSource,
+      controller: owner,
+      zone: getUnitZone(nextState, readiedSource.instanceId),
+    });
+    if (nextState.pendingChoice) break;
+  }
+  return nextState;
 }

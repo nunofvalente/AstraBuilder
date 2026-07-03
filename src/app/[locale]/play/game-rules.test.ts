@@ -1235,7 +1235,7 @@ describe('game rules', () => {
     );
   });
 
-  it('lets Blinding Mist prevent damage to an exhausted defender while the defender still hits back', () => {
+  it('lets Blinding Mist prevent damage while an exhausted defender deals no combat damage', () => {
     const attacker = makeInstance({
       instanceId: 'selena',
       ready: true,
@@ -1298,9 +1298,13 @@ describe('game rules', () => {
 
     expect(opponentPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(defender.instanceId);
     expect(opponentPassed.state.zones.battlefieldLeft[0]?.damage).toBe(0);
-    expect(opponentPassed.state.zones.graveyard[0]?.instanceId).toBe(attacker.instanceId);
+    expect(opponentPassed.state.zones.staging[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      ready: false,
+      damage: 0,
+    });
     expect(opponentPassed.state.log.some((entry) =>
-      entry.suffix === 'Selena, Voice of Unity dealt 0 damage to Dreadscythe Myrmidon. Dreadscythe Myrmidon dealt 3 damage to Selena, Voice of Unity.'
+      entry.suffix === 'Selena, Voice of Unity dealt 0 damage to Dreadscythe Myrmidon. Dreadscythe Myrmidon dealt 0 damage to Selena, Voice of Unity.'
     )).toBe(true);
   });
 
@@ -2504,7 +2508,7 @@ describe('game rules', () => {
     });
   });
 
-  it('lets exhausted defenders deal combat damage', () => {
+  it('prevents exhausted defenders from dealing combat damage', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
@@ -2535,14 +2539,18 @@ describe('game rules', () => {
       return;
     }
 
-    expect(result.attackerDestroyed).toBe(true);
+    expect(result.attackerDestroyed).toBe(false);
     expect(result.defenderDestroyed).toBe(false);
     expect(result.captured).toBe(false);
     expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
       instanceId: defender.instanceId,
       damage: 1,
     });
-    expect(result.state.zones.graveyard[0]?.instanceId).toBe(attacker.instanceId);
+    expect(result.state.zones.staging[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      ready: false,
+      damage: 0,
+    });
   });
 
   it('destroys units when new combat damage plus marked damage reaches health', () => {
@@ -2554,7 +2562,7 @@ describe('game rules', () => {
     const defender = makeInstance({
       instanceId: 'defender',
       owner: 'opponent',
-      ready: false,
+      ready: true,
       damage: 2,
       card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 5, health: 3 }),
     });
