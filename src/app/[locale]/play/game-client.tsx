@@ -1,0 +1,1707 @@
+'use client';
+
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, ChevronsRight, Flag, Hand, Layers, Play, RotateCcw, Swords, Users } from 'lucide-react';
+
+import type { Locale } from '@/i18n/config';
+import { supabase } from '@/lib/supabase/supabaseClient';
+import type { Card } from '../create/deck-builder/types';
+import { getBotBattlefieldAttackChoice } from './bot-policy';
+import { applyPlayerCardAction } from './game-actions';
+import { BOT_TURN_STEPS, applyBotTurnStep, playFirstBotCounter } from './game-bot';
+import {
+  AttackArrowOverlay,
+  BattlefieldPanel,
+  CombinedStagingSupplyPanel,
+  DamageBadge,
+  HandStrip,
+  type AttackArrowState,
+} from './game-board-ui';
+import {
+  BATTLEFIELD_ZONES,
+  activateCardAbility,
+  addLogEntry,
+  advanceToNextTurn,
+  buildInitialGameState,
+  canManuallySupplyFromHand,
+  createLogEntry,
+  declareBattlefieldAttack,
+  getCardController,
+  getCounterPlayError,
+  getCounterTargetOptions,
+  getFriendlyUnitsInPlay,
+  getModifiedPlayCost,
+  getReadySupplyCount,
+  getStagingUnitCards,
+  isItemCard,
+  isUnitCard,
+  passCounterPriority,
+  playCounterCard,
+  recordCardsDrawn,
+  resolvePendingChoice,
+  resolveBattlefieldAttack,
+  rollFirstPlayer,
+  shuffleCards,
+  startGameAfterSetup,
+  type GameCardInstance,
+  type GameState,
+  type PrivateZones,
+  type SavedDeck,
+  type ZoneId,
+} from './game-rules';
+import {
+  BOT_TURN_STEP_DELAY_MS,
+  CARD_BACK_IMAGE_SRC,
+  MATCH_SESSION_STORAGE_KEY,
+  ZONE_LABELS,
+  mapDeckRows,
+  type DeckRow,
+  type MoveCardOptions,
+} from './game-client-support';
+import {
+  ActionLogList,
+  CardZoomPreview,
+  VictoryPointScoreControl,
+  OpponentHandStrip,
+  RequiredActionToast,
+} from './game-client-ui';
+
+type LoadStatus = 'idle' | 'loading' | 'ready' | 'auth' | 'error';
+type PlayMode = 'matchmaking' | 'lobby' | 'practice';
+type PlayQueue = 'ranked' | 'casual';
+type PendingHandPlayCost = {
+  sourceInstanceId: string;
+  costType: 'sacrifice' | 'discard' | 'reanimate';
+};
+
+export type GameClientProps = {
+  locale: Locale;
+  initialCards: Card[];
+  initialError: string | null;
+  initialMode?: 'lobby' | 'match';
+};
+
+type MatchSessionPayload = {
+  deckId: string;
+  botDeckId: string | null;
+  mode?: 'practice' | 'multiplayer';
+};
+
+export function GameClient({ locale, initialCards, initialError, initialMode = 'lobby' }: GameClientProps) {
+  const router = useRouter();
+  const [status, setStatus] = useState<LoadStatus>('idle');
+  const [decks, setDecks] = useState<SavedDeck[]>([]);
+  const [selectedMode, setSelectedMode] = useState<PlayMode>('practice');
+  const [selectedQueue, setSelectedQueue] = useState<PlayQueue>('casual');
+  const [selectedDeckId, setSelectedDeckId] = useState('');
+  const [selectedBotDeckId, setSelectedBotDeckId] = useState('');
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [pendingAbilitySourceId, setPendingAbilitySourceId] = useState<string | null>(null);
+  const [pendingCounterTargetSourceId, setPendingCounterTargetSourceId] = useState<string | null>(null);
+  const [pendingHandPlayCost, setPendingHandPlayCost] = useState<PendingHandPlayCost | null>(null);
+  const [pendingLucilleSacrificeIds, setPendingLucilleSacrificeIds] = useState<string[]>([]);
+  const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
+  const [isPassTurnDialogOpen, setIsPassTurnDialogOpen] = useState(false);
+  const [attackArrow, setAttackArrow] = useState<AttackArrowState | null>(null);
+  const [hoveredCounterPreviewCards, setHoveredCounterPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
+  const [matchSetupError, setMatchSetupError] = useState<string | null>(null);
+  const botTurnTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const cardMap = useMemo(() => new Map(initialCards.map((card) => [card.id, card])), [initialCards]);
+  const selectedDeck = useMemo(
+    () => decks.find((deck) => deck.id === selectedDeckId) ?? null,
+    [decks, selectedDeckId]
+  );
+  const selectedBotDeck = useMemo(
+    () => decks.find((deck) => deck.id === selectedBotDeckId) ?? null,
+    [decks, selectedBotDeckId]
+  );
+  const isMatchRoute = initialMode === 'match';
+  const lobbyHref = `/${locale}/play`;
+  const matchHref = `/${locale}/match`;
+  const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(isMatchRoute ? matchHref : lobbyHref)}`;
+
+  function clearBotTurnTimers() {
+    for (const timerId of botTurnTimersRef.current) {
+      clearTimeout(timerId);
+    }
+
+    botTurnTimersRef.current = [];
+  }
+
+  function getElementCenter(element: Element): { x: number; y: number } {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  }
+
+  function showAttackArrow(attackerInstanceId: string, targetZone: ZoneId, state: GameState): number | null {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return null;
+    }
+
+    const attackerElement = document.querySelector(`[data-card-instance-id="${CSS.escape(attackerInstanceId)}"]`);
+    const defender = state.zones[targetZone]?.find((instance) => isUnitCard(instance.card) && instance.instanceId !== attackerInstanceId) ?? null;
+    const targetElement = defender
+      ? document.querySelector(`[data-card-instance-id="${CSS.escape(defender.instanceId)}"]`)
+      : document.querySelector(`[data-battlefield-zone="${CSS.escape(targetZone)}"]`);
+
+    if (!attackerElement || !targetElement) {
+      return null;
+    }
+
+    const arrowId = Date.now();
+    setAttackArrow({
+      id: arrowId,
+      from: getElementCenter(attackerElement),
+      to: getElementCenter(targetElement),
+    });
+
+    return arrowId;
+  }
+
+  function clearAttackArrow(arrowId: number | null) {
+    if (arrowId === null) {
+      return;
+    }
+
+    setAttackArrow((current) => (current?.id === arrowId ? null : current));
+  }
+
+  function playAutomaticBotTurn(botTurnState: GameState) {
+    clearBotTurnTimers();
+    setGameState(botTurnState);
+
+    for (const [index, step] of BOT_TURN_STEPS.entries()) {
+      const timerId = setTimeout(() => {
+        setGameState((previous) => {
+          if (!previous) {
+            return previous;
+          }
+
+          if (step !== 'attackBattlefield') {
+            return applyBotTurnStep(previous, step);
+          }
+
+          const choice = getBotBattlefieldAttackChoice(previous);
+
+          if (!choice) {
+            return previous;
+          }
+
+          const arrowId = showAttackArrow(choice.attackerInstanceId, choice.targetZone, previous);
+          window.setTimeout(() => {
+            setGameState((current) => {
+              if (!current) {
+                return current;
+              }
+
+              const nextState = applyBotTurnStep(current, step);
+
+              if (!nextState.pendingCombat) {
+                clearAttackArrow(arrowId);
+              }
+
+              return nextState;
+            });
+          }, 700);
+
+          return previous;
+        });
+      }, BOT_TURN_STEP_DELAY_MS * (index + 1));
+
+      botTurnTimersRef.current.push(timerId);
+    }
+
+    const passTurnTimerId = setTimeout(() => {
+      setGameState((previous) => {
+        if (!previous || previous.phase !== 'main' || previous.activePlayer !== 'opponent') {
+          return previous;
+        }
+
+        return advanceToNextTurn(previous);
+      });
+      botTurnTimersRef.current = [];
+    }, BOT_TURN_STEP_DELAY_MS * (BOT_TURN_STEPS.length + 2));
+
+    botTurnTimersRef.current.push(passTurnTimerId);
+  }
+
+  useEffect(() => clearBotTurnTimers, []);
+
+  useEffect(() => {
+    if (gameState?.winner) {
+      clearBotTurnTimers();
+      setAttackArrow(null);
+      setIsPassTurnDialogOpen(false);
+      setHoveredCounterPreviewCards(null);
+      setPendingHandPlayCost(null);
+    }
+  }, [gameState?.winner]);
+
+  useEffect(() => {
+    if (!gameState?.pendingCombat) {
+      setHoveredCounterPreviewCards(null);
+    }
+  }, [gameState?.pendingCombat]);
+
+  useEffect(() => {
+    setPendingLucilleSacrificeIds([]);
+  }, [gameState?.pendingChoice?.kind, gameState?.pendingChoice?.sourceInstanceId]);
+
+  useEffect(() => {
+    if (
+      !gameState ||
+      gameState.winner ||
+      gameState.phase !== 'main' ||
+      gameState.activePlayer !== 'opponent' ||
+      Boolean(gameState.pendingCombat) ||
+      Boolean(gameState.pendingChoice) ||
+      botTurnTimersRef.current.length > 0
+    ) {
+      return;
+    }
+
+    playAutomaticBotTurn(gameState);
+  }, [gameState]);
+
+  useEffect(() => {
+    if (!gameState?.pendingCombat || gameState.pendingCombat.priorityOwner !== 'opponent') {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      setGameState((previous) => {
+        if (!previous?.pendingCombat || previous.pendingCombat.priorityOwner !== 'opponent') {
+          return previous;
+        }
+
+        const counterState = playFirstBotCounter(previous);
+
+        if (counterState) {
+          return counterState;
+        }
+
+        const result = passCounterPriority(previous, 'opponent');
+
+        if ('error' in result) {
+          return {
+            ...previous,
+            log: addLogEntry(previous, { suffix: result.error }),
+          };
+        }
+
+        if (result.resolvedCombat) {
+          setAttackArrow(null);
+          return result.state.activePlayer === 'opponent' ? advanceToNextTurn(result.state) : result.state;
+        }
+
+        return result.state;
+      });
+    }, 600);
+
+    return () => window.clearTimeout(timerId);
+  }, [gameState?.pendingCombat]);
+
+  useEffect(() => {
+    if (!isMatchRoute) {
+      return;
+    }
+
+    document.body.classList.add('simulator-route-active');
+
+    return () => {
+      document.body.classList.remove('simulator-route-active');
+    };
+  }, [isMatchRoute]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDecks() {
+      setStatus('loading');
+      setErrorMessage(initialError);
+
+      const { data: userResult, error: userError } = await supabase.auth.getUser();
+      if (!isMounted) {
+        return;
+      }
+
+      if (userError || !userResult?.user) {
+        setStatus('auth');
+        setDecks([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('decks')
+        .select('id,title,created_at,deck_cards(quantity,card_id)')
+        .eq('user_id', userResult.user.id)
+        .order('created_at', { ascending: false });
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        console.error('Failed to load simulator decks', error);
+        setErrorMessage(error.message);
+        setStatus('error');
+        setDecks([]);
+        return;
+      }
+
+      const mappedDecks = mapDeckRows((data ?? []) as DeckRow[], cardMap).filter((deck) => deck.cardCount > 0);
+      setDecks(mappedDecks);
+      setSelectedDeckId((previous) => previous || mappedDecks[0]?.id || '');
+      setSelectedBotDeckId((previous) => previous || mappedDecks[1]?.id || mappedDecks[0]?.id || '');
+      setStatus('ready');
+    }
+
+    void loadDecks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cardMap, initialError]);
+
+  useEffect(() => {
+    if (!isMatchRoute || status !== 'ready' || gameState) {
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedPayload = window.sessionStorage.getItem(MATCH_SESSION_STORAGE_KEY);
+    if (!storedPayload) {
+      setMatchSetupError('Start a practice room from the Play lobby first.');
+      return;
+    }
+
+    let payload: MatchSessionPayload;
+    try {
+      payload = JSON.parse(storedPayload) as MatchSessionPayload;
+    } catch {
+      window.sessionStorage.removeItem(MATCH_SESSION_STORAGE_KEY);
+      setMatchSetupError('The saved match setup could not be opened. Please start a new room from the Play lobby.');
+      return;
+    }
+
+    const matchDeck = decks.find((deck) => deck.id === payload.deckId) ?? null;
+    const matchBotDeck = payload.botDeckId ? decks.find((deck) => deck.id === payload.botDeckId) ?? null : null;
+
+    if (!matchDeck || !matchBotDeck) {
+      setMatchSetupError('One of the selected decks is no longer available. Please start a new room from the Play lobby.');
+      return;
+    }
+
+    setSelectedMode('practice');
+    setSelectedDeckId(matchDeck.id);
+    setSelectedBotDeckId(matchBotDeck.id);
+    setMatchSetupError(null);
+    setGameState(buildInitialGameState(matchDeck, matchBotDeck, payload.mode ?? 'practice'));
+  }, [decks, gameState, isMatchRoute, status]);
+
+  function startSelectedDeck() {
+    if (!selectedDeck || !selectedBotDeck || selectedMode !== 'practice') {
+      return;
+    }
+
+    if (isMatchRoute) {
+      setPendingAbilitySourceId(null);
+      setGameState(buildInitialGameState(selectedDeck, selectedBotDeck, 'practice'));
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(
+        MATCH_SESSION_STORAGE_KEY,
+        JSON.stringify({ deckId: selectedDeck.id, botDeckId: selectedBotDeck.id, mode: 'practice' } satisfies MatchSessionPayload)
+      );
+    }
+
+    router.push(matchHref);
+  }
+
+  function returnToLobby() {
+    clearBotTurnTimers();
+    setIsConcedeDialogOpen(false);
+    setIsPassTurnDialogOpen(false);
+    setPendingAbilitySourceId(null);
+    setGameState(null);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(MATCH_SESSION_STORAGE_KEY);
+    }
+    if (isMatchRoute) {
+      router.push(lobbyHref);
+    }
+  }
+
+  function confirmConcede() {
+    returnToLobby();
+  }
+
+  function requestPassTurn() {
+    if (!gameState || gameState.winner || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+      return;
+    }
+
+    setIsPassTurnDialogOpen(true);
+  }
+
+  function confirmPassTurn() {
+    if (!gameState || gameState.winner || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+      setIsPassTurnDialogOpen(false);
+      return;
+    }
+
+    setIsPassTurnDialogOpen(false);
+    const botTurnState = advanceToNextTurn(gameState);
+
+    if (botTurnState.activePlayer === 'opponent') {
+      playAutomaticBotTurn(botTurnState);
+      return;
+    }
+
+    setGameState(botTurnState);
+  }
+
+  function drawCards(count: number) {
+    setGameState((previous) => {
+      if (!previous || previous.winner || previous.zones.deck.length === 0) {
+        return previous;
+      }
+
+      const drawn = previous.zones.deck.slice(0, count);
+      const remainingDeck = previous.zones.deck.slice(drawn.length);
+      const label = drawn.length === 1 ? 'card' : 'cards';
+
+      return recordCardsDrawn({
+        ...previous,
+        zones: {
+          ...previous.zones,
+          deck: remainingDeck,
+          hand: [...previous.zones.hand, ...drawn],
+        },
+        log: addLogEntry(previous, { suffix: `Drew ${drawn.length} ${label}.` }),
+      }, 'player', drawn.length);
+    });
+  }
+
+  function moveCard(instanceId: string, fromZone: ZoneId, toZone: ZoneId, options: MoveCardOptions = {}) {
+    if (fromZone === 'hand' && toZone === 'staging' && gameState) {
+      const handCard = gameState.zones.hand.find((instance) => instance.instanceId === instanceId) ?? null;
+
+      if (handCard?.card.id === 'IMP004' && !options.sacrificeUnitInstanceId) {
+        setPendingHandPlayCost({ sourceInstanceId: instanceId, costType: 'sacrifice' });
+        return;
+      }
+
+      if (handCard?.card.id === 'IMP005' && !options.discardCardInstanceId) {
+        setPendingHandPlayCost({ sourceInstanceId: instanceId, costType: 'discard' });
+        return;
+      }
+
+      if (handCard?.card.id === 'IMP006' && !options.reanimateTargetInstanceId) {
+        setPendingHandPlayCost({ sourceInstanceId: instanceId, costType: 'reanimate' });
+        return;
+      }
+    }
+
+    setGameState((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      const setupFirstPlayer =
+        fromZone === 'hand' &&
+        toZone === 'supply' &&
+        !previous.playerStartingSupplyPlaced &&
+        previous.sessionMode === 'multiplayer'
+          ? rollFirstPlayer()
+          : undefined;
+
+      return applyPlayerCardAction(previous, {
+        instanceId,
+        fromZone,
+        toZone,
+        options: {
+          ...options,
+          setupFirstPlayer,
+        },
+      }).state;
+    });
+  }
+
+  function resolvePendingHandPlayCost(targetInstanceId: string) {
+    const pending = pendingHandPlayCost;
+
+    if (!pending) {
+      return;
+    }
+
+    moveCard(
+      pending.sourceInstanceId,
+      'hand',
+      'staging',
+      pending.costType === 'sacrifice'
+        ? { sacrificeUnitInstanceId: targetInstanceId }
+        : pending.costType === 'discard'
+          ? { discardCardInstanceId: targetInstanceId }
+          : { reanimateTargetInstanceId: targetInstanceId }
+    );
+    setPendingHandPlayCost(null);
+  }
+
+  function togglePendingLucilleSacrifice(instanceId: string) {
+    setPendingLucilleSacrificeIds((current) =>
+      current.includes(instanceId) ? current.filter((entry) => entry !== instanceId) : [...current, instanceId]
+    );
+  }
+
+  function confirmPendingLucilleChoice(selectNone = false) {
+    let nextResolvedState: GameState | null = null;
+
+    setGameState((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      const result = resolvePendingChoice(previous, selectNone ? [] : pendingLucilleSacrificeIds);
+
+      if ('error' in result) {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: result.error }),
+        };
+      }
+
+      nextResolvedState = result;
+      return result;
+    });
+
+    setPendingLucilleSacrificeIds([]);
+
+    const resolvedState = nextResolvedState as GameState | null;
+
+    if (resolvedState?.activePlayer === 'opponent' && !resolvedState.pendingChoice) {
+      playAutomaticBotTurn(resolvedState);
+    }
+  }
+
+  function requestAbilityActivation(source: GameCardInstance) {
+    setPendingAbilitySourceId(source.instanceId);
+  }
+
+  function activateAbilityWithTarget(targetInstanceId: string) {
+    const sourceInstanceId = pendingAbilitySourceId;
+
+    if (!sourceInstanceId) {
+      return;
+    }
+
+    setGameState((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      const result = activateCardAbility(previous, 'player', sourceInstanceId, targetInstanceId);
+
+      if ('error' in result) {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: result.error }),
+        };
+      }
+
+      return result.state;
+    });
+    setPendingAbilitySourceId(null);
+  }
+
+  function attackBattlefield(attackerInstanceId: string, targetZone: ZoneId) {
+    setGameState((previous) => {
+      if (!previous || previous.winner) {
+        return previous;
+      }
+
+      const defender = previous.zones[targetZone].find((instance) => isUnitCard(instance.card) && getCardController(instance) !== 'player') ?? null;
+      const arrowId = showAttackArrow(attackerInstanceId, targetZone, previous);
+
+      if (!defender) {
+        window.setTimeout(() => {
+          setGameState((current) => {
+            if (!current) {
+              return current;
+            }
+
+            const nextResult = resolveBattlefieldAttack(current, 'player', attackerInstanceId, targetZone);
+
+            if ('error' in nextResult) {
+              return {
+                ...current,
+                log: addLogEntry(current, { suffix: nextResult.error }),
+              };
+            }
+
+            return nextResult.state;
+          });
+          clearAttackArrow(arrowId);
+        }, 700);
+
+        return previous;
+      }
+
+      const result = declareBattlefieldAttack(previous, 'player', attackerInstanceId, targetZone);
+
+      if ('error' in result) {
+        clearAttackArrow(arrowId);
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: result.error }),
+        };
+      }
+
+      return result.state;
+    });
+  }
+
+  function passPlayerCounterPriority() {
+    setGameState((previous) => {
+      if (!previous || previous.winner) {
+        return previous;
+      }
+
+      const result = passCounterPriority(previous, 'player');
+
+      if ('error' in result) {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: result.error }),
+        };
+      }
+
+      if (result.resolvedCombat) {
+        setAttackArrow(null);
+        return result.state.activePlayer === 'opponent' ? advanceToNextTurn(result.state) : result.state;
+      }
+
+      return result.state;
+    });
+  }
+
+  function playPlayerCounter(instanceId: string, targetInstanceId?: string) {
+    setGameState((previous) => {
+      if (!previous || previous.winner) {
+        return previous;
+      }
+
+      const result = playCounterCard(previous, 'player', instanceId, targetInstanceId ? { targetInstanceId } : undefined);
+
+      if ('error' in result) {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: result.error }),
+        };
+      }
+
+      return result.state;
+    });
+    setPendingCounterTargetSourceId(null);
+  }
+
+  function requestPlayerCounter(instance: GameCardInstance) {
+    if (!gameState) {
+      return;
+    }
+
+    if (getCounterTargetOptions(gameState, instance).length > 0) {
+      setPendingCounterTargetSourceId(instance.instanceId);
+      return;
+    }
+
+    playPlayerCounter(instance.instanceId);
+  }
+
+  function shuffleLibrary() {
+    setGameState((previous) => {
+      if (!previous || previous.winner) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        zones: {
+          ...previous.zones,
+          deck: shuffleCards(previous.zones.deck),
+        },
+        log: addLogEntry(previous, { suffix: 'Shuffled deck.' }),
+      };
+    });
+  }
+
+  function chooseFirstPlayer(firstPlayer: 'player' | 'opponent') {
+    if (!gameState || gameState.phase !== 'setup' || !gameState.playerStartingSupplyPlaced) {
+      return;
+    }
+
+    const startedState = startGameAfterSetup(gameState, firstPlayer);
+
+    if (startedState.activePlayer === 'opponent') {
+      playAutomaticBotTurn(startedState);
+      return;
+    }
+
+    setGameState(startedState);
+  }
+
+  function resetGame() {
+    if (selectedDeck) {
+      clearBotTurnTimers();
+      setPendingAbilitySourceId(null);
+      setGameState(buildInitialGameState(selectedDeck, selectedBotDeck));
+    }
+  }
+
+  const content = (() => {
+    if (status === 'loading' || status === 'idle') {
+      return (
+        <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center text-sm text-[color:var(--text-secondary)]">
+          Loading your decks...
+        </div>
+      );
+    }
+
+    if (status === 'auth') {
+      return (
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
+          <p className="text-sm text-[color:var(--text-secondary)]">Sign in to simulate games with your saved decks.</p>
+          <Link
+            href={signInHref}
+            className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+          >
+            Sign in
+          </Link>
+        </div>
+      );
+    }
+
+    if (status === 'error') {
+      return (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-100">
+          {errorMessage ?? 'Unable to load decks.'}
+        </div>
+      );
+    }
+
+    if (decks.length === 0) {
+      return (
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
+          <p className="text-sm text-[color:var(--text-secondary)]">Save a deck before starting a simulator session.</p>
+          <Link
+            href={`/${locale}/create`}
+            className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+          >
+            Build a deck
+          </Link>
+        </div>
+      );
+    }
+
+    if (isMatchRoute && matchSetupError) {
+      return (
+        <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
+          <p className="text-sm text-[color:var(--text-secondary)]">{matchSetupError}</p>
+          <Link
+            href={lobbyHref}
+            className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+          >
+            Back to Play lobby
+          </Link>
+        </div>
+      );
+    }
+
+    if (isMatchRoute && !gameState) {
+      return (
+        <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center text-sm text-[color:var(--text-secondary)]">
+          Opening match room...
+        </div>
+      );
+    }
+
+    if (!gameState) {
+      return (
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center">
+          <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-2xl shadow-black/20">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-3 rounded-lg border border-[color:var(--border)] bg-[linear-gradient(110deg,rgba(241,143,59,0.18),rgba(44,180,120,0.14))] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[color:var(--accent)]/20 text-[color:var(--accent)]">
+                    <Swords className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h2 className="min-w-0 truncate text-base font-bold text-[color:var(--text-primary)]">
+                      {selectedDeck?.title?.trim() || 'Untitled deck'}
+                    </h2>
+                    <label className="relative inline-flex cursor-pointer items-center rounded-md border border-[color:var(--border)] bg-black/20 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)]">
+                      Change
+                      <select
+                        aria-label="Change deck"
+                        value={selectedDeckId}
+                        onChange={(event) => setSelectedDeckId(event.target.value)}
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      >
+                        {decks.map((deck) => (
+                          <option key={deck.id} value={deck.id}>
+                            {deck.title?.trim() || 'Untitled deck'} ({deck.cardCount})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <span className="rounded-full border border-[color:var(--border)] bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-primary)]">
+                  {selectedDeck?.cardCount ?? 0} cards
+                </span>
+              </div>
+
+              <div className="rounded-full border border-[color:var(--border)] bg-black/20 p-1" role="tablist" aria-label="Play mode">
+                <div className="grid gap-1 sm:grid-cols-3">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedMode === 'matchmaking'}
+                  onClick={() => setSelectedMode('matchmaking')}
+                  className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                    selectedMode === 'matchmaking'
+                      ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
+                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
+                  }`}
+                >
+                  <Swords className="h-4 w-4" aria-hidden="true" />
+                  Matchmaking
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedMode === 'lobby'}
+                  onClick={() => setSelectedMode('lobby')}
+                  className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                    selectedMode === 'lobby'
+                      ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
+                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
+                  }`}
+                >
+                  <Users className="h-4 w-4" aria-hidden="true" />
+                  Lobby
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedMode === 'practice'}
+                  onClick={() => setSelectedMode('practice')}
+                  className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                    selectedMode === 'practice'
+                      ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
+                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
+                  }`}
+                >
+                  <Bot className="h-4 w-4" aria-hidden="true" />
+                  Practice
+                </button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                <div className="flex flex-col gap-4">
+                  {selectedMode === 'matchmaking' ? (
+                    <>
+                      <div className="rounded-full border border-[color:var(--border)] bg-black/15 p-1">
+                        <div className="grid grid-cols-2 gap-1">
+                          {(['ranked', 'casual'] as PlayQueue[]).map((queue) => (
+                            <button
+                              key={queue}
+                              type="button"
+                              onClick={() => setSelectedQueue(queue)}
+                              className={`rounded-full px-4 py-3 text-sm font-bold capitalize transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                                selectedQueue === queue
+                                  ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
+                                  : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
+                              }`}
+                            >
+                              {queue}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex min-h-40 items-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)]/20 px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-md bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]">
+                            <Users className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                          <div>
+                            <h2 className="text-xl font-bold capitalize text-[color:var(--text-primary)]">{selectedQueue} matchmaking</h2>
+                            <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                              Multiplayer is coming soon. When it is ready, this will find an online room for your selected deck.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : selectedMode === 'practice' ? (
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">
+                      <div className="flex min-h-56 items-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)]/20 px-6 py-8">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-md bg-[color:var(--accent)]/15 text-[color:var(--accent)]">
+                            <Bot className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                          <div>
+                            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">Practice vs Bot</h2>
+                            <p className="mt-1 text-sm text-[color:var(--text-secondary)]">Choose one of your saved decks for the bot opponent.</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
+                        <label htmlFor="simulator-bot-deck" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                          Bot deck
+                        </label>
+                        <select
+                          id="simulator-bot-deck"
+                          value={selectedBotDeckId}
+                          onChange={(event) => setSelectedBotDeckId(event.target.value)}
+                          className="mt-2 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                        >
+                          {decks.map((deck) => (
+                            <option key={deck.id} value={deck.id}>
+                              {deck.title?.trim() || 'Untitled deck'} ({deck.cardCount})
+                            </option>
+                          ))}
+                        </select>
+                        {selectedBotDeck ? (
+                          <div className="mt-4 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3">
+                            <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
+                              {selectedBotDeck.title?.trim() || 'Untitled deck'}
+                            </p>
+                            <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{selectedBotDeck.cardCount} cards</p>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex min-h-56 items-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)]/20 px-6 py-8">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-md bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]">
+                          <Users className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div>
+                          <h2 className="text-xl font-bold text-[color:var(--text-primary)]">Room lobby</h2>
+                          <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                            Create a custom game and invite a friend with a room code.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <aside className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">Your deck</h2>
+                  {selectedDeck ? (
+                    <div className="mt-4 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3">
+                      <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
+                        {selectedDeck.title?.trim() || 'Untitled deck'}
+                      </p>
+                      <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{selectedDeck.cardCount} cards selected</p>
+                    </div>
+                  ) : null}
+                </aside>
+              </div>
+
+              <button
+                type="button"
+                onClick={startSelectedDeck}
+                disabled={!selectedDeck || !selectedBotDeck || selectedMode !== 'practice'}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--text-primary)] px-4 py-4 text-base font-bold text-[color:var(--background)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                <Play className="h-4 w-4" aria-hidden="true" />
+                {selectedMode === 'practice'
+                  ? 'Launch Practice vs Bot'
+                  : selectedMode === 'matchmaking'
+                    ? `Find ${selectedQueue} match`
+                    : 'Create Lobby'}
+              </button>
+            </div>
+          </section>
+        </div>
+      );
+    }
+    const pendingCombat = gameState.pendingCombat;
+    const pendingChoice = gameState.pendingChoice;
+    const playablePlayerCounters =
+      pendingCombat?.priorityOwner === 'player'
+        ? gameState.zones.hand.filter((instance) => !getCounterPlayError(gameState, 'player', instance.instanceId))
+        : [];
+    const canTakePlayerActions = !gameState.winner && (gameState.phase === 'setup' || gameState.activePlayer === 'player');
+    const canUseBoardActions = canTakePlayerActions && !pendingCombat && !pendingChoice;
+    const canPlayFromHand = gameState.phase === 'main' && gameState.activePlayer === 'player' && !pendingCombat && !pendingChoice;
+    const readySupplyCount = getReadySupplyCount(gameState, 'player');
+    const playerStagingUnits = getStagingUnitCards(gameState.zones.staging, 'player');
+    const friendlyUnitsInPlay = getFriendlyUnitsInPlay(gameState, 'player');
+    const pendingAbilitySource =
+      friendlyUnitsInPlay.find((instance) => instance.instanceId === pendingAbilitySourceId) ?? null;
+    const pendingAbilityTargets = pendingAbilitySource
+      ? friendlyUnitsInPlay.filter((instance) => instance.instanceId !== pendingAbilitySource.instanceId)
+      : [];
+    const canFlipFaceUp = canPlayFromHand;
+    const canSupplyFromHand =
+      gameState.phase === 'setup'
+        ? !gameState.playerStartingSupplyPlaced
+        : canManuallySupplyFromHand(gameState, 'player');
+    const pendingHandPlaySource =
+      pendingHandPlayCost
+        ? gameState.zones.hand.find((instance) => instance.instanceId === pendingHandPlayCost.sourceInstanceId) ?? null
+        : null;
+    const pendingHandPlayTargets =
+      pendingHandPlayCost?.costType === 'sacrifice'
+        ? friendlyUnitsInPlay
+        : pendingHandPlayCost?.costType === 'reanimate'
+          ? gameState.zones.graveyard.filter(
+              (instance) => isUnitCard(instance.card) && !instance.card.type.toLowerCase().includes('renowned')
+            )
+        : pendingHandPlaySource
+          ? gameState.zones.hand.filter((instance) => instance.instanceId !== pendingHandPlaySource.instanceId)
+          : [];
+    const pendingChoiceTargets =
+      pendingChoice?.kind === 'lucilleScore'
+        ? gameState.zones.staging.filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId))
+        : pendingChoice?.kind === 'nerezzaSacrifice'
+          ? [
+              ...gameState.zones.staging,
+              ...gameState.zones.battlefieldLeft,
+              ...gameState.zones.battlefieldCenter,
+              ...gameState.zones.battlefieldRight,
+            ].filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId))
+        : pendingChoice?.kind === 'nerezzaSteal' || pendingChoice?.kind === 'nocturneMark'
+          ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'].flatMap((zone) =>
+              gameState.zones[zone as ZoneId].filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId))
+            )
+          : pendingChoice?.kind === 'forcedDiscard'
+            ? gameState.zones.hand.filter((instance) => pendingChoice.availableCardInstanceIds.includes(instance.instanceId))
+            : pendingChoice?.kind === 'noxTarget'
+              ? [
+                  ...gameState.zones.hand,
+                  ...gameState.zones.staging,
+                  ...gameState.zones.graveyard,
+                  ...gameState.opponentZones.staging,
+                  ...gameState.zones.battlefieldLeft,
+                  ...gameState.zones.battlefieldCenter,
+                  ...gameState.zones.battlefieldRight,
+                ].filter((instance) => pendingChoice.availableInstanceIds.includes(instance.instanceId))
+            : [];
+    const pendingCounterTargetSource = pendingCounterTargetSourceId
+      ? gameState.zones.hand.find((instance) => instance.instanceId === pendingCounterTargetSourceId) ?? null
+      : null;
+    const pendingCounterTargets = pendingCounterTargetSource
+      ? getCounterTargetOptions(gameState, pendingCounterTargetSource)
+      : [];
+    const getTargetLocationLabel = (target: GameCardInstance) => {
+      const battlefieldZone = (['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] as const).find((zone) =>
+        gameState.zones[zone].some((instance) => instance.instanceId === target.instanceId)
+      );
+      const zoneLabel = battlefieldZone
+        ? ZONE_LABELS[battlefieldZone]
+        : getCardController(target) === 'player' && gameState.zones.staging.some((instance) => instance.instanceId === target.instanceId)
+          ? 'Your staging'
+          : getCardController(target) === 'opponent' && gameState.opponentZones.staging.some((instance) => instance.instanceId === target.instanceId)
+            ? 'Enemy staging'
+            : 'In play';
+      return `${getCardController(target) === 'player' ? 'Yours' : 'Enemy'} · ${zoneLabel} · ${target.instanceId.slice(-4)}`;
+    };
+
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        {attackArrow ? <AttackArrowOverlay arrow={attackArrow} /> : null}
+        <CardZoomPreview cards={hoveredCounterPreviewCards} />
+        <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
+          <div className="flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
+            <section className="rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <button type="button" onClick={returnToLobby} className="mb-2 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
+                Back to lobby
+              </button>
+              <div className="mb-3 rounded-md border border-[color:var(--border)] bg-black/15 px-3 py-2 text-center">
+                <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  {gameState.phase === 'setup' ? 'Turn 0 setup' : `Turn ${gameState.turn}`}
+                </p>
+                <p className="mt-0.5 text-sm font-black text-[color:var(--text-primary)]">
+                  {gameState.phase === 'setup'
+                    ? 'Setup'
+                    : gameState.activePlayer === 'player'
+                      ? 'Your turn'
+                      : 'Bot turn'}
+                </p>
+              </div>
+              <div className="mb-3 grid gap-2">
+                <VictoryPointScoreControl label="Your victory points" value={gameState.playerVictoryPoints} tone="player" />
+                <VictoryPointScoreControl label="Enemy victory points" value={gameState.opponentVictoryPoints} tone="opponent" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => drawCards(1)} disabled={Boolean(gameState.winner)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
+                  <Hand className="h-3.5 w-3.5" aria-hidden="true" />
+                  Draw 1
+                </button>
+                <button type="button" onClick={() => drawCards(7)} disabled={Boolean(gameState.winner)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
+                  <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+                  Draw 7
+                </button>
+                <button type="button" onClick={() => setIsConcedeDialogOpen(true)} className="inline-flex items-center justify-center gap-1 rounded-md border border-red-500/45 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:border-red-300 focus:outline-none focus-visible:ring focus-visible:ring-red-400">
+                  <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+                  Concede
+                </button>
+                <button type="button" onClick={requestPassTurn} disabled={Boolean(gameState.winner) || gameState.phase === 'setup' || gameState.activePlayer !== 'player' || Boolean(pendingCombat)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
+                  <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  Turn
+                </button>
+              </div>
+            </section>
+            <aside className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <header className="border-b border-[color:var(--border)] px-4 py-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide">Action log</h2>
+              </header>
+              <ol className="deck-builder-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm text-[color:var(--text-secondary)]">
+                <ActionLogList entries={gameState.log} />
+              </ol>
+            </aside>
+          </div>
+          <div className="relative grid min-h-[42rem] grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
+            {pendingCombat ? (
+              <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/45 px-4" role="presentation">
+                <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">
+                  <p id="counter-window-title" className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">Counter window</p>
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Counter stack</p>
+                    {pendingCombat.counterStack.length > 0 ? (
+                      <ol className="mt-2 grid max-h-40 gap-2 overflow-y-auto">
+                        {[...pendingCombat.counterStack].reverse().map((counter, index) => (
+                          <li
+                            key={counter.instanceId}
+                            className="flex min-w-0 items-center gap-2 rounded-md border border-[color:var(--border)] bg-black/15 p-2"
+                            onMouseEnter={() => setHoveredCounterPreviewCards([counter])}
+                            onMouseLeave={() => {
+                              setHoveredCounterPreviewCards((current) =>
+                                current?.[0]?.instanceId === counter.instanceId ? null : current
+                              );
+                            }}
+                          >
+                            <div
+                              className="relative h-12 w-9 shrink-0 overflow-hidden rounded-sm border border-white/10 bg-black/20"
+                              onFocus={() => setHoveredCounterPreviewCards([counter])}
+                              onBlur={() => {
+                                setHoveredCounterPreviewCards((current) =>
+                                  current?.[0]?.instanceId === counter.instanceId ? null : current
+                                );
+                              }}
+                            >
+                              {counter.card.imageSrc ? <Image src={counter.card.imageSrc} alt="" fill sizes="36px" className="object-cover" /> : null}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">{counter.card.name}</p>
+                              <p className="text-[0.65rem] text-[color:var(--text-secondary)]">
+                                {index === 0 ? 'Resolves next' : `Stack position ${pendingCombat.counterStack.length - index}`}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="mt-2 text-sm text-[color:var(--text-secondary)]">No counters played.</p>
+                    )}
+                  </div>
+                  {pendingCombat.priorityOwner === 'player' && playablePlayerCounters.length > 0 ? (
+                    <div className="mt-4 border-t border-[color:var(--border)] pt-3">
+                      <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Available counters</p>
+                      <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto">
+                        {playablePlayerCounters.map((counter) => (
+                          <button
+                            key={counter.instanceId}
+                            type="button"
+                            onClick={() => requestPlayerCounter(counter)}
+                            onMouseEnter={() => setHoveredCounterPreviewCards([counter])}
+                            onFocus={() => setHoveredCounterPreviewCards([counter])}
+                            onMouseLeave={() => {
+                              setHoveredCounterPreviewCards((current) =>
+                                current?.[0]?.instanceId === counter.instanceId ? null : current
+                              );
+                            }}
+                            onBlur={() => {
+                              setHoveredCounterPreviewCards((current) =>
+                                current?.[0]?.instanceId === counter.instanceId ? null : current
+                              );
+                            }}
+                            className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                          >
+                            <span className="truncate text-sm font-semibold">{counter.card.name}</span>
+                            <span className="shrink-0 text-xs text-[color:var(--text-secondary)]">Cost {getModifiedPlayCost(gameState, 'player', counter.card)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={passPlayerCounterPriority}
+                    disabled={pendingCombat.priorityOwner !== 'player'}
+                    className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--accent)]/55 bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {pendingCombat.priorityOwner === 'player' ? 'Pass counter' : 'Waiting for bot'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            <CombinedStagingSupplyPanel
+              stagingCards={gameState.opponentZones.staging}
+              supplyCards={gameState.opponentZones.supply}
+              graveyardCards={gameState.opponentZones.graveyard}
+              banishCards={gameState.opponentZones.banish}
+              deckCards={gameState.opponentZones.deck}
+              compact
+              mirror
+              cardsDrawnThisTurnByOwner={{
+                player: gameState.playerCardsDrawnThisTurn,
+                opponent: gameState.opponentCardsDrawnThisTurn,
+              }}
+            />
+            <div className="grid min-h-0 gap-2 md:grid-cols-3">
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+            </div>
+            <CombinedStagingSupplyPanel
+              stagingCards={gameState.zones.staging}
+              supplyCards={gameState.zones.supply}
+              graveyardCards={gameState.zones.graveyard}
+              banishCards={gameState.zones.banish}
+              deckCards={gameState.zones.deck}
+              onMove={moveCard}
+              onAttack={attackBattlefield}
+              onActivate={requestAbilityActivation}
+              battlefieldCardsByZone={{
+                battlefieldLeft: gameState.zones.battlefieldLeft,
+                battlefieldCenter: gameState.zones.battlefieldCenter,
+                battlefieldRight: gameState.zones.battlefieldRight,
+              }}
+              disabled={!canUseBoardActions}
+              cardsDrawnThisTurnByOwner={{
+                player: gameState.playerCardsDrawnThisTurn,
+                opponent: gameState.opponentCardsDrawnThisTurn,
+              }}
+            />
+          </div>
+        </div>
+        {pendingChoice ? (
+          <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pending-choice-title"
+              className="w-full max-w-2xl rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 shadow-2xl"
+            >
+              <h2 id="pending-choice-title" className="text-lg font-bold text-[color:var(--text-primary)]">
+                {pendingChoice.kind === 'lucilleScore'
+                  ? 'Lucille, Blood Baroness'
+                  : pendingChoice.kind === 'nerezzaSacrifice' || pendingChoice.kind === 'nerezzaSteal'
+                    ? 'Nerezza, Umbrasco Scion'
+                    : pendingChoice.kind === 'nocturneMark'
+                      ? 'Nocturne Agent'
+                      : pendingChoice.kind === 'noxTarget'
+                        ? pendingChoice.sourceName
+                      : 'Discard a card'}
+              </h2>
+              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                {pendingChoice.kind === 'lucilleScore'
+                  ? 'Choose any number of units in your staging area to sacrifice. You gain that many victory points. Choosing none is allowed.'
+                  : pendingChoice.kind === 'nerezzaSacrifice'
+                    ? 'Choose another friendly unit to sacrifice for Nerezza. Choosing none is allowed.'
+                    : pendingChoice.kind === 'nerezzaSteal'
+                      ? 'Choose an enemy unit in a combat zone to take control of.'
+                      : pendingChoice.kind === 'nocturneMark'
+                        ? 'Choose an enemy unit in a combat zone. If it dies this turn, its controller discards a card.'
+                        : pendingChoice.kind === 'noxTarget'
+                          ? 'Choose a valid target to resolve this card ability.'
+                        : 'Choose exactly one card to discard.'}
+              </p>
+              {pendingChoiceTargets.length > 0 ? (
+                <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
+                  {pendingChoiceTargets.map((target) => {
+                    const isSelected = pendingLucilleSacrificeIds.includes(target.instanceId);
+
+                    return (
+                      <button
+                        key={target.instanceId}
+                        type="button"
+                        onClick={() => {
+                          if (pendingChoice.kind === 'lucilleScore') {
+                            togglePendingLucilleSacrifice(target.instanceId);
+                            return;
+                          }
+
+                          setPendingLucilleSacrificeIds([target.instanceId]);
+                        }}
+                        className={`rounded-md border p-2 text-left transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                          isSelected
+                            ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/10'
+                            : 'border-[color:var(--border)] bg-[color:var(--surface-muted)] hover:border-[color:var(--accent)]'
+                        }`}
+                      >
+                        <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
+                          {target.card.imageSrc ? (
+                            <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                          ) : null}
+                          <DamageBadge instance={target} />
+                        </span>
+                        <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                        <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                          {getTargetLocationLabel(target)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-4 rounded-md border border-dashed border-[color:var(--border)] p-4 text-center text-sm text-[color:var(--text-secondary)]">
+                  {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget'
+                    ? pendingChoice.kind === 'forcedDiscard'
+                      ? 'No cards are available to discard.'
+                      : 'No valid targets are available.'
+                    : 'No valid choices are available.'}
+                </p>
+              )}
+              <div className={`mt-4 grid gap-2 ${pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || (pendingChoice.kind === 'noxTarget' && pendingChoice.optional) ? 'sm:grid-cols-2' : ''}`}>
+                {pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || (pendingChoice.kind === 'noxTarget' && pendingChoice.optional) ? (
+                  <button
+                    type="button"
+                    onClick={() => confirmPendingLucilleChoice(true)}
+                    className="inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                  >
+                    {pendingChoice.kind === 'lucilleScore' ? 'Do not sacrifice' : 'Do not use ability'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => confirmPendingLucilleChoice(false)}
+                  disabled={
+                    (pendingChoice.kind === 'nerezzaSteal' || pendingChoice.kind === 'nocturneMark' || pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget') &&
+                    pendingLucilleSacrificeIds.length !== 1
+                  }
+                  className="inline-flex w-full items-center justify-center rounded-md bg-[color:var(--accent)] px-3 py-2 text-sm font-bold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Confirm {pendingLucilleSacrificeIds.length > 0 ? `(${pendingLucilleSacrificeIds.length})` : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {pendingCounterTargetSource ? (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="counter-target-title"
+              className="w-full max-w-2xl rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 shadow-2xl"
+            >
+              <h2 id="counter-target-title" className="text-lg font-bold text-[color:var(--text-primary)]">
+                {pendingCounterTargetSource.card.name}
+              </h2>
+              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                {pendingCounterTargetSource.card.rulesText}
+              </p>
+              <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
+                {pendingCounterTargets.map((target) => (
+                  <button
+                    key={target.instanceId}
+                    type="button"
+                    onClick={() => playPlayerCounter(pendingCounterTargetSource.instanceId, target.instanceId)}
+                    className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                  >
+                    <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
+                      {target.card.imageSrc ? (
+                        <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                      ) : null}
+                      <DamageBadge instance={target} />
+                    </span>
+                    <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                    <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      {getTargetLocationLabel(target)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingCounterTargetSourceId(null)}
+                className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {pendingAbilitySource ? (
+          <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="ability-target-title"
+              className="w-full max-w-lg rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 shadow-2xl"
+            >
+              <h2 id="ability-target-title" className="text-lg font-bold text-[color:var(--text-primary)]">
+                Sacrifice another unit
+              </h2>
+              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                Choose a friendly unit to sacrifice. {pendingAbilitySource.card.name} will ready.
+              </p>
+              {pendingAbilityTargets.length > 0 ? (
+                <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
+                  {pendingAbilityTargets.map((target) => (
+                    <button
+                      key={target.instanceId}
+                      type="button"
+                      onClick={() => activateAbilityWithTarget(target.instanceId)}
+                      className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                    >
+                      <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
+                        {target.card.imageSrc ? (
+                          <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                        ) : null}
+                        <DamageBadge instance={target} />
+                      </span>
+                      <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 rounded-md border border-dashed border-[color:var(--border)] p-4 text-center text-sm text-[color:var(--text-secondary)]">
+                  No other friendly unit can be sacrificed.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setPendingAbilitySourceId(null)}
+                className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {pendingHandPlaySource ? (
+          <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="play-cost-title"
+              className="w-full max-w-lg rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 shadow-2xl"
+            >
+              <h2 id="play-cost-title" className="text-lg font-bold text-[color:var(--text-primary)]">
+                {pendingHandPlayCost?.costType === 'sacrifice' ? 'Sacrifice a unit' : 'Discard a card'}
+              </h2>
+              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                {pendingHandPlayCost?.costType === 'sacrifice'
+                  ? `Choose a friendly unit to sacrifice to play ${pendingHandPlaySource.card.name}.`
+                  : pendingHandPlayCost?.costType === 'reanimate'
+                    ? `Choose a non-Renowned unit in your graveyard to return with ${pendingHandPlaySource.card.name}.`
+                  : `Choose another card to discard to play ${pendingHandPlaySource.card.name}.`}
+              </p>
+              {pendingHandPlayTargets.length > 0 ? (
+                <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
+                  {pendingHandPlayTargets.map((target) => (
+                    <button
+                      key={target.instanceId}
+                      type="button"
+                      onClick={() => resolvePendingHandPlayCost(target.instanceId)}
+                      className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                    >
+                      <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
+                        {target.card.imageSrc ? (
+                          <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                        ) : null}
+                        <DamageBadge instance={target} />
+                      </span>
+                      <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 rounded-md border border-dashed border-[color:var(--border)] p-4 text-center text-sm text-[color:var(--text-secondary)]">
+                  {pendingHandPlayCost?.costType === 'sacrifice'
+                    ? 'No friendly unit can be sacrificed.'
+                    : pendingHandPlayCost?.costType === 'reanimate'
+                      ? 'No non-Renowned unit is in your graveyard.'
+                    : 'No other card can be discarded.'}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setPendingHandPlayCost(null)}
+                className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {gameState.winner ? (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="game-result-title" className="w-full max-w-sm rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 text-center shadow-2xl shadow-black/50">
+              <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">Game over</p>
+              <h2 id="game-result-title" className="mt-2 text-2xl font-black text-[color:var(--text-primary)]">
+                {gameState.winner === 'player' ? 'You won!' : 'You lost'}
+              </h2>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-[color:var(--accent)]/40 bg-black/15 p-3">
+                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">You</p>
+                  <p className="mt-1 text-3xl font-black">{gameState.playerVictoryPoints}</p>
+                </div>
+                <div className="rounded-md border border-red-400/40 bg-black/15 p-3">
+                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Bot</p>
+                  <p className="mt-1 text-3xl font-black">{gameState.opponentVictoryPoints}</p>
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={returnToLobby}
+                  className="inline-flex items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Lobby
+                </button>
+                <button
+                  type="button"
+                  onClick={resetGame}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--accent)] px-3 py-2 text-sm font-bold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  Rematch
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {isConcedeDialogOpen ? (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-4" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="concede-title" className="w-full max-w-sm rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-2xl">
+              <h2 id="concede-title" className="text-lg font-semibold text-[color:var(--text-primary)]">Concede game?</h2>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
+                This will leave the current room and return you to the lobby.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConcedeDialogOpen(false)}
+                  className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmConcede}
+                  className="rounded-md border border-red-500/45 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-100 transition hover:border-red-300 focus:outline-none focus-visible:ring focus-visible:ring-red-400"
+                >
+                  Concede
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {isPassTurnDialogOpen ? (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-4" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="pass-turn-title" className="w-full max-w-sm rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-2xl">
+              <h2 id="pass-turn-title" className="text-lg font-semibold text-[color:var(--text-primary)]">Pass turn?</h2>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
+                This will end your actions for this turn and pass priority to the bot.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPassTurnDialogOpen(false)}
+                  className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmPassTurn}
+                  className="rounded-md border border-[color:var(--accent)]/50 bg-[color:var(--accent)]/20 px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Pass turn
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        <RequiredActionToast
+          message={
+            !gameState.playerStartingSupplyPlaced
+              ? 'Choose 1 card from your hand to place as starting supply.'
+              : gameState.phase === 'setup'
+                ? gameState.sessionMode === 'multiplayer'
+                  ? 'Rolling to choose who takes the first turn.'
+                  : 'Choose who takes the first turn.'
+                : null
+          }
+          actions={
+            gameState.sessionMode === 'practice' && gameState.phase === 'setup' && gameState.playerStartingSupplyPlaced ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => chooseFirstPlayer('player')}
+                  className="pointer-events-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  You first
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseFirstPlayer('opponent')}
+                  className="pointer-events-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  Bot first
+                </button>
+              </>
+            ) : null
+          }
+        />
+        <OpponentHandStrip cards={gameState.opponentZones.hand} />
+        <HandStrip
+          cards={gameState.zones.hand}
+          onMove={moveCard}
+          disabled={!canUseBoardActions}
+          canSupplyFromHand={canSupplyFromHand}
+          canPlayFromHand={canPlayFromHand}
+          friendlyUnitsInPlay={friendlyUnitsInPlay}
+          graveyardCards={gameState.zones.graveyard}
+          readySupplyCount={readySupplyCount}
+          stagingUnits={playerStagingUnits}
+          demonicAdvanceActive={gameState.playerDemonicAdvanceActive}
+          battlefieldCardsByZone={{
+            battlefieldLeft: gameState.zones.battlefieldLeft,
+            battlefieldCenter: gameState.zones.battlefieldCenter,
+            battlefieldRight: gameState.zones.battlefieldRight,
+          }}
+        />
+      </div>
+    );
+  })();
+
+  return (
+    <main className="deck-builder-workspace flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 text-[color:var(--text-primary)] lg:px-6">
+      {content}
+    </main>
+  );
+}
