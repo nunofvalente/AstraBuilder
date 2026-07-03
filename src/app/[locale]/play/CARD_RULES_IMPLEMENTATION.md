@@ -17,7 +17,13 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Implemented ability handlers resolve through `CARD_ABILITY_REGISTRY`.
 - Printed but unimplemented triggers are logged in the action log.
 
-## Phase 1 Status
+## Implemented Affinities
+
+- Nox cards `IMP001` through `IMP032` are registered and integrated with the simulator.
+- Lux cards `IMP033` through `IMP063` are registered and integrated with the simulator.
+- Lux integration includes Provoke, combat stat modifiers, damage prevention, Drone creation, targeted tactics and counters, graveyard recovery, temporary supply, end-turn choices, and Quarantine Zone rules.
+
+## Simulator Status
 
 - Manual supply is limited to 1 card from hand during your own main turn.
 - Staging accepts units only.
@@ -29,15 +35,7 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Territories can be played face down to a battlefield at 0 cost.
 - Face-down territories can be flipped face up during your main phase by paying their printed supply cost.
 - Manual moves to deck, hand, graveyard, and banish are blocked unless a future card ability implements them.
-
-## Next Rule Work
-
-1. Add combat/death transitions, then fire `onDeath` when a unit leaves play because it died.
-2. Add target selection state for abilities with required targets.
-3. Add token creation helpers before implementing token-producing cards.
-4. Add turn-duration effect state for effects that last until end of turn, next ready phase, or next main phase.
-5. Add scoring resolution and fire `onScore`.
-6. Add activated ability UI for `{Exhaust}` abilities.
+- Combat, death, scoring, counter windows, targeted choices, token creation, and turn-duration effects are active.
 
 ## Database Guidance
 

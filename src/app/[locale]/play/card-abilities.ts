@@ -9,6 +9,8 @@ import {
 } from './game-rules';
 import { createNoxAbilityHandlers } from './nox-card-ability-handlers';
 import { createNoxCardAbilityRegistry } from './nox-card-abilities';
+import { createLuxAbilityHandlers } from './lux-card-ability-handlers';
+import { createLuxCardAbilityRegistry } from './lux-card-abilities';
 import { createSolaraCardAbilityRegistry } from './solara-card-abilities';
 
 export type AbilityTrigger =
@@ -157,9 +159,11 @@ const PRINTED_TRIGGER_PATTERNS: Array<{ trigger: AbilityTrigger; pattern: RegExp
 ];
 
 const noxHandlers = createNoxAbilityHandlers();
+const luxHandlers = createLuxAbilityHandlers();
 
 export const CARD_ABILITY_REGISTRY: Record<string, CardAbilityDefinition> = {
   ...createNoxCardAbilityRegistry(noxHandlers),
+  ...createLuxCardAbilityRegistry(luxHandlers),
   ...createCaelumCardAbilityRegistry(createDrawCardsAbility(1)),
   ...createSolaraCardAbilityRegistry(createDrawCardsAbility(1)),
 };

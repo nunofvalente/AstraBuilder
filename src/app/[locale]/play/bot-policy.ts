@@ -11,6 +11,7 @@ import {
   getManualPlayCost,
   getModifiedPlayCost,
   getPlayCostError,
+  getReadySupplyCount,
   isCounterCard,
   isItemCard,
   isTacticCard,
@@ -61,7 +62,7 @@ function getPlayableCost(state: GameState, instance: GameCardInstance, toZone: Z
 }
 
 function hasReadySupplyFor(state: GameState, instance: GameCardInstance, toZone: ZoneId, faceDown = false): boolean {
-  const readySupply = state.opponentZones.supply.filter((card) => card.ready).length;
+  const readySupply = getReadySupplyCount(state, 'opponent');
 
   return readySupply >= getPlayableCost(state, instance, toZone, faceDown);
 }

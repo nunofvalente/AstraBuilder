@@ -75,6 +75,8 @@ export function buildInitialGameState(deck: SavedDeck, botDeck: SavedDeck | null
     opponentCardsDrawnThisTurn: 0,
     playerDemonicAdvanceActive: false,
     opponentDemonicAdvanceActive: false,
+    playerTemporarySupply: 0,
+    opponentTemporarySupply: 0,
     winner: null,
     pendingCombat: null,
     pendingChoice: null,

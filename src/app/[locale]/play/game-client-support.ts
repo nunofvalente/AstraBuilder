@@ -59,6 +59,7 @@ export const ZONE_LABELS: Record<ZoneId, string> = {
 export const MATCH_SESSION_STORAGE_KEY = 'astrabuilder-simulator-match';
 export const CARD_BACK_IMAGE_SRC = '/images/card-back.png';
 export const BOT_TURN_STEP_DELAY_MS = 500;
+export const BOT_POST_COMBAT_REVIEW_DELAY_MS = 2200;
 
 const DEFAULT_MOVE_TARGETS: ZoneId[] = [
   'hand',

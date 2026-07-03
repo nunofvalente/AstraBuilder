@@ -40,7 +40,7 @@ describe('CombinedStagingSupplyPanel', () => {
     expect(container.querySelector('[data-card-zoom-preview]')).toHaveClass('z-[100]');
   });
 
-  it('shows temporary influence bonuses on staging units', () => {
+  it('folds temporary influence bonuses into the staging influence total', () => {
     const buffedUnit: GameCardInstance = {
       ...makeInstance(),
       instanceId: 'buffed-staging-unit',
@@ -58,7 +58,8 @@ describe('CombinedStagingSupplyPanel', () => {
       />,
     );
 
-    expect(screen.getByText('+1 INF')).toBeInTheDocument();
+    expect(screen.getByLabelText('Buffed Staging Unit has 1 influence')).toHaveTextContent('1');
+    expect(screen.queryByText('+1 INF')).not.toBeInTheDocument();
   });
 
   it('shows Vermillion current influence on staging units', () => {
@@ -84,7 +85,74 @@ describe('CombinedStagingSupplyPanel', () => {
       />,
     );
 
-    expect(screen.getByText('INF 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('Vermillion, Ghastly Researcher has 2 influence')).toHaveTextContent('2');
+  });
+
+  it('renders Fortuna temporary supply as distinct supply cards', () => {
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        temporarySupplyCount={3}
+      />,
+    );
+
+    expect(screen.getByLabelText('3 total supply, including 3 temporary')).toBeInTheDocument();
+    expect(screen.getAllByTitle('Temporary supply from Fortuna Bank')).toHaveLength(3);
+    expect(container.querySelectorAll('[data-temporary-supply]')).toHaveLength(3);
+  });
+
+  it('shows current modified attack and health on staging units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'vero-buffed-unit',
+      card: createTestCard({
+        id: 'vero-buffed-unit',
+        name: 'Vero Buffed Unit',
+        type: 'Unit',
+        attack: 4,
+        health: 6,
+      }),
+      ready: true,
+    };
+
+    render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[unit]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        currentCombatStatsByInstanceId={{
+          [unit.instanceId]: { attack: 5, health: 7 },
+        }}
+      />,
+    );
+
+    const stats = screen.getByLabelText('Vero Buffed Unit has 5 attack and 7 health, modified');
+    expect(stats).toHaveAttribute('data-combat-stats-modified', 'true');
+    expect(stats).toHaveClass('bg-black/80', 'border-amber-300/90');
+    expect(stats).toHaveAttribute('title', 'Current stats: 5 attack, 7 health (printed 4/6)');
+  });
+
+  it('places the opponent deck above the banish pile', () => {
+    render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        mirror
+      />,
+    );
+
+    const deckLabel = screen.getByText('Deck');
+    const banishLabel = screen.getByText('Banish');
+    expect(deckLabel.compareDocumentPosition(banishLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -165,7 +233,7 @@ describe('BattlefieldPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Battlefield 1 (Captured)')).toBeInTheDocument();
+    expect(screen.getByText('CAPTURED')).toHaveClass('text-emerald-400');
   });
 
   it('shows enemy battlefield control in the zone title', () => {
@@ -184,10 +252,10 @@ describe('BattlefieldPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Battlefield 1 (Lost)')).toBeInTheDocument();
+    expect(screen.getByText('LOST')).toHaveClass('text-red-400');
   });
 
-  it('shows temporary influence bonuses on battlefield units', () => {
+  it('folds temporary influence bonuses into the battlefield influence total', () => {
     const unit: GameCardInstance = {
       ...makeInstance(),
       instanceId: 'buffed-battlefield-unit',
@@ -203,7 +271,8 @@ describe('BattlefieldPanel', () => {
       />,
     );
 
-    expect(screen.getByText('+1 INF')).toBeInTheDocument();
+    expect(screen.getByLabelText('Buffed Battlefield Unit has 1 influence')).toHaveTextContent('1');
+    expect(screen.queryByText('+1 INF')).not.toBeInTheDocument();
   });
 
   it('shows Vermillion current influence on battlefield units capped at three', () => {
@@ -227,6 +296,56 @@ describe('BattlefieldPanel', () => {
       />,
     );
 
-    expect(screen.getByText('INF 3')).toBeInTheDocument();
+    expect(screen.getByLabelText('Vermillion, Ghastly Researcher has 3 influence')).toHaveTextContent('3');
+  });
+
+  it('shows Quarantine Zone progress and remaining turns', () => {
+    const quarantine: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'quarantine-zone',
+      card: createTestCard({
+        id: 'IMP063',
+        name: 'Quarantine Zone',
+        type: 'Territory',
+      }),
+      progressCounters: 1,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[quarantine]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.getByText('1 turn left')).toBeInTheDocument();
+    expect(screen.getByLabelText('Quarantine Zone has 1 of 2 progress counters and 1 turn left')).toBeInTheDocument();
+  });
+
+  it('does not reveal Quarantine progress while the territory is face down', () => {
+    const quarantine: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'hidden-quarantine-zone',
+      card: createTestCard({
+        id: 'IMP063',
+        name: 'Quarantine Zone',
+        type: 'Territory',
+      }),
+      faceDown: true,
+      progressCounters: 1,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[quarantine]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByText('1/2')).not.toBeInTheDocument();
+    expect(screen.queryByText('1 turn left')).not.toBeInTheDocument();
   });
 });

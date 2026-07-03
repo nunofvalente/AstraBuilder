@@ -11,6 +11,7 @@ import {
   getModifiedPlayCost,
   getPlayCost,
   getPlayCostError,
+  getReadySupplyCount,
   getRenownedUnitLimitError,
   getStagingPlacementError,
   isItemCard,
@@ -423,6 +424,13 @@ function moveCard(
   if (BATTLEFIELD_ZONES.has(fromZone) && toZone === 'staging' && !isUnitCard(card.card)) {
     return rejected(state, 'Only units can retreat from a battlefield zone to staging.');
   }
+  if (
+    BATTLEFIELD_ZONES.has(fromZone) &&
+    toZone === 'staging' &&
+    state.zones[fromZone].some((instance) => instance.card.id === 'IMP063' && !instance.faceDown)
+  ) {
+    return rejected(state, 'Units cannot retreat from a Quarantine Zone.');
+  }
 
   if (isUnitCard(card.card) && (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone))) {
     const sourceIsAlreadyInPlay = fromZone === 'staging' || BATTLEFIELD_ZONES.has(fromZone);
@@ -476,7 +484,7 @@ function moveCard(
     const cost = isTacticCard(card.card)
       ? getModifiedPlayCost(state, owner, card.card)
       : getManualPlayCost(card.card, toZone, { faceDown: options.faceDown });
-    const readySupplyCount = ownerZones.supply.filter((instance) => instance.ready).length;
+    const readySupplyCount = getReadySupplyCount(state, owner);
 
     if (readySupplyCount < cost) {
       return rejected(

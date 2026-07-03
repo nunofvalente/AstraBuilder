@@ -41,6 +41,12 @@ export type GameCardInstance = {
   temporaryInfluenceBonus?: number;
   temporaryInfluenceExpiresAfterTurn?: number;
   preventNextCombatDamageThisTurn?: boolean;
+  temporaryAttackBonus?: number;
+  temporaryHealthBonus?: number;
+  temporaryStatsExpireAfterTurn?: number;
+  combatAttackBonus?: number;
+  progressCounters?: number;
+  endTurnAbilityResolvedTurn?: number;
 };
 
 export type LogEntry = {
@@ -118,6 +124,37 @@ export type PendingChoice =
       availableInstanceIds: string[];
       optional?: boolean;
       resumeTurnAdvance?: boolean;
+    }
+  | {
+      kind: 'luxTarget';
+      owner: 'player';
+      sourceInstanceId: string;
+      sourceName: string;
+      prompt: string;
+      effect:
+        | 'artilleryDamage'
+        | 'biscuitBottom'
+        | 'biscuitReturn'
+        | 'celesteExhaust'
+        | 'communityEffort'
+        | 'strategistReady'
+        | 'emergencyReturn'
+        | 'farsightDamage'
+        | 'fortunaSacrifice'
+        | 'hallowedReturn'
+        | 'musterReady'
+        | 'medicPrevent'
+        | 'resuscitate'
+        | 'seraphielReturn'
+        | 'smokescreen'
+        | 'stormhammerExhaust'
+        | 'stormhammerDamage'
+        | 'suppression';
+      availableInstanceIds: string[];
+      optional?: boolean;
+      maxSelections?: number;
+      contextInstanceIds?: string[];
+      resumeTurnAdvance?: boolean;
     };
 
 export type GameState = {
@@ -141,6 +178,8 @@ export type GameState = {
   opponentCardsDrawnThisTurn: number;
   playerDemonicAdvanceActive: boolean;
   opponentDemonicAdvanceActive: boolean;
+  playerTemporarySupply: number;
+  opponentTemporarySupply: number;
   winner: Owner | null;
   pendingCombat: PendingCombat | null;
   pendingChoice: PendingChoice | null;
