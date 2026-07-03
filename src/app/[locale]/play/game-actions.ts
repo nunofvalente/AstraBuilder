@@ -7,16 +7,20 @@ import {
   getBattlefieldPlacementError,
   getEquipmentAttachmentError,
   getManualPlayCost,
+  getModifiedPlayCost,
   getPlayCost,
   getPlayCostError,
   getStagingPlacementError,
   isItemCard,
   isTerritoryCard,
+  isTacticCard,
   isUnitCard,
   markSuppliedThisTurn,
   placeCardIntoSupply,
   placeStartingSupply,
   prepareCardForZone,
+  recordCardsDrawn,
+  resolveUnitTakesControlOfZone,
   stabilizeAttachmentState,
   splitBattlefieldReplacement,
   startGameAfterSetup,
@@ -32,6 +36,9 @@ export type MoveCardOptions = {
   faceDown?: boolean;
   enterExhausted?: boolean;
   attachToInstanceId?: string;
+  sacrificeUnitInstanceId?: string;
+  discardCardInstanceId?: string;
+  reanimateTargetInstanceId?: string;
   setupFirstPlayer?: Owner;
 };
 
@@ -134,6 +141,112 @@ function applied(state: GameState): CardActionResult {
   };
 }
 
+function getOwnedUnitsInPlay(state: GameState, owner: Owner): GameCardInstance[] {
+  const ownerZones = getOwnerZoneMap(state, owner);
+
+  return [
+    ...ownerZones.staging,
+    ...state.zones.battlefieldLeft,
+    ...state.zones.battlefieldCenter,
+    ...state.zones.battlefieldRight,
+  ].filter((instance) => instance.owner === owner && isUnitCard(instance.card));
+}
+
+function applyAdditionalPlayCost(
+  state: GameState,
+  owner: Owner,
+  card: GameCardInstance,
+  options: MoveCardOptions
+): CardActionResult {
+  if (card.card.id === 'IMP004') {
+    const targetId = options.sacrificeUnitInstanceId;
+
+    if (!targetId) {
+      return rejected(state, 'Choose a friendly unit to sacrifice to play Demonic Berserker.');
+    }
+
+    const ownerZones = getOwnerZoneMap(state, owner);
+    const targetZone = (['staging', 'battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] as const).find((zone) =>
+      (zone === 'staging' ? ownerZones.staging : state.zones[zone]).some(
+        (instance) => instance.instanceId === targetId && instance.owner === owner && isUnitCard(instance.card)
+      )
+    );
+
+    if (!targetZone) {
+      return rejected(state, 'That unit cannot be sacrificed to play Demonic Berserker.');
+    }
+
+    const zoneCards = targetZone === 'staging' ? ownerZones.staging : state.zones[targetZone];
+    const sacrificedUnit = zoneCards.find((instance) => instance.instanceId === targetId)!;
+    const sacrificedIds = new Set([
+      sacrificedUnit.instanceId,
+      ...zoneCards.filter((instance) => instance.attachedToInstanceId === sacrificedUnit.instanceId).map((instance) => instance.instanceId),
+    ]);
+    const remainingZoneCards = zoneCards.filter((instance) => !sacrificedIds.has(instance.instanceId));
+    const sacrificedCards = zoneCards
+      .filter((instance) => sacrificedIds.has(instance.instanceId))
+      .map((instance) => prepareCardForZone(instance, 'graveyard'));
+
+    const nextOwnerZones = {
+      ...ownerZones,
+      graveyard: [...sacrificedCards, ...ownerZones.graveyard],
+      ...(targetZone === 'staging'
+        ? { staging: remainingZoneCards }
+        : { [targetZone]: remainingZoneCards }),
+    } as Record<ZoneId, GameCardInstance[]>;
+
+    const nextState = applyOwnerZoneMap(state, owner, nextOwnerZones);
+    const loggedState = {
+      ...nextState,
+      log: addLogEntry(nextState, {
+        prefix: owner === 'player' ? 'Sacrificed ' : 'Bot sacrificed ',
+        cardName: sacrificedUnit.card.name,
+        suffix: ' to play Demonic Berserker.',
+      }),
+    };
+
+    return applied(triggerCardAbilities(loggedState, 'onDeath', {
+      source: sacrificedUnit,
+      controller: owner,
+      zone: 'graveyard',
+    }));
+  }
+
+  if (card.card.id === 'IMP005') {
+    const discardId = options.discardCardInstanceId;
+    const ownerZones = getOwnerZoneMap(state, owner);
+
+    if (!discardId) {
+      return rejected(state, 'Choose a card to discard to play Dreadscythe Myrmidon.');
+    }
+
+    const discardedCard = ownerZones.hand.find(
+      (instance) => instance.instanceId === discardId && instance.instanceId !== card.instanceId
+    );
+
+    if (!discardedCard) {
+      return rejected(state, 'That card cannot be discarded to play Dreadscythe Myrmidon.');
+    }
+
+    const nextState = applyOwnerZoneMap(state, owner, {
+      ...ownerZones,
+      hand: ownerZones.hand.filter((instance) => instance.instanceId !== discardedCard.instanceId),
+      graveyard: [prepareCardForZone(discardedCard, 'graveyard'), ...ownerZones.graveyard],
+    });
+
+    return applied({
+      ...nextState,
+      log: addLogEntry(state, {
+        prefix: owner === 'player' ? 'Discarded ' : 'Bot discarded ',
+        cardName: discardedCard.card.name,
+        suffix: ' to play Dreadscythe Myrmidon.',
+      }),
+    });
+  }
+
+  return applied(state);
+}
+
 function placeSupply(
   state: GameState,
   owner: Owner,
@@ -151,7 +264,7 @@ function placeSupply(
       return unchanged(state);
     }
 
-    const setupState = {
+    const setupState = recordCardsDrawn({
       ...state,
       playerStartingSupplyPlaced: true,
       zones: {
@@ -163,7 +276,7 @@ function placeSupply(
         cardName: setupSupply.selectedCard.card.name,
         suffix: ` as starting supply and drew ${setupSupply.replacementDraw.length} replacement card.`,
       }),
-    };
+    }, owner, setupSupply.replacementDraw.length);
 
     if (setupState.sessionMode !== 'multiplayer') {
       return applied(setupState);
@@ -193,14 +306,14 @@ function placeSupply(
     ...suppliedCard.zones,
   });
 
-  return applied(markSuppliedThisTurn({
+  return applied(recordCardsDrawn(markSuppliedThisTurn({
     ...suppliedState,
     log: addLogEntry(state, {
       prefix: owner === 'player' ? 'Supplied ' : 'Bot supplied ',
       cardName: suppliedCard.selectedCard.card.name,
       suffix: ` and drew ${suppliedCard.replacementDraw.length} card.`,
     }),
-  }, owner));
+  }, owner), owner, suppliedCard.replacementDraw.length));
 }
 
 function flipTerritory(
@@ -227,7 +340,7 @@ function flipTerritory(
     return rejected(state, costError);
   }
 
-  const paidState = exhaustSupplyForCost(state, owner, getPlayCost(card.card));
+  const paidState = exhaustSupplyForCost(state, owner, getModifiedPlayCost(state, owner, card.card));
   const ownerZones = getOwnerZoneMap(paidState, owner);
   const flippedCard = prepareCardForZone(card, zone, { faceDown: false });
   const flippedState = applyOwnerZoneMap(paidState, owner, {
@@ -280,7 +393,25 @@ function moveCard(
     }
   }
 
-  if (fromZone === 'hand' && BATTLEFIELD_ZONES.has(toZone) && !isTerritoryCard(card.card)) {
+  const demonicAdvanceActive = owner === 'player'
+    ? state.playerDemonicAdvanceActive
+    : state.opponentDemonicAdvanceActive;
+  const isDemonicAdvanceUnitPlay =
+    fromZone === 'hand' &&
+    BATTLEFIELD_ZONES.has(toZone) &&
+    isUnitCard(card.card) &&
+    demonicAdvanceActive &&
+    !state.zones[toZone].some((instance) => isUnitCard(instance.card));
+
+  if (
+    fromZone === 'hand' &&
+    toZone === 'graveyard' &&
+    !isTacticCard(card.card)
+  ) {
+    return rejected(state, 'Only tactics can be played directly to the graveyard.');
+  }
+
+  if (fromZone === 'hand' && BATTLEFIELD_ZONES.has(toZone) && !isTerritoryCard(card.card) && !isDemonicAdvanceUnitPlay) {
     return rejected(state, `${ZONE_LABELS[toZone]} only accepts territories from hand.`);
   }
 
@@ -292,15 +423,40 @@ function moveCard(
     fromZone === 'hand' &&
     (
       (toZone === 'staging' && (isUnitCard(card.card) || isItemCard(card.card))) ||
-      (BATTLEFIELD_ZONES.has(toZone) && isTerritoryCard(card.card))
+      (BATTLEFIELD_ZONES.has(toZone) && (isTerritoryCard(card.card) || isDemonicAdvanceUnitPlay)) ||
+      (toZone === 'graveyard' && isTacticCard(card.card))
     );
+  const isPaidPlayFromGraveyard =
+    fromZone === 'graveyard' &&
+    toZone === 'staging' &&
+    (card.card.id === 'IMP007' || card.card.id === 'IMP009');
+  const isPaidPlay = isPaidPlayFromHand || isPaidPlayFromGraveyard;
 
-  if (isPaidPlayFromHand) {
+  if (isPaidPlay) {
     if (state.phase !== 'main' || state.activePlayer !== owner) {
       return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only play cards during ${owner === 'player' ? 'your' : 'its'} main turn.`);
     }
 
-    const cost = getManualPlayCost(card.card, toZone, { faceDown: options.faceDown });
+    if (card.card.id === 'IMP004' && getOwnedUnitsInPlay(state, owner).length === 0) {
+      return rejected(state, 'You need a friendly unit in play to sacrifice for Demonic Berserker.');
+    }
+
+    if (card.card.id === 'IMP005' && ownerZones.hand.filter((instance) => instance.instanceId !== card.instanceId).length === 0) {
+      return rejected(state, 'You need another card in hand to discard for Dreadscythe Myrmidon.');
+    }
+
+    if (
+      card.card.id === 'IMP006' &&
+      !ownerZones.graveyard.some(
+        (instance) => isUnitCard(instance.card) && !instance.card.type.toLowerCase().includes('renowned')
+      )
+    ) {
+      return rejected(state, 'You need a non-Renowned unit in your graveyard to play Ebonblight Invoker.');
+    }
+
+    const cost = isTacticCard(card.card)
+      ? getModifiedPlayCost(state, owner, card.card)
+      : getManualPlayCost(card.card, toZone, { faceDown: options.faceDown });
     const readySupplyCount = ownerZones.supply.filter((instance) => instance.ready).length;
 
     if (readySupplyCount < cost) {
@@ -311,8 +467,20 @@ function moveCard(
     }
   }
 
-  const paidState = isPaidPlayFromHand
-    ? exhaustSupplyForCost(state, owner, getManualPlayCost(card.card, toZone, { faceDown: options.faceDown }))
+  const additionalCostState = isPaidPlayFromHand ? applyAdditionalPlayCost(state, owner, card, options) : applied(state);
+
+  if (isPaidPlayFromHand && additionalCostState.error) {
+    return additionalCostState;
+  }
+
+  const paidState = isPaidPlay
+    ? exhaustSupplyForCost(
+        additionalCostState.state,
+        owner,
+        isTacticCard(card.card)
+          ? getModifiedPlayCost(additionalCostState.state, owner, card.card)
+          : getManualPlayCost(card.card, toZone, { faceDown: options.faceDown })
+      )
     : state;
   const paidOwnerZones = getOwnerZoneMap(paidState, owner);
   const destinationCards = paidOwnerZones[toZone];
@@ -321,7 +489,10 @@ function moveCard(
     : { destinationCards, replacedTerritory: null };
 
   if (BATTLEFIELD_ZONES.has(toZone)) {
-    const placementError = getBattlefieldPlacementError(card, battlefieldPlacement.destinationCards);
+    const placementError = getBattlefieldPlacementError(
+      isDemonicAdvanceUnitPlay ? { ...card, ready: true } : card,
+      battlefieldPlacement.destinationCards
+    );
 
     if (placementError) {
       return rejected(state, `${ZONE_LABELS[toZone]} ${placementError}`);
@@ -330,19 +501,31 @@ function moveCard(
 
   const attachedCards =
     fromZone === 'staging' || BATTLEFIELD_ZONES.has(fromZone)
-      ? getAttachedCards(ownerZones[fromZone], card.instanceId)
+      ? getAttachedCards(paidOwnerZones[fromZone], card.instanceId)
       : [];
   const movedCardIds = new Set([card.instanceId, ...attachedCards.map((instance) => instance.instanceId)]);
-  const sourceCards = ownerZones[fromZone].filter((instance) => !movedCardIds.has(instance.instanceId));
+  const sourceCards = paidOwnerZones[fromZone].filter((instance) => !movedCardIds.has(instance.instanceId));
   const graveyardCards = battlefieldPlacement.replacedTerritory
     ? [battlefieldPlacement.replacedTerritory, ...paidOwnerZones.graveyard]
     : paidOwnerZones.graveyard;
+  const nextGraveyardCards = fromZone === 'graveyard' ? sourceCards : graveyardCards;
   const movedCard = prepareCardForZone(card, toZone, {
     faceDown: BATTLEFIELD_ZONES.has(toZone) && isTerritoryCard(card.card) ? options.faceDown : false,
     enterExhausted: toZone === 'staging' ? options.enterExhausted || BATTLEFIELD_ZONES.has(fromZone) : false,
-    enterReady: fromZone === 'hand' && isItemCard(card.card) ? true : undefined,
+    enterReady:
+      isDemonicAdvanceUnitPlay
+        ? true
+        :
+      fromZone === 'hand' && isItemCard(card.card)
+        ? true
+        : fromZone === 'graveyard' && card.card.id === 'IMP009'
+          ? true
+          : undefined,
     attachToInstanceId: isItemCard(card.card) ? options.attachToInstanceId ?? card.attachedToInstanceId : null,
   });
+  if (fromZone === 'graveyard' && (card.card.id === 'IMP007' || card.card.id === 'IMP009')) {
+    movedCard.banishOnDeath = true;
+  }
   const movedAttachments = attachedCards.map((instance) =>
     prepareCardForZone(instance, toZone, {
       attachToInstanceId: movedCard.instanceId,
@@ -351,7 +534,7 @@ function moveCard(
   const nextZones = {
     ...paidOwnerZones,
     [fromZone]: sourceCards,
-    graveyard: graveyardCards,
+    graveyard: nextGraveyardCards,
     [toZone]: [movedCard, ...movedAttachments, ...battlefieldPlacement.destinationCards],
   };
   const stabilizedAttachments = stabilizeAttachmentState(nextZones, owner);
@@ -362,6 +545,11 @@ function moveCard(
   const movedZoneState = applyOwnerZoneMap(paidState, owner, stabilizedAttachments.zones);
   let movedState = {
     ...movedZoneState,
+    ...(isDemonicAdvanceUnitPlay
+      ? owner === 'player'
+        ? { playerDemonicAdvanceActive: false }
+        : { opponentDemonicAdvanceActive: false }
+      : null),
     log: addLogEntry(state, {
       prefix: owner === 'player' ? 'Moved ' : 'Bot moved ',
       cardName: card.card.name,
@@ -396,9 +584,10 @@ function moveCard(
           source: movedCard,
           controller: owner,
           zone: toZone,
+          targets: options.reanimateTargetInstanceId ? [{ type: 'card', instanceId: options.reanimateTargetInstanceId }] : undefined,
         })
       : movedState;
-  const enteredState =
+  let enteredState =
     toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone)
       ? triggerCardAbilities(playTriggeredState, 'onEnter', {
           source: movedCard,
@@ -406,6 +595,10 @@ function moveCard(
           zone: toZone,
         })
       : playTriggeredState;
+
+  if (isDemonicAdvanceUnitPlay) {
+    enteredState = resolveUnitTakesControlOfZone(enteredState, toZone);
+  }
 
   return applied(enteredState);
 }
@@ -428,6 +621,10 @@ export function applyCardAction(
     return rejected(state, 'Resolve the pending combat before taking another action.');
   }
 
+  if (state.pendingChoice) {
+    return rejected(state, 'Resolve the pending ability choice before taking another action.');
+  }
+
   const ownerZones = getOwnerZoneMap(state, owner);
   const card = ownerZones[fromZone].find((instance) => instance.instanceId === instanceId) ?? null;
 
@@ -447,7 +644,13 @@ export function applyCardAction(
     return rejected(state, 'Only cards from hand can be supplied manually.');
   }
 
-  if (toZone === 'deck' || toZone === 'hand' || toZone === 'graveyard' || toZone === 'banish') {
+  const isTacticPlay = fromZone === 'hand' && toZone === 'graveyard' && isTacticCard(card.card);
+  if (
+    toZone === 'deck' ||
+    toZone === 'hand' ||
+    (toZone === 'graveyard' && !isTacticPlay) ||
+    toZone === 'banish'
+  ) {
     return rejected(state, `Cards cannot be moved to ${ZONE_LABELS[toZone]} manually.`);
   }
 
@@ -457,17 +660,29 @@ export function applyCardAction(
 
   const isHandPlay =
     fromZone === 'hand' &&
-    (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone));
+    (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone) || isTacticPlay);
+  const isSpecialGraveyardPlay =
+    fromZone === 'graveyard' &&
+    toZone === 'staging' &&
+    (card.card.id === 'IMP007' || card.card.id === 'IMP009');
   const isRetreat =
     BATTLEFIELD_ZONES.has(fromZone) &&
     toZone === 'staging';
 
-  if (!isHandPlay && !isRetreat) {
+  if (!isHandPlay && !isRetreat && !isSpecialGraveyardPlay) {
     return rejected(state, `Cards cannot be moved from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]} manually.`);
   }
 
   if (isRetreat && (state.phase !== 'main' || state.activePlayer !== owner)) {
     return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only retreat units during ${owner === 'player' ? 'your' : 'its'} main turn.`);
+  }
+
+  if (isRetreat && card.retreatLockedUntilNextTurn) {
+    return rejected(state, 'That unit cannot retreat until your next turn because it captured the battlefield through combat this turn.');
+  }
+
+  if (isSpecialGraveyardPlay && (state.phase !== 'main' || state.activePlayer !== owner)) {
+    return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only play cards during ${owner === 'player' ? 'your' : 'its'} main turn.`);
   }
 
   return moveCard(state, owner, card, fromZone, toZone, options);

@@ -12,7 +12,7 @@ import {
   type GameState,
 } from './game-rules';
 
-export const BOT_TURN_STEPS = ['supply', 'stageUnit', 'attackBattlefield'] as const satisfies BotTurnStep[];
+export const BOT_TURN_STEPS = ['supply', 'stageUnit', 'stageUnit', 'attackBattlefield'] as const satisfies BotTurnStep[];
 
 export function applyBotTurnStep(state: GameState, step: BotTurnStep): GameState {
   const command = chooseBotTurnCommand(state, step);

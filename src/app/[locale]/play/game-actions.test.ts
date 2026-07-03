@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { createTestCard } from '../create/deck-builder/test-utils';
 import { applyCardAction, applyPlayerCardAction } from './game-actions';
 import {
+  advanceToNextTurn,
   buildInitialGameState,
   declareBattlefieldAttack,
+  resolveBattlefieldAttack,
   type GameCardInstance,
   type GameState,
   type SavedDeck,
@@ -33,6 +35,9 @@ function makeInstance(overrides: Partial<GameCardInstance> = {}): GameCardInstan
     faceDown: overrides.faceDown ?? false,
     attachedToInstanceId: overrides.attachedToInstanceId ?? null,
     damage: overrides.damage ?? 0,
+    retreatLockedUntilNextTurn: overrides.retreatLockedUntilNextTurn ?? false,
+    banishOnDeath: overrides.banishOnDeath ?? false,
+    discardCardOnDeathThisTurnCount: overrides.discardCardOnDeathThisTurnCount ?? 0,
   };
 }
 
@@ -206,6 +211,348 @@ describe('deterministic player card actions', () => {
     expect(result.state.zones.supply[0]?.ready).toBe(false);
   });
 
+  it('plays IMP014 and creates an Experiment token on enter', () => {
+    const researcher = makeInstance({
+      instanceId: 'noxhaven-researcher',
+      card: createTestCard({
+        id: 'IMP014',
+        name: 'Noxhaven Researcher',
+        type: 'Unit Vampire',
+        cost: 2,
+        attack: 0,
+        health: 1,
+        influence: 1,
+        rulesText: 'On Enter: Create a 2/2 Experiment unit token with 0 influence.',
+      }),
+    });
+    const supplies = [
+      makeInstance({ instanceId: 'supply-1', ready: true }),
+      makeInstance({ instanceId: 'supply-2', ready: true }),
+    ];
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [researcher],
+        staging: [],
+        supply: supplies,
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: researcher.instanceId,
+      fromZone: 'hand',
+      toZone: 'staging',
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instanceId: researcher.instanceId, ready: false }),
+        expect.objectContaining({
+          owner: 'player',
+          ready: false,
+          card: expect.objectContaining({ id: 'IMP000', name: 'Experiment', attack: 2, health: 2, influence: 0 }),
+        }),
+      ])
+    );
+    expect(result.state.zones.supply.every((instance) => !instance.ready)).toBe(true);
+    expect(result.state.log[0]?.suffix).toBe('Noxhaven Researcher created Experiment in staging.');
+  });
+
+  it('plays a Nox tactic and uses Demonic Advance for the next unit', () => {
+    const advance = makeInstance({
+      instanceId: 'demonic-advance',
+      card: createTestCard({
+        id: 'IMP021',
+        name: 'Demonic Advance',
+        type: 'Tactic',
+        cost: 1,
+        rulesText: 'The next unit you play this turn can be played directly into an unoccupied combat zone. If you do, it enters ready.',
+      }),
+    });
+    const unit = makeInstance({
+      instanceId: 'advanced-unit',
+      card: createTestCard({ id: 'advanced-unit', name: 'Advanced Unit', type: 'Unit', cost: 2 }),
+    });
+    const supplies = [
+      makeInstance({ instanceId: 'supply-1', ready: true }),
+      makeInstance({ instanceId: 'supply-2', ready: true }),
+      makeInstance({ instanceId: 'supply-3', ready: true }),
+    ];
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [advance, unit],
+        supply: supplies,
+      },
+    };
+
+    const tacticResult = applyPlayerCardAction(state, {
+      instanceId: advance.instanceId,
+      fromZone: 'hand',
+      toZone: 'graveyard',
+    });
+    expect(tacticResult.applied).toBe(true);
+    expect(tacticResult.state.playerDemonicAdvanceActive).toBe(true);
+
+    const unitResult = applyPlayerCardAction(tacticResult.state, {
+      instanceId: unit.instanceId,
+      fromZone: 'hand',
+      toZone: 'battlefieldLeft',
+    });
+    expect(unitResult.applied).toBe(true);
+    expect(unitResult.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: unit.instanceId,
+      ready: true,
+    });
+    expect(unitResult.state.playerDemonicAdvanceActive).toBe(false);
+    expect(unitResult.state.zones.supply.every((card) => !card.ready)).toBe(true);
+  });
+
+  it('plays IMP004 and resolves the sacrificed unit on-death ability', () => {
+    const berserker = makeInstance({
+      instanceId: 'berserker',
+      card: createTestCard({
+        id: 'IMP004',
+        name: 'Demonic Berserker',
+        type: 'Unit',
+        cost: 3,
+        attack: 4,
+        health: 5,
+        rulesText: 'As an additional cost to play this unit, sacrifice a unit.',
+      }),
+    });
+    const sacrifice = makeInstance({
+      instanceId: 'cadaver-supplier',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP002',
+        name: 'Cadaver Supplier',
+        type: 'Unit',
+        attack: 3,
+        health: 2,
+        influence: 1,
+        rulesText: 'On Death: Create a 2/2 Experiment unit token with 0 influence.',
+      }),
+    });
+    const supplies = [
+      makeInstance({ instanceId: 'supply-1', ready: true }),
+      makeInstance({ instanceId: 'supply-2', ready: true }),
+      makeInstance({ instanceId: 'supply-3', ready: true }),
+    ];
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [berserker],
+        staging: [sacrifice],
+        supply: supplies,
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: berserker.instanceId,
+      fromZone: 'hand',
+      toZone: 'staging',
+      options: { sacrificeUnitInstanceId: sacrifice.instanceId },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.hand).toEqual([]);
+    expect(result.state.zones.staging).toEqual(
+      expect.arrayContaining([expect.objectContaining({ instanceId: berserker.instanceId, ready: false })])
+    );
+    expect(result.state.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          owner: 'player',
+          ready: false,
+          card: expect.objectContaining({ id: 'IMP000', name: 'Experiment' }),
+        }),
+      ])
+    );
+    expect(result.state.zones.graveyard[0]?.instanceId).toBe(sacrifice.instanceId);
+    expect(result.state.zones.supply.every((instance) => !instance.ready)).toBe(true);
+  });
+
+  it('plays IMP005 by discarding another card as an additional cost', () => {
+    const myrmidon = makeInstance({
+      instanceId: 'myrmidon',
+      card: createTestCard({
+        id: 'IMP005',
+        name: 'Dreadscythe Myrmidon',
+        type: 'Unit',
+        cost: 4,
+        attack: 5,
+        health: 4,
+        rulesText: 'As an additional cost to play this unit, discard a card.',
+      }),
+    });
+    const discard = makeInstance({ instanceId: 'discard', card: createTestCard({ id: 'discard', name: 'Spare Card', type: 'Tactic' }) });
+    const supplies = [
+      makeInstance({ instanceId: 'supply-1', ready: true }),
+      makeInstance({ instanceId: 'supply-2', ready: true }),
+      makeInstance({ instanceId: 'supply-3', ready: true }),
+      makeInstance({ instanceId: 'supply-4', ready: true }),
+    ];
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [myrmidon, discard],
+        supply: supplies,
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: myrmidon.instanceId,
+      fromZone: 'hand',
+      toZone: 'staging',
+      options: { discardCardInstanceId: discard.instanceId },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.hand).toEqual([]);
+    expect(result.state.zones.staging[0]).toMatchObject({
+      instanceId: myrmidon.instanceId,
+      ready: false,
+    });
+    expect(result.state.zones.graveyard[0]?.instanceId).toBe(discard.instanceId);
+    expect(result.state.zones.supply.every((instance) => !instance.ready)).toBe(true);
+  });
+
+  it('plays IMP006 and returns a non-Renowned unit from graveyard to staging exhausted', () => {
+    const invoker = makeInstance({
+      instanceId: 'invoker',
+      card: createTestCard({
+        id: 'IMP006',
+        name: 'Ebonblight Invoker',
+        type: 'Unit',
+        cost: 7,
+        attack: 3,
+        health: 3,
+        rulesText: 'On Play: Return a non-Renowned unit from your graveyard to your staging area. (Units enter exhausted.)',
+      }),
+    });
+    const revived = makeInstance({
+      instanceId: 'revived',
+      card: createTestCard({ id: 'revived', name: 'Revived Unit', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const supplies = Array.from({ length: 7 }, (_, index) => makeInstance({ instanceId: `supply-${index}`, ready: true }));
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [invoker],
+        graveyard: [revived],
+        supply: supplies,
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: invoker.instanceId,
+      fromZone: 'hand',
+      toZone: 'staging',
+      options: { reanimateTargetInstanceId: revived.instanceId },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instanceId: invoker.instanceId, ready: false }),
+        expect.objectContaining({ instanceId: revived.instanceId, ready: false }),
+      ])
+    );
+    expect(result.state.zones.graveyard).toEqual([]);
+  });
+
+  it('plays IMP007 from graveyard and marks it to be banished on death', () => {
+    const guineaPig = makeInstance({
+      instanceId: 'guinea-pig',
+      card: createTestCard({
+        id: 'IMP007',
+        name: 'Guinea Pig',
+        type: 'Unit',
+        cost: 1,
+        attack: 1,
+        health: 1,
+        rulesText: 'You may play this card from your graveyard. If you do, it gains "On Death: Banish this instead."',
+      }),
+    });
+    const supply = makeInstance({ instanceId: 'supply', ready: true });
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        graveyard: [guineaPig],
+        supply: [supply],
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: guineaPig.instanceId,
+      fromZone: 'graveyard',
+      toZone: 'staging',
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.graveyard).toEqual([]);
+    expect(result.state.zones.staging[0]).toMatchObject({
+      instanceId: guineaPig.instanceId,
+      ready: false,
+      banishOnDeath: true,
+    });
+    expect(result.state.zones.supply[0]?.ready).toBe(false);
+  });
+
+  it('plays IMP009 from graveyard ready and marks it to be banished on death', () => {
+    const jormun = makeInstance({
+      instanceId: 'jormun',
+      card: createTestCard({
+        id: 'IMP009',
+        name: 'Jormun, Feldragon of Wyrmscar',
+        type: 'Renowned Unit Dragon',
+        cost: 6,
+        attack: 6,
+        health: 6,
+        rulesText: 'You may play this card from your graveyard. If you do, it enters ready and gains "On Death: Banish this instead."',
+      }),
+    });
+    const supplies = Array.from({ length: 6 }, (_, index) => makeInstance({ instanceId: `supply-${index}`, ready: true }));
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        graveyard: [jormun],
+        supply: supplies,
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: jormun.instanceId,
+      fromZone: 'graveyard',
+      toZone: 'staging',
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.graveyard).toEqual([]);
+    expect(result.state.zones.staging[0]).toMatchObject({
+      instanceId: jormun.instanceId,
+      ready: true,
+      banishOnDeath: true,
+    });
+    expect(result.state.zones.supply.every((instance) => !instance.ready)).toBe(true);
+  });
+
   it('attaches equipment to a staging unit and pays its cost', () => {
     const unit = makeInstance({ instanceId: 'host-unit', ready: true });
     const equipment = makeInstance({
@@ -326,6 +673,92 @@ describe('deterministic player card actions', () => {
       expect.arrayContaining([
         expect.objectContaining({ instanceId: unit.instanceId, ready: false, damage: 0 }),
         expect.objectContaining({ instanceId: equipment.instanceId, attachedToInstanceId: unit.instanceId }),
+      ])
+    );
+  });
+
+  it('does not let a unit retreat on the same turn it captured through combat', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const baseState = makePlayerTurn();
+    const combatState = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const combatResult = resolveBattlefieldAttack(combatState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in combatResult ? combatResult.error : null).toBeNull();
+    if ('error' in combatResult) {
+      return;
+    }
+
+    const retreatResult = applyPlayerCardAction(combatResult.state, {
+      instanceId: attacker.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'staging',
+    });
+
+    expect(retreatResult.applied).toBe(false);
+    expect(retreatResult.error).toBe(
+      'That unit cannot retreat until your next turn because it captured the battlefield through combat this turn.'
+    );
+  });
+
+  it('lets a captured battlefield unit retreat on a later turn', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2 }),
+    });
+    const baseState = makePlayerTurn();
+    const combatState = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const combatResult = resolveBattlefieldAttack(combatState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in combatResult ? combatResult.error : null).toBeNull();
+    if ('error' in combatResult) {
+      return;
+    }
+
+    const nextTurnState = advanceToNextTurn(advanceToNextTurn(combatResult.state));
+    const retreatResult = applyPlayerCardAction(nextTurnState, {
+      instanceId: attacker.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'staging',
+    });
+
+    expect(retreatResult.applied).toBe(true);
+    expect(retreatResult.state.zones.battlefieldLeft).toEqual([]);
+    expect(retreatResult.state.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instanceId: attacker.instanceId, ready: false, retreatLockedUntilNextTurn: false }),
       ])
     );
   });
