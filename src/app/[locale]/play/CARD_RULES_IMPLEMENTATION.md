@@ -11,8 +11,9 @@ Card rules are implemented from canonical card text, not stored as executable da
 
 ## Current Trigger Flow
 
-- Moving a card from hand fires `onPlay`.
-- Moving a card into staging or a battlefield zone fires `onEnter`.
+- Playing a card from hand fires `onPlay`.
+- Playing a card into staging or a battlefield zone fires `onEnter`.
+- Ordinary board movement, including attacks into combat zones and retreats to staging, does not fire `onEnter`.
 - Implemented ability handlers resolve through `CARD_ABILITY_REGISTRY`.
 - Printed but unimplemented triggers are logged in the action log.
 

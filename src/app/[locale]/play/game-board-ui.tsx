@@ -6,10 +6,13 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Card } from '../create/deck-builder/types';
 import {
   getAttachedCards,
+  getCardController,
+  getCurrentUnitInfluence,
   getPlayCost,
   isTerritoryCard,
   isUnitCard,
   type GameCardInstance,
+  type Owner,
   type ZoneId,
 } from './game-rules';
 import {
@@ -32,6 +35,7 @@ import {
 export type BattlefieldZoneId = 'battlefieldLeft' | 'battlefieldCenter' | 'battlefieldRight';
 type AttackBattlefieldHandler = (attackerInstanceId: string, targetZone: ZoneId) => void;
 type ActivateAbilityHandler = (source: GameCardInstance) => void;
+type CardsDrawnThisTurnByOwner = Record<Owner, number>;
 export type AttackArrowState = {
   id: number;
   from: { x: number; y: number };
@@ -47,6 +51,48 @@ export function DamageBadge({ instance }: { instance: GameCardInstance }) {
   return (
     <span className="absolute right-1 top-1 z-20 grid h-5 min-w-5 place-items-center rounded-full border border-red-200/60 bg-red-700/95 px-1 text-[0.62rem] font-black leading-none text-white shadow-md">
       {damage}
+    </span>
+  );
+}
+
+export function InfluenceBonusBadge({ instance }: { instance: GameCardInstance }) {
+  const bonus = Number(instance.temporaryInfluenceBonus ?? 0);
+
+  if (!isUnitCard(instance.card) || !Number.isFinite(bonus) || bonus <= 0) {
+    return null;
+  }
+
+  return (
+    <span
+      className="absolute left-1 top-1 z-20 rounded-full border border-emerald-200/70 bg-emerald-700/95 px-1.5 py-0.5 text-[0.56rem] font-black leading-none text-white shadow-md"
+      title={`+${bonus} influence`}
+    >
+      +{bonus} INF
+    </span>
+  );
+}
+
+export function CurrentInfluenceBadge({
+  instance,
+  attachedCards,
+  cardsDrawnThisTurnByOwner,
+}: {
+  instance: GameCardInstance;
+  attachedCards: GameCardInstance[];
+  cardsDrawnThisTurnByOwner: CardsDrawnThisTurnByOwner;
+}) {
+  if (!isUnitCard(instance.card) || instance.card.id !== 'IMP019') {
+    return null;
+  }
+
+  const influence = getCurrentUnitInfluence(instance, attachedCards, cardsDrawnThisTurnByOwner[getCardController(instance)]);
+
+  return (
+    <span
+      className="absolute bottom-1 left-1 z-20 rounded-full border border-sky-100/70 bg-sky-700/95 px-1.5 py-0.5 text-[0.56rem] font-black leading-none text-white shadow-md"
+      title={`Current influence: ${influence}`}
+    >
+      INF {influence}
     </span>
   );
 }
@@ -87,6 +133,7 @@ export function BattlefieldPanel({
   disabled = false,
   canFlipFaceUp = false,
   readySupplyCount = 0,
+  cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
 }: {
   zone: ZoneId;
   cards: GameCardInstance[];
@@ -95,8 +142,10 @@ export function BattlefieldPanel({
   disabled?: boolean;
   canFlipFaceUp?: boolean;
   readySupplyCount?: number;
+  cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
 }) {
   const unit = cards.find((instance) => isUnitCard(instance.card)) ?? null;
+  const zoneControlLabel = unit ? (getCardController(unit) === 'player' ? 'Captured' : 'Lost') : null;
   const playerTerritory = cards.find((instance) => instance.owner === 'player' && isTerritoryCard(instance.card)) ?? null;
   const opponentTerritory = cards.find((instance) => instance.owner === 'opponent' && isTerritoryCard(instance.card)) ?? null;
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
@@ -111,7 +160,8 @@ export function BattlefieldPanel({
       })
     : [];
   const canActivate =
-    activeInstance?.owner === 'player' &&
+    activeInstance &&
+    getCardController(activeInstance) === 'player' &&
     (
       (activeInstance.card.id === 'IMP001' && !activeInstance.ready) ||
       (activeInstance.card.id === 'IMP016' && activeInstance.ready)
@@ -137,7 +187,11 @@ export function BattlefieldPanel({
 
   function openPreview(instance: GameCardInstance) {
     cancelPreviewClear();
-    setPreviewCards([instance, ...getAttachedCards(cards, instance.instanceId)]);
+    const previewInstance =
+      instance.owner === 'player' && instance.faceDown && isTerritoryCard(instance.card)
+        ? { ...instance, faceDown: false }
+        : instance;
+    setPreviewCards([previewInstance, ...getAttachedCards(cards, instance.instanceId)]);
   }
 
   function openEquipmentPreview(instance: GameCardInstance) {
@@ -202,6 +256,12 @@ export function BattlefieldPanel({
           {instance.faceDown || instance.card.imageSrc ? (
             <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes={size === 'unit' ? '88px' : '56px'} className="object-cover" />
           ) : null}
+          <InfluenceBonusBadge instance={instance} />
+          <CurrentInfluenceBadge
+            instance={instance}
+            attachedCards={getAttachedCards(cards, instance.instanceId)}
+            cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
+          />
           <DamageBadge instance={instance} />
         </span>
       </button>
@@ -231,7 +291,7 @@ export function BattlefieldPanel({
         }}
       />
       <p className="truncate text-center text-[0.7rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-        {ZONE_LABELS[zone]}
+        {ZONE_LABELS[zone]}{zoneControlLabel ? ` (${zoneControlLabel})` : ''}
       </p>
       <div className="grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
         {renderTerritoryColumn('Your territory', playerTerritory)}
@@ -304,6 +364,7 @@ export function CombinedStagingSupplyPanel({
   onActivate,
   battlefieldCardsByZone,
   disabled = false,
+  cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
 }: {
   stagingCards: GameCardInstance[];
   supplyCards: GameCardInstance[];
@@ -317,6 +378,7 @@ export function CombinedStagingSupplyPanel({
   onActivate?: ActivateAbilityHandler;
   battlefieldCardsByZone?: Record<BattlefieldZoneId, GameCardInstance[]>;
   disabled?: boolean;
+  cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
 }) {
   const visibleStagingCards = stagingCards.filter(
     (instance) =>
@@ -339,7 +401,8 @@ export function CombinedStagingSupplyPanel({
     ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']
     : [];
   const canActivateActiveStagingCard =
-    activeStagingCard?.owner === 'player' &&
+    activeStagingCard &&
+    getCardController(activeStagingCard) === 'player' &&
     (
       (activeStagingCard.card.id === 'IMP001' && !activeStagingCard.ready) ||
       (activeStagingCard.card.id === 'IMP016' && activeStagingCard.ready)
@@ -517,6 +580,12 @@ export function CombinedStagingSupplyPanel({
                     {instance.card.imageSrc ? (
                       <Image src={instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                     ) : null}
+                    <InfluenceBonusBadge instance={instance} />
+                    <CurrentInfluenceBadge
+                      instance={instance}
+                      attachedCards={attachedItems}
+                      cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
+                    />
                     <DamageBadge instance={instance} />
                   </button>
                 </div>
@@ -596,8 +665,8 @@ export function CombinedStagingSupplyPanel({
               </button>
             ) : null}
             {stagingTargets.map((target) => {
-              const defender = battlefieldCardsByZone?.[target]?.find((instance) => isUnitCard(instance.card) && instance.owner !== activeStagingCard.owner) ?? null;
-              const friendlyOccupant = battlefieldCardsByZone?.[target]?.find((instance) => isUnitCard(instance.card) && instance.owner === activeStagingCard.owner) ?? null;
+              const defender = battlefieldCardsByZone?.[target]?.find((instance) => isUnitCard(instance.card) && getCardController(instance) !== getCardController(activeStagingCard)) ?? null;
+              const friendlyOccupant = battlefieldCardsByZone?.[target]?.find((instance) => isUnitCard(instance.card) && getCardController(instance) === getCardController(activeStagingCard)) ?? null;
 
               return (
                 <button
@@ -651,7 +720,7 @@ export function CombinedStagingSupplyPanel({
                       onMouseEnter={() => openEquipmentPreview(instance)}
                       onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
                     >
-                      {onMove && !disabled && instance.owner === 'player' && (instance.card.id === 'IMP007' || instance.card.id === 'IMP009') ? (
+                      {onMove && !disabled && getCardController(instance) === 'player' && (instance.card.id === 'IMP007' || instance.card.id === 'IMP009') ? (
                         <button
                           type="button"
                           onClick={() => {

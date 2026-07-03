@@ -4,6 +4,7 @@ import {
   canManuallySupplyFromHand,
   getBattlefieldAttackError,
   getBattlefieldPlacementError,
+  getCardController,
   getCounterPlayError,
   getEquipmentAttachmentError,
   getFriendlyUnitsInPlay,
@@ -287,7 +288,7 @@ function chooseBotTerritoryPlay(state: GameState): BotCommand | null {
 }
 
 function getAttackChoiceScore(state: GameState, attacker: GameCardInstance, targetZone: ZoneId): number {
-  const defender = state.zones[targetZone].find((instance) => instance.owner === 'player' && isUnitCard(instance.card)) ?? null;
+  const defender = state.zones[targetZone].find((instance) => getCardController(instance) === 'player' && isUnitCard(instance.card)) ?? null;
 
   if (!defender) {
     const territoryValue = state.zones[targetZone].some((instance) => isTerritoryCard(instance.card)) ? 3 : 0;
@@ -316,7 +317,7 @@ export function getBotBattlefieldAttackChoice(state: GameState): BotBattlefieldA
   const readyAttackers = state.opponentZones.staging.filter((instance) => instance.ready && isUnitCard(instance.card));
   const targetZones = [
     ...BATTLEFIELD_ZONE_IDS.filter((zone) =>
-      state.zones[zone].some((instance) => instance.owner === 'player' && isUnitCard(instance.card))
+      state.zones[zone].some((instance) => getCardController(instance) === 'player' && isUnitCard(instance.card))
     ),
     ...BATTLEFIELD_ZONE_IDS.filter((zone) =>
       !state.zones[zone].some((instance) => isUnitCard(instance.card))

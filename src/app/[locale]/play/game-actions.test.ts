@@ -261,6 +261,80 @@ describe('deterministic player card actions', () => {
     expect(result.state.log[0]?.suffix).toBe('Noxhaven Researcher created Experiment in staging.');
   });
 
+  it('does not fire Noxhaven Researcher on-enter when it attacks into a battlefield', () => {
+    const researcher = makeInstance({
+      instanceId: 'noxhaven-researcher',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP014',
+        name: 'Noxhaven Researcher',
+        type: 'Unit Vampire',
+        cost: 2,
+        attack: 0,
+        health: 1,
+        influence: 1,
+        rulesText: 'On Enter: Create a 2/2 Experiment unit token with 0 influence.',
+      }),
+    });
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        staging: [researcher],
+        battlefieldLeft: [],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(state, 'player', researcher.instanceId, 'battlefieldLeft');
+
+    expect('error' in result).toBe(false);
+    if ('error' in result) {
+      return;
+    }
+    expect(result.state.zones.battlefieldLeft[0]?.instanceId).toBe(researcher.instanceId);
+    expect(result.state.zones.staging).toEqual([]);
+    expect(result.state.log.some((entry) => entry.suffix.includes('created Experiment'))).toBe(false);
+  });
+
+  it('does not fire Noxhaven Researcher on-enter when it retreats to staging', () => {
+    const researcher = makeInstance({
+      instanceId: 'noxhaven-researcher',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP014',
+        name: 'Noxhaven Researcher',
+        type: 'Unit Vampire',
+        cost: 2,
+        attack: 0,
+        health: 1,
+        influence: 1,
+        rulesText: 'On Enter: Create a 2/2 Experiment unit token with 0 influence.',
+      }),
+    });
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        battlefieldLeft: [researcher],
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: researcher.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'staging',
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.battlefieldLeft).toEqual([]);
+    expect(result.state.zones.staging).toEqual([
+      expect.objectContaining({ instanceId: researcher.instanceId, ready: false }),
+    ]);
+    expect(result.state.log.some((entry) => entry.suffix.includes('created Experiment'))).toBe(false);
+  });
+
   it('plays a Nox tactic and uses Demonic Advance for the next unit', () => {
     const advance = makeInstance({
       instanceId: 'demonic-advance',
@@ -511,6 +585,63 @@ describe('deterministic player card actions', () => {
       banishOnDeath: true,
     });
     expect(result.state.zones.supply[0]?.ready).toBe(false);
+  });
+
+  it('does not let a player have two Renowned units in play', () => {
+    const existingRenowned = makeInstance({
+      instanceId: 'existing-renowned',
+      card: createTestCard({ id: 'renowned-1', name: 'Existing Renowned', type: 'Renowned Unit', cost: 1 }),
+    });
+    const secondRenowned = makeInstance({
+      instanceId: 'second-renowned',
+      card: createTestCard({ id: 'renowned-2', name: 'Second Renowned', type: 'Renowned Unit', cost: 1 }),
+    });
+    const supply = makeInstance({ instanceId: 'supply', ready: true });
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [secondRenowned],
+        staging: [existingRenowned],
+        supply: [supply],
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: secondRenowned.instanceId,
+      fromZone: 'hand',
+      toZone: 'staging',
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.error).toBe('You can only have one Renowned unit in play.');
+    expect(result.state.zones.hand).toEqual([secondRenowned]);
+    expect(result.state.zones.staging).toEqual([existingRenowned]);
+  });
+
+  it('lets an existing Renowned unit capture a battlefield', () => {
+    const renowned = makeInstance({
+      instanceId: 'renowned',
+      ready: true,
+      card: createTestCard({ id: 'renowned', name: 'Renowned', type: 'Renowned Unit', cost: 1 }),
+    });
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        staging: [renowned],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(state, 'player', renowned.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+    expect(result.state.zones.battlefieldLeft[0]?.instanceId).toBe(renowned.instanceId);
   });
 
   it('plays IMP009 from graveyard ready and marks it to be banished on death', () => {

@@ -10,8 +10,11 @@ import {
   BATTLEFIELD_ZONE_IDS,
   addLogEntry,
   adjustVictoryPoints,
+  getCardController,
   getFriendlyUnitsInPlay,
+  getRenownedUnitLimitError,
   getUnitsInPlay,
+  moveCardsToOwnerGraveyards,
   recordCardsDrawn,
   removeUnitFromPlay,
   resolvePendingChoice,
@@ -196,7 +199,7 @@ function resolveAssimilatingAbominationAbility({ state, event }: AbilityContext)
     return cards.some(
       (instance) =>
         instance.instanceId === event.source.instanceId &&
-        instance.owner === event.controller &&
+        getCardController(instance) === event.controller &&
         instance.card.id === 'IMP001'
     );
   });
@@ -205,7 +208,7 @@ function resolveAssimilatingAbominationAbility({ state, event }: AbilityContext)
     return cards.some(
       (instance) =>
         instance.instanceId === sacrificeTarget.instanceId &&
-        instance.owner === event.controller &&
+        getCardController(instance) === event.controller &&
         isUnit(instance.card)
     );
   });
@@ -222,15 +225,7 @@ function resolveAssimilatingAbominationAbility({ state, event }: AbilityContext)
       .filter((instance) => instance.attachedToInstanceId === sacrificedUnit.instanceId)
       .map((instance) => instance.instanceId),
   ]);
-  const sacrificedCards = targetZoneCards
-    .filter((instance) => sacrificedIds.has(instance.instanceId))
-    .map((instance) => ({
-      ...instance,
-      faceDown: false,
-      attachedToInstanceId: null,
-      damage: 0,
-      retreatLockedUntilNextTurn: false,
-    }));
+  const sacrificedCards = targetZoneCards.filter((instance) => sacrificedIds.has(instance.instanceId));
 
   const updateZone = (zone: ZoneId, cards: GameCardInstance[]): GameCardInstance[] =>
     cards
@@ -249,25 +244,21 @@ function resolveAssimilatingAbominationAbility({ state, event }: AbilityContext)
     UNIT_ABILITY_ZONES.filter((zone) => zone !== 'staging').map((zone) => [zone, updateZone(zone, state.zones[zone])])
   ) as Pick<Record<ZoneId, GameCardInstance[]>, 'battlefieldLeft' | 'battlefieldCenter' | 'battlefieldRight'>;
 
-  return {
-    state: {
-      ...state,
+  const removedState = {
+    ...state,
       zones: {
         ...state.zones,
         ...nextBattlefields,
         ...(event.controller === 'player' ? { staging: nextStaging } : null),
-        ...(event.controller === 'player'
-          ? { graveyard: [...sacrificedCards, ...state.zones.graveyard] }
-          : null),
       },
       opponentZones: {
         ...state.opponentZones,
         ...(event.controller === 'opponent' ? { staging: nextStaging } : null),
-        ...(event.controller === 'opponent'
-          ? { graveyard: [...sacrificedCards, ...state.opponentZones.graveyard] }
-          : null),
       },
-    },
+    };
+
+  return {
+    state: moveCardsToOwnerGraveyards(removedState, sacrificedCards),
     resolved: true,
     followUpEvents: [
       {
@@ -283,7 +274,7 @@ function resolveAssimilatingAbominationAbility({ state, event }: AbilityContext)
 
 function resolveLucilleOnScoreAbility({ state, event }: AbilityContext): AbilityResolution {
   const controllerStaging = event.controller === 'player' ? state.zones.staging : state.opponentZones.staging;
-  const stagingUnits = controllerStaging.filter((instance) => instance.owner === event.controller && isUnit(instance.card));
+  const stagingUnits = controllerStaging.filter((instance) => getCardController(instance) === event.controller && isUnit(instance.card));
 
   if (stagingUnits.length === 0) {
     return { state, resolved: false };
@@ -360,7 +351,8 @@ function resolveNerezzaOnPlayAbility({ state, event }: AbilityContext): AbilityR
   const sacrificeChoices = getFriendlyUnitsInPlay(state, event.controller).filter((instance) => instance.instanceId !== event.source.instanceId);
   const enemyCombatUnits = UNIT_ABILITY_ZONES
     .filter((zone) => zone !== 'staging')
-    .flatMap((zone) => state.zones[zone].filter((instance) => instance.owner !== event.controller && isUnit(instance.card)));
+    .flatMap((zone) => state.zones[zone].filter((instance) => getCardController(instance) !== event.controller && isUnit(instance.card)))
+    .filter((instance) => !getRenownedUnitLimitError(state, event.controller, instance));
 
   if (sacrificeChoices.length === 0 || enemyCombatUnits.length === 0) {
     return { state, resolved: false };
@@ -405,7 +397,7 @@ function resolveNerezzaOnPlayAbility({ state, event }: AbilityContext): AbilityR
 function resolveNocturneOnEnterAbility({ state, event }: AbilityContext): AbilityResolution {
   const enemyCombatUnits = UNIT_ABILITY_ZONES
     .filter((zone) => zone !== 'staging')
-    .flatMap((zone) => state.zones[zone].filter((instance) => instance.owner !== event.controller && isUnit(instance.card)));
+    .flatMap((zone) => state.zones[zone].filter((instance) => getCardController(instance) !== event.controller && isUnit(instance.card)));
 
   if (enemyCombatUnits.length === 0) {
     return { state, resolved: false };
@@ -535,7 +527,7 @@ function discardFirstCardAndCreateExperiment(state: GameState, owner: Owner, sou
 }
 
 function isProtectedFromEnemyTactic(state: GameState, unit: GameCardInstance, controller: Owner): boolean {
-  if (unit.owner === controller) {
+  if (getCardController(unit) === controller) {
     return false;
   }
 
@@ -545,7 +537,7 @@ function isProtectedFromEnemyTactic(state: GameState, unit: GameCardInstance, co
   return Boolean(
     zone &&
     state.zones[zone].some(
-      (instance) => instance.card.id === 'IMP032' && instance.owner === unit.owner
+      (instance) => instance.card.id === 'IMP032' && getCardController(instance) === getCardController(unit)
     )
   );
 }
@@ -640,7 +632,7 @@ function resolveRetainerOnDeath({ state, event }: AbilityContext): AbilityResolu
     state: updateUnitInPlay(state, target.instanceId, (instance) => ({
       ...instance,
       temporaryInfluenceBonus: (instance.temporaryInfluenceBonus ?? 0) + 1,
-      temporaryInfluenceExpiresAfterTurn: state.activePlayer === target.owner ? state.turn + 1 : state.turn,
+      temporaryInfluenceExpiresAfterTurn: state.activePlayer === getCardController(target) ? state.turn + 1 : state.turn,
     })),
     resolved: true,
     message: `${event.source.card.name} gave ${target.card.name} +1 influence until the end of Bot's next turn.`,
@@ -684,6 +676,21 @@ function resolveTargetedNoxTactic(
     const targets = getTargets(state, event);
     if (targets.length === 0) {
       return { state, resolved: false };
+    }
+    const selectedTarget = event.targets?.find((target) => target.type === 'card');
+    if (selectedTarget) {
+      const target = targets.find((unit) => unit.instanceId === selectedTarget.instanceId);
+      if (!target) {
+        return { state, resolved: false };
+      }
+      const removed = removeUnitFromPlay(state, target.instanceId);
+      return 'error' in removed
+        ? { state, resolved: false }
+        : {
+            state: removed.state,
+            resolved: true,
+            message: `${event.source.card.name} destroyed ${removed.unit.card.name}.`,
+          };
     }
     if (event.controller === 'player') {
       return {
@@ -803,7 +810,7 @@ export function resolveNoxTargetChoice(
     return updateUnitInPlay(nextState, selectedId, (instance) => ({
       ...instance,
       temporaryInfluenceBonus: (instance.temporaryInfluenceBonus ?? 0) + 1,
-      temporaryInfluenceExpiresAfterTurn: state.activePlayer === instance.owner ? state.turn + 1 : state.turn,
+      temporaryInfluenceExpiresAfterTurn: state.activePlayer === getCardController(instance) ? state.turn + 1 : state.turn,
     }));
   }
 
@@ -821,7 +828,7 @@ export function resolveNoxTargetChoice(
       },
     };
     nextState = createExperimentForOwner(nextState, 'player', pendingChoice.sourceName);
-    if (source?.owner === 'opponent') {
+    if (source && getCardController(source) === 'opponent') {
       nextState = discardFirstCardAndCreateExperiment(nextState, 'opponent', pendingChoice.sourceName);
     }
     return nextState;
@@ -878,11 +885,11 @@ export function resolveNoxTargetChoice(
       zones: {
         ...nextState.zones,
         [sourceZone]: nextState.zones[sourceZone].filter((instance) => instance.instanceId !== selectedId),
-        graveyard: source.owner === 'player'
+        graveyard: getCardController(source) === 'player'
           ? [{ ...source, faceDown: false }, ...nextState.zones.graveyard]
           : nextState.zones.graveyard,
       },
-      opponentZones: source.owner === 'opponent'
+      opponentZones: getCardController(source) === 'opponent'
         ? {
             ...nextState.opponentZones,
             graveyard: [{ ...source, faceDown: false }, ...nextState.opponentZones.graveyard],
@@ -902,7 +909,7 @@ export function resolveNoxTargetChoice(
               event: {
                 trigger: 'onPlay',
                 source,
-                controller: source.owner,
+                controller: getCardController(source),
                 zone: 'graveyard',
               },
             }).state,

@@ -5,17 +5,20 @@ import {
   exhaustSupplyForCost,
   getAttachedCards,
   getBattlefieldPlacementError,
+  getCardController,
   getEquipmentAttachmentError,
   getManualPlayCost,
   getModifiedPlayCost,
   getPlayCost,
   getPlayCostError,
+  getRenownedUnitLimitError,
   getStagingPlacementError,
   isItemCard,
   isTerritoryCard,
   isTacticCard,
   isUnitCard,
   markSuppliedThisTurn,
+  moveCardsToOwnerGraveyards,
   placeCardIntoSupply,
   placeStartingSupply,
   prepareCardForZone,
@@ -149,7 +152,7 @@ function getOwnedUnitsInPlay(state: GameState, owner: Owner): GameCardInstance[]
     ...state.zones.battlefieldLeft,
     ...state.zones.battlefieldCenter,
     ...state.zones.battlefieldRight,
-  ].filter((instance) => instance.owner === owner && isUnitCard(instance.card));
+  ].filter((instance) => getCardController(instance) === owner && isUnitCard(instance.card));
 }
 
 function applyAdditionalPlayCost(
@@ -168,7 +171,7 @@ function applyAdditionalPlayCost(
     const ownerZones = getOwnerZoneMap(state, owner);
     const targetZone = (['staging', 'battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] as const).find((zone) =>
       (zone === 'staging' ? ownerZones.staging : state.zones[zone]).some(
-        (instance) => instance.instanceId === targetId && instance.owner === owner && isUnitCard(instance.card)
+        (instance) => instance.instanceId === targetId && getCardController(instance) === owner && isUnitCard(instance.card)
       )
     );
 
@@ -183,19 +186,21 @@ function applyAdditionalPlayCost(
       ...zoneCards.filter((instance) => instance.attachedToInstanceId === sacrificedUnit.instanceId).map((instance) => instance.instanceId),
     ]);
     const remainingZoneCards = zoneCards.filter((instance) => !sacrificedIds.has(instance.instanceId));
-    const sacrificedCards = zoneCards
-      .filter((instance) => sacrificedIds.has(instance.instanceId))
-      .map((instance) => prepareCardForZone(instance, 'graveyard'));
+    const sacrificedCards = zoneCards.filter((instance) => sacrificedIds.has(instance.instanceId));
+    const removedState = targetZone === 'staging'
+      ? applyOwnerZoneMap(state, owner, {
+          ...ownerZones,
+          staging: remainingZoneCards,
+        })
+      : {
+          ...state,
+          zones: {
+            ...state.zones,
+            [targetZone]: remainingZoneCards,
+          },
+        };
 
-    const nextOwnerZones = {
-      ...ownerZones,
-      graveyard: [...sacrificedCards, ...ownerZones.graveyard],
-      ...(targetZone === 'staging'
-        ? { staging: remainingZoneCards }
-        : { [targetZone]: remainingZoneCards }),
-    } as Record<ZoneId, GameCardInstance[]>;
-
-    const nextState = applyOwnerZoneMap(state, owner, nextOwnerZones);
+    const nextState = moveCardsToOwnerGraveyards(removedState, sacrificedCards);
     const loggedState = {
       ...nextState,
       log: addLogEntry(nextState, {
@@ -326,7 +331,7 @@ function flipTerritory(
     return unchanged(state);
   }
 
-  if (card.owner !== owner) {
+  if (getCardController(card) !== owner) {
     return rejected(state, 'Only your face-down territories can be flipped manually.');
   }
 
@@ -417,6 +422,20 @@ function moveCard(
 
   if (BATTLEFIELD_ZONES.has(fromZone) && toZone === 'staging' && !isUnitCard(card.card)) {
     return rejected(state, 'Only units can retreat from a battlefield zone to staging.');
+  }
+
+  if (isUnitCard(card.card) && (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone))) {
+    const sourceIsAlreadyInPlay = fromZone === 'staging' || BATTLEFIELD_ZONES.has(fromZone);
+    const renownedLimitError = getRenownedUnitLimitError(
+      state,
+      owner,
+      card,
+      sourceIsAlreadyInPlay ? card.instanceId : null
+    );
+
+    if (renownedLimitError) {
+      return rejected(state, renownedLimitError);
+    }
   }
 
   const isPaidPlayFromHand =
@@ -587,8 +606,11 @@ function moveCard(
           targets: options.reanimateTargetInstanceId ? [{ type: 'card', instanceId: options.reanimateTargetInstanceId }] : undefined,
         })
       : movedState;
+  const entersFromPlay =
+    isPaidPlay &&
+    (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone));
   let enteredState =
-    toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone)
+    entersFromPlay
       ? triggerCardAbilities(playTriggeredState, 'onEnter', {
           source: movedCard,
           controller: owner,
@@ -632,7 +654,7 @@ export function applyCardAction(
     return unchanged(state);
   }
 
-  if (card.owner !== owner) {
+  if (getCardController(card) !== owner) {
     return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only move ${owner === 'player' ? 'your' : 'its'} own cards.`);
   }
 

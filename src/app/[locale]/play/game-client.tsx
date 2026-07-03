@@ -29,7 +29,9 @@ import {
   canManuallySupplyFromHand,
   createLogEntry,
   declareBattlefieldAttack,
+  getCardController,
   getCounterPlayError,
+  getCounterTargetOptions,
   getFriendlyUnitsInPlay,
   getModifiedPlayCost,
   getReadySupplyCount,
@@ -54,6 +56,7 @@ import {
   BOT_TURN_STEP_DELAY_MS,
   CARD_BACK_IMAGE_SRC,
   MATCH_SESSION_STORAGE_KEY,
+  ZONE_LABELS,
   mapDeckRows,
   type DeckRow,
   type MoveCardOptions,
@@ -97,6 +100,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [selectedBotDeckId, setSelectedBotDeckId] = useState('');
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [pendingAbilitySourceId, setPendingAbilitySourceId] = useState<string | null>(null);
+  const [pendingCounterTargetSourceId, setPendingCounterTargetSourceId] = useState<string | null>(null);
   const [pendingHandPlayCost, setPendingHandPlayCost] = useState<PendingHandPlayCost | null>(null);
   const [pendingLucilleSacrificeIds, setPendingLucilleSacrificeIds] = useState<string[]>([]);
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
@@ -628,7 +632,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         return previous;
       }
 
-      const defender = previous.zones[targetZone].find((instance) => isUnitCard(instance.card) && instance.owner !== 'player') ?? null;
+      const defender = previous.zones[targetZone].find((instance) => isUnitCard(instance.card) && getCardController(instance) !== 'player') ?? null;
       const arrowId = showAttackArrow(attackerInstanceId, targetZone, previous);
 
       if (!defender) {
@@ -693,13 +697,13 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     });
   }
 
-  function playPlayerCounter(instanceId: string) {
+  function playPlayerCounter(instanceId: string, targetInstanceId?: string) {
     setGameState((previous) => {
       if (!previous || previous.winner) {
         return previous;
       }
 
-      const result = playCounterCard(previous, 'player', instanceId);
+      const result = playCounterCard(previous, 'player', instanceId, targetInstanceId ? { targetInstanceId } : undefined);
 
       if ('error' in result) {
         return {
@@ -710,6 +714,20 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
       return result.state;
     });
+    setPendingCounterTargetSourceId(null);
+  }
+
+  function requestPlayerCounter(instance: GameCardInstance) {
+    if (!gameState) {
+      return;
+    }
+
+    if (getCounterTargetOptions(gameState, instance).length > 0) {
+      setPendingCounterTargetSourceId(instance.instanceId);
+      return;
+    }
+
+    playPlayerCounter(instance.instanceId);
   }
 
   function shuffleLibrary() {
@@ -1088,6 +1106,25 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   ...gameState.zones.battlefieldRight,
                 ].filter((instance) => pendingChoice.availableInstanceIds.includes(instance.instanceId))
             : [];
+    const pendingCounterTargetSource = pendingCounterTargetSourceId
+      ? gameState.zones.hand.find((instance) => instance.instanceId === pendingCounterTargetSourceId) ?? null
+      : null;
+    const pendingCounterTargets = pendingCounterTargetSource
+      ? getCounterTargetOptions(gameState, pendingCounterTargetSource)
+      : [];
+    const getTargetLocationLabel = (target: GameCardInstance) => {
+      const battlefieldZone = (['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] as const).find((zone) =>
+        gameState.zones[zone].some((instance) => instance.instanceId === target.instanceId)
+      );
+      const zoneLabel = battlefieldZone
+        ? ZONE_LABELS[battlefieldZone]
+        : getCardController(target) === 'player' && gameState.zones.staging.some((instance) => instance.instanceId === target.instanceId)
+          ? 'Your staging'
+          : getCardController(target) === 'opponent' && gameState.opponentZones.staging.some((instance) => instance.instanceId === target.instanceId)
+            ? 'Enemy staging'
+            : 'In play';
+      return `${getCardController(target) === 'player' ? 'Yours' : 'Enemy'} · ${zoneLabel} · ${target.instanceId.slice(-4)}`;
+    };
 
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -1195,7 +1232,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           <button
                             key={counter.instanceId}
                             type="button"
-                            onClick={() => playPlayerCounter(counter.instanceId)}
+                            onClick={() => requestPlayerCounter(counter)}
                             onMouseEnter={() => setHoveredCounterPreviewCards([counter])}
                             onFocus={() => setHoveredCounterPreviewCards([counter])}
                             onMouseLeave={() => {
@@ -1236,11 +1273,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               deckCards={gameState.opponentZones.deck}
               compact
               mirror
+              cardsDrawnThisTurnByOwner={{
+                player: gameState.playerCardsDrawnThisTurn,
+                opponent: gameState.opponentCardsDrawnThisTurn,
+              }}
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1257,6 +1298,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 battlefieldRight: gameState.zones.battlefieldRight,
               }}
               disabled={!canUseBoardActions}
+              cardsDrawnThisTurnByOwner={{
+                player: gameState.playerCardsDrawnThisTurn,
+                opponent: gameState.opponentCardsDrawnThisTurn,
+              }}
             />
           </div>
         </div>
@@ -1322,6 +1367,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           <DamageBadge instance={target} />
                         </span>
                         <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                        <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                          {getTargetLocationLabel(target)}
+                        </span>
                       </button>
                     );
                   })}
@@ -1329,7 +1377,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               ) : (
                 <p className="mt-4 rounded-md border border-dashed border-[color:var(--border)] p-4 text-center text-sm text-[color:var(--text-secondary)]">
                   {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget'
-                    ? 'No cards are available to discard.'
+                    ? pendingChoice.kind === 'forcedDiscard'
+                      ? 'No cards are available to discard.'
+                      : 'No valid targets are available.'
                     : 'No valid choices are available.'}
                 </p>
               )}
@@ -1355,6 +1405,51 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   Confirm {pendingLucilleSacrificeIds.length > 0 ? `(${pendingLucilleSacrificeIds.length})` : ''}
                 </button>
               </div>
+            </div>
+          </div>
+        ) : null}
+        {pendingCounterTargetSource ? (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="counter-target-title"
+              className="w-full max-w-2xl rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 shadow-2xl"
+            >
+              <h2 id="counter-target-title" className="text-lg font-bold text-[color:var(--text-primary)]">
+                {pendingCounterTargetSource.card.name}
+              </h2>
+              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                {pendingCounterTargetSource.card.rulesText}
+              </p>
+              <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
+                {pendingCounterTargets.map((target) => (
+                  <button
+                    key={target.instanceId}
+                    type="button"
+                    onClick={() => playPlayerCounter(pendingCounterTargetSource.instanceId, target.instanceId)}
+                    className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                  >
+                    <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
+                      {target.card.imageSrc ? (
+                        <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                      ) : null}
+                      <DamageBadge instance={target} />
+                    </span>
+                    <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                    <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      {getTargetLocationLabel(target)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingCounterTargetSourceId(null)}
+                className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         ) : null}

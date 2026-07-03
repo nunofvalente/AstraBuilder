@@ -24,6 +24,7 @@ import {
   getAttachedCards,
   getManualPlayCost,
   getModifiedPlayCost,
+  getCounterTargetOptions,
   getPlayCostError,
   getReadySupplyCount,
   getStagingUnitCards,
@@ -1234,6 +1235,299 @@ describe('game rules', () => {
     );
   });
 
+  it('lets Blinding Mist prevent damage to an exhausted defender while the defender still hits back', () => {
+    const attacker = makeInstance({
+      instanceId: 'selena',
+      ready: true,
+      card: createTestCard({ id: 'selena', name: 'Selena, Voice of Unity', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'myrmidon',
+      owner: 'opponent',
+      ready: false,
+      card: createTestCard({ id: 'IMP005', name: 'Dreadscythe Myrmidon', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const mist = makeInstance({
+      instanceId: 'mist',
+      owner: 'opponent',
+      card: createTestCard({
+        id: 'IMP025',
+        name: 'Blinding Mist',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'The next time target defending unit would be dealt combat damage this turn, prevent that damage.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [mist],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+    const played = playCounterCard(declared.state, 'opponent', mist.instanceId);
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) {
+      return;
+    }
+    const playerPassed = passCounterPriority(played.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+    const opponentPassed = passCounterPriority(playerPassed.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+
+    expect(opponentPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(defender.instanceId);
+    expect(opponentPassed.state.zones.battlefieldLeft[0]?.damage).toBe(0);
+    expect(opponentPassed.state.zones.graveyard[0]?.instanceId).toBe(attacker.instanceId);
+    expect(opponentPassed.state.log.some((entry) =>
+      entry.suffix === 'Selena, Voice of Unity dealt 0 damage to Dreadscythe Myrmidon. Dreadscythe Myrmidon dealt 3 damage to Selena, Voice of Unity.'
+    )).toBe(true);
+  });
+
+  it('requires Quash Insurrection to choose and resolve a valid cheap combat unit target', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3, cost: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2, cost: 2 }),
+    });
+    const quash = makeInstance({
+      instanceId: 'quash',
+      card: createTestCard({
+        id: 'IMP027',
+        name: 'Quash Insurrection',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'Destroy target unit in a combat zone with cost 2 or less.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        hand: [quash],
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    const opponentPassedFirst = passCounterPriority(declared.state, 'opponent');
+    expect('error' in opponentPassedFirst ? opponentPassedFirst.error : null).toBeNull();
+    if ('error' in opponentPassedFirst) {
+      return;
+    }
+
+    const missingTarget = playCounterCard(opponentPassedFirst.state, 'player', quash.instanceId);
+    expect('error' in missingTarget ? missingTarget.error : null).toBe('Choose a target for Quash Insurrection.');
+
+    const played = playCounterCard(opponentPassedFirst.state, 'player', quash.instanceId, {
+      targetInstanceId: defender.instanceId,
+    });
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) {
+      return;
+    }
+    expect(played.state.pendingCombat?.counterStack[0]?.selectedAbilityTargetInstanceIds).toEqual([defender.instanceId]);
+
+    const opponentPassed = passCounterPriority(played.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.state.opponentZones.graveyard.some((card) => card.instanceId === defender.instanceId)).toBe(true);
+    expect(playerPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(playerPassed.state.zones.graveyard[0]?.instanceId).toBe(quash.instanceId);
+  });
+
+  it('lets Quash Insurrection target a cheap attacking unit', () => {
+    const attacker = makeInstance({
+      instanceId: 'cheap-attacker',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'cheap-attacker', name: 'Cheap Attacker', type: 'Unit', attack: 2, health: 2, cost: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'player-defender',
+      ready: true,
+      card: createTestCard({ id: 'player-defender', name: 'Player Defender', type: 'Unit', attack: 1, health: 3, cost: 3 }),
+    });
+    const quash = makeInstance({
+      instanceId: 'quash',
+      card: createTestCard({
+        id: 'IMP027',
+        name: 'Quash Insurrection',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'Destroy target unit in a combat zone with cost 2 or less.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      zones: {
+        ...state.zones,
+        hand: [quash],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        staging: [attacker],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(getCounterTargetOptions(declared.state, quash).map((target) => target.instanceId)).toEqual([
+      attacker.instanceId,
+    ]);
+
+    const played = playCounterCard(declared.state, 'player', quash.instanceId, {
+      targetInstanceId: attacker.instanceId,
+    });
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) {
+      return;
+    }
+
+    const opponentPassed = passCounterPriority(played.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.state.opponentZones.graveyard.some((card) => card.instanceId === attacker.instanceId)).toBe(true);
+    expect(playerPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
+  });
+
+  it('lets Killing Blow destroy the attacking unit before combat damage resolves', () => {
+    const attacker = makeInstance({
+      instanceId: 'enemy-attacker',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'enemy-attacker', name: 'Enemy Attacker', type: 'Unit', attack: 5, health: 5 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'player-defender',
+      ready: true,
+      card: createTestCard({ id: 'player-defender', name: 'Player Defender', type: 'Unit', attack: 1, health: 5 }),
+    });
+    const killingBlow = makeInstance({
+      instanceId: 'killing-blow',
+      card: createTestCard({
+        id: 'IMP026',
+        name: 'Killing Blow',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'Destroy target unit in a combat zone.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      zones: {
+        ...state.zones,
+        hand: [killingBlow],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        staging: [attacker],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(getCounterTargetOptions(declared.state, killingBlow).map((target) => target.instanceId)).toContain(attacker.instanceId);
+
+    const played = playCounterCard(declared.state, 'player', killingBlow.instanceId, {
+      targetInstanceId: attacker.instanceId,
+    });
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) {
+      return;
+    }
+
+    const opponentPassed = passCounterPriority(played.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.state.pendingCombat).toBeNull();
+    expect(playerPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
+    expect(playerPassed.state.opponentZones.graveyard.some((card) => card.instanceId === attacker.instanceId)).toBe(true);
+    expect(playerPassed.state.log.some((entry) =>
+      entry.suffix === 'Enemy Attacker was removed before combat damage, so combat ends without damage.'
+    )).toBe(true);
+    expect(playerPassed.resolvedCombat).toMatchObject({
+      attackerDestroyed: true,
+      defenderDestroyed: false,
+      captured: false,
+    });
+  });
+
   it('reduces tactic counter costs by 1 while IMP003 is in play', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
@@ -1593,6 +1887,47 @@ describe('game rules', () => {
     expect(nextState.activePlayer).toBe('opponent');
   });
 
+  it('still treats zero-influence units as scoring for Blighted Ruins', () => {
+    const token = makeInstance({
+      instanceId: 'experiment-token',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP000',
+        name: 'Experiment',
+        type: 'Unit Token',
+        influence: 0,
+      }),
+    });
+    const ruins = makeInstance({
+      instanceId: 'blighted-ruins',
+      card: createTestCard({
+        id: 'IMP030',
+        name: 'Blighted Ruins',
+        type: 'Territory',
+        rulesText: 'Whenever a friendly unit scores this zone, lose 1 victory point. If you do, draw a card.',
+      }),
+    });
+    const drawCard = makeInstance({ instanceId: 'draw-card' });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      playerVictoryPoints: 1,
+      zones: {
+        ...state.zones,
+        deck: [drawCard],
+        hand: [],
+        battlefieldLeft: [token, ruins],
+      },
+    };
+
+    const scoredState = scoreBattlefieldVictoryPoints(activeState, 'player');
+
+    expect(scoredState.playerVictoryPoints).toBe(0);
+    expect(scoredState.zones.hand[0]?.instanceId).toBe(drawCard.instanceId);
+  });
+
   it('pauses turn advancement for a Lucille score choice instead of sacrificing automatically', () => {
     const lucille = makeInstance({
       instanceId: 'lucille',
@@ -1767,10 +2102,52 @@ describe('game rules', () => {
     expect(afterSteal.zones.staging).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ instanceId: nerezza.instanceId }),
-        expect.objectContaining({ instanceId: enemy.instanceId, owner: 'player', ready: false }),
+        expect.objectContaining({ instanceId: enemy.instanceId, owner: 'opponent', controller: 'player', ready: false }),
       ])
     );
     expect(afterSteal.zones.graveyard[0]?.instanceId).toBe(ally.instanceId);
+  });
+
+  it('sends a Nerezza-stolen unit to its original owner graveyard when it dies', () => {
+    const stolenUnit = makeInstance({
+      instanceId: 'stolen-unit',
+      owner: 'opponent',
+      controller: 'player',
+      ready: true,
+      card: createTestCard({ id: 'stolen-unit', name: 'Stolen Unit', type: 'Unit', attack: 1, health: 1 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 2, health: 3 }),
+    });
+    const baseState = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...baseState,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...baseState.zones,
+        staging: [stolenUnit],
+        battlefieldLeft: [defender],
+      },
+    };
+
+    const result = resolveBattlefieldAttack(activeState, 'player', stolenUnit.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.attackerDestroyed).toBe(true);
+    expect(result.state.zones.graveyard.some((card) => card.instanceId === stolenUnit.instanceId)).toBe(false);
+    expect(result.state.opponentZones.graveyard[0]).toMatchObject({
+      instanceId: stolenUnit.instanceId,
+      owner: 'opponent',
+      controller: undefined,
+    });
   });
 
   it('resolves Nocturne Agent by marking a unit, then forcing its controller to discard when it dies this turn', () => {
@@ -2038,6 +2415,9 @@ describe('game rules', () => {
 
     expect(result.state.zones.graveyard).toEqual([]);
     expect(result.state.zones.banish[0]?.instanceId).toBe(attacker.instanceId);
+    expect(result.state.log.some((entry) =>
+      entry.suffix === 'On Death is detected on Guinea Pig, but this ability is not implemented yet.'
+    )).toBe(false);
   });
 
   it('leaves a surviving defender occupying the battlefield when the attacker dies', () => {
@@ -2124,7 +2504,7 @@ describe('game rules', () => {
     });
   });
 
-  it('does not let exhausted defenders deal combat damage', () => {
+  it('lets exhausted defenders deal combat damage', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
@@ -2155,18 +2535,14 @@ describe('game rules', () => {
       return;
     }
 
-    expect(result.attackerDestroyed).toBe(false);
+    expect(result.attackerDestroyed).toBe(true);
     expect(result.defenderDestroyed).toBe(false);
     expect(result.captured).toBe(false);
-    expect(result.state.zones.staging[0]).toMatchObject({
-      instanceId: attacker.instanceId,
-      damage: 0,
-    });
     expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
       instanceId: defender.instanceId,
       damage: 1,
     });
-    expect(result.state.zones.graveyard).toHaveLength(0);
+    expect(result.state.zones.graveyard[0]?.instanceId).toBe(attacker.instanceId);
   });
 
   it('destroys units when new combat damage plus marked damage reaches health', () => {
@@ -2202,13 +2578,11 @@ describe('game rules', () => {
     }
 
     expect(result.defenderDestroyed).toBe(true);
-    expect(result.attackerDestroyed).toBe(false);
-    expect(result.captured).toBe(true);
+    expect(result.attackerDestroyed).toBe(true);
+    expect(result.captured).toBe(false);
     expect(result.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
-    expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
-      instanceId: attacker.instanceId,
-      damage: 0,
-    });
+    expect(result.state.zones.graveyard[0]?.instanceId).toBe(attacker.instanceId);
+    expect(result.state.zones.battlefieldLeft).toEqual([]);
   });
 
   it('clears marked damage at end of turn before the next player starts', () => {

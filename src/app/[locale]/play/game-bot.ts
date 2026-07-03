@@ -7,6 +7,7 @@ import {
 import {
   advanceToNextTurn,
   declareBattlefieldAttack,
+  getCounterTargetOptions,
   playCounterCard,
   resolveBattlefieldAttack,
   type GameState,
@@ -68,7 +69,14 @@ export function playFirstBotCounter(state: GameState): GameState | null {
     return null;
   }
 
-  const result = playCounterCard(state, 'opponent', counterInstanceId);
+  const counter = state.opponentZones.hand.find((instance) => instance.instanceId === counterInstanceId) ?? null;
+  const target = counter ? getCounterTargetOptions(state, counter)[0] ?? null : null;
+  const result = playCounterCard(
+    state,
+    'opponent',
+    counterInstanceId,
+    target ? { targetInstanceId: target.instanceId } : undefined
+  );
   return 'error' in result ? null : result.state;
 }
 

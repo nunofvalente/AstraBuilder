@@ -27,6 +27,7 @@ export type SavedDeck = {
 export type GameCardInstance = {
   instanceId: string;
   owner: Owner;
+  controller?: Owner;
   card: Card;
   ready: boolean;
   faceDown: boolean;
@@ -34,6 +35,7 @@ export type GameCardInstance = {
   damage: number;
   retreatLockedUntilNextTurn: boolean;
   banishOnDeath?: boolean;
+  selectedAbilityTargetInstanceIds?: string[];
   loseVictoryPointOnDeathThisTurnCount?: number;
   discardCardOnDeathThisTurnCount?: number;
   temporaryInfluenceBonus?: number;
