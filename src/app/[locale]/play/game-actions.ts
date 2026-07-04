@@ -7,7 +7,7 @@ import {
   getBattlefieldPlacementError,
   getCardController,
   getEquipmentAttachmentError,
-  getManualPlayCost,
+  getModifiedManualPlayCost,
   getModifiedPlayCost,
   getPlayCost,
   getPlayCostError,
@@ -17,6 +17,7 @@ import {
   isItemCard,
   isTerritoryCard,
   isTacticCard,
+  isUnitInQuarantineZone,
   isUnitCard,
   markSuppliedThisTurn,
   moveCardsToOwnerGraveyards,
@@ -115,6 +116,59 @@ function applyOwnerZoneMap(
       battlefieldRight: zones.battlefieldRight,
     },
     opponentZones,
+  };
+}
+
+function applySynthalVampireTacticBuff(state: GameState, owner: Owner): GameState {
+  if (state.activePlayer !== owner) {
+    return state;
+  }
+
+  const ownerZones = getOwnerZoneMap(state, owner);
+  let buffedCount = 0;
+  const buffSynthalInZone = (cards: GameCardInstance[]): GameCardInstance[] =>
+    cards.map((instance) => {
+      if (
+        instance.card.id !== 'IMP077' ||
+        getCardController(instance) !== owner ||
+        isUnitInQuarantineZone(state, instance.instanceId) ||
+        (instance.abilitiesSuppressedUntilTurn && state.turn <= instance.abilitiesSuppressedUntilTurn)
+      ) {
+        return instance;
+      }
+
+      buffedCount += 1;
+      return {
+        ...instance,
+        temporaryAttackBonus: (instance.temporaryAttackBonus ?? 0) + 1,
+        temporaryHealthBonus: (instance.temporaryHealthBonus ?? 0) + 1,
+        temporaryStatsExpireAfterTurn: state.turn,
+      };
+    });
+
+  const nextZones = {
+    ...ownerZones,
+    staging: buffSynthalInZone(ownerZones.staging),
+    battlefieldLeft: buffSynthalInZone(ownerZones.battlefieldLeft),
+    battlefieldCenter: buffSynthalInZone(ownerZones.battlefieldCenter),
+    battlefieldRight: buffSynthalInZone(ownerZones.battlefieldRight),
+  };
+
+  if (buffedCount === 0) {
+    return state;
+  }
+
+  const buffedState = applyOwnerZoneMap(state, owner, nextZones);
+
+  return {
+    ...buffedState,
+    log: addLogEntry(buffedState, {
+      cardName: 'Synthal Vampire',
+      suffix:
+        buffedCount === 1
+          ? ' got +1/+1 until end of turn.'
+          : ` got +1/+1 until end of turn on ${buffedCount} copies.`,
+    }),
   };
 }
 
@@ -314,11 +368,18 @@ function placeSupply(
 
   return applied(recordCardsDrawn(markSuppliedThisTurn({
     ...suppliedState,
-    log: addLogEntry(state, {
-      prefix: owner === 'player' ? 'Supplied ' : 'Bot supplied ',
-      cardName: suppliedCard.selectedCard.card.name,
-      suffix: ` and drew ${suppliedCard.replacementDraw.length} card.`,
-    }),
+    log: addLogEntry(
+      state,
+      owner === 'player'
+        ? {
+            prefix: 'Supplied ',
+            cardName: suppliedCard.selectedCard.card.name,
+            suffix: ` and drew ${suppliedCard.replacementDraw.length} card.`,
+          }
+        : {
+            suffix: `Bot supplied a card and drew ${suppliedCard.replacementDraw.length} card.`,
+          }
+    ),
   }, owner), owner, suppliedCard.replacementDraw.length));
 }
 
@@ -338,6 +399,10 @@ function flipTerritory(
 
   if (state.phase !== 'main' || state.activePlayer !== owner) {
     return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only flip a territory face up during ${owner === 'player' ? 'your' : 'its'} main turn.`);
+  }
+
+  if (card.faceDownEnteredTurn === state.turn) {
+    return rejected(state, 'Territories can only be flipped face up on a later turn after they are played face down.');
   }
 
   const costError = getPlayCostError(state, owner, card.card);
@@ -453,6 +518,7 @@ function moveCard(
       (BATTLEFIELD_ZONES.has(toZone) && (isTerritoryCard(card.card) || isDemonicAdvanceUnitPlay)) ||
       (toZone === 'graveyard' && isTacticCard(card.card))
     );
+  const isTacticPlayFromHand = fromZone === 'hand' && toZone === 'graveyard' && isTacticCard(card.card);
   const isPaidPlayFromGraveyard =
     fromZone === 'graveyard' &&
     toZone === 'staging' &&
@@ -481,9 +547,7 @@ function moveCard(
       return rejected(state, 'You need a non-Renowned unit in your graveyard to play Ebonblight Invoker.');
     }
 
-    const cost = isTacticCard(card.card)
-      ? getModifiedPlayCost(state, owner, card.card)
-      : getManualPlayCost(card.card, toZone, { faceDown: options.faceDown });
+    const cost = getModifiedManualPlayCost(state, owner, card.card, toZone, { faceDown: options.faceDown });
     const readySupplyCount = getReadySupplyCount(state, owner);
 
     if (readySupplyCount < cost) {
@@ -504,9 +568,7 @@ function moveCard(
     ? exhaustSupplyForCost(
         additionalCostState.state,
         owner,
-        isTacticCard(card.card)
-          ? getModifiedPlayCost(additionalCostState.state, owner, card.card)
-          : getManualPlayCost(card.card, toZone, { faceDown: options.faceDown })
+        getModifiedManualPlayCost(additionalCostState.state, owner, card.card, toZone, { faceDown: options.faceDown })
       )
     : state;
   const paidOwnerZones = getOwnerZoneMap(paidState, owner);
@@ -538,6 +600,13 @@ function moveCard(
   const nextGraveyardCards = fromZone === 'graveyard' ? sourceCards : graveyardCards;
   const movedCard = prepareCardForZone(card, toZone, {
     faceDown: BATTLEFIELD_ZONES.has(toZone) && isTerritoryCard(card.card) ? options.faceDown : false,
+    faceDownEnteredTurn:
+      fromZone === 'hand' &&
+      BATTLEFIELD_ZONES.has(toZone) &&
+      isTerritoryCard(card.card) &&
+      options.faceDown
+        ? state.turn
+        : undefined,
     enterExhausted: toZone === 'staging' ? options.enterExhausted || BATTLEFIELD_ZONES.has(fromZone) : false,
     enterReady:
       isDemonicAdvanceUnitPlay
@@ -577,15 +646,21 @@ function moveCard(
         ? { playerDemonicAdvanceActive: false }
         : { opponentDemonicAdvanceActive: false }
       : null),
-    log: addLogEntry(state, {
-      prefix: owner === 'player' ? 'Moved ' : 'Bot moved ',
-      cardName: card.card.name,
-      suffix: attachmentTargetName
-        ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, attaching to ${attachmentTargetName}.`
-        : battlefieldPlacement.replacedTerritory
-          ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, replacing ${battlefieldPlacement.replacedTerritory.card.name}.`
-          : ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
-    }),
+    log: addLogEntry(state, isTacticPlayFromHand
+      ? {
+          prefix: owner === 'player' ? 'Played ' : 'Bot played ',
+          cardName: card.card.name,
+          suffix: '.',
+        }
+      : {
+          prefix: owner === 'player' ? 'Moved ' : 'Bot moved ',
+          cardName: card.card.name,
+          suffix: attachmentTargetName
+            ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, attaching to ${attachmentTargetName}.`
+            : battlefieldPlacement.replacedTerritory
+              ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, replacing ${battlefieldPlacement.replacedTerritory.card.name}.`
+              : ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
+        }),
   };
 
   if (stabilizedAttachments.orphanedAttachments.length > 0) {
@@ -614,20 +689,31 @@ function moveCard(
           targets: options.reanimateTargetInstanceId ? [{ type: 'card', instanceId: options.reanimateTargetInstanceId }] : undefined,
         })
       : movedState;
+  const tacticBuffedState = isTacticPlayFromHand
+    ? applySynthalVampireTacticBuff(playTriggeredState, owner)
+    : playTriggeredState;
   const entersFromPlay =
     isPaidPlay &&
     (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone));
   let enteredState =
     entersFromPlay
-      ? triggerCardAbilities(playTriggeredState, 'onEnter', {
+      ? triggerCardAbilities(tacticBuffedState, 'onEnter', {
           source: movedCard,
           controller: owner,
           zone: toZone,
         })
-      : playTriggeredState;
+      : tacticBuffedState;
 
   if (isDemonicAdvanceUnitPlay) {
     enteredState = resolveUnitTakesControlOfZone(enteredState, toZone);
+  }
+
+  if (BATTLEFIELD_ZONES.has(fromZone) && toZone === 'staging' && isUnitCard(movedCard.card)) {
+    enteredState = triggerCardAbilities(enteredState, 'onRetreat', {
+      source: movedCard,
+      controller: owner,
+      zone: fromZone,
+    });
   }
 
   return applied(enteredState);
@@ -705,10 +791,6 @@ export function applyCardAction(
 
   if (isRetreat && (state.phase !== 'main' || state.activePlayer !== owner)) {
     return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only retreat units during ${owner === 'player' ? 'your' : 'its'} main turn.`);
-  }
-
-  if (isRetreat && card.retreatLockedUntilNextTurn) {
-    return rejected(state, 'That unit cannot retreat until your next turn because it captured the battlefield through combat this turn.');
   }
 
   if (isSpecialGraveyardPlay && (state.phase !== 'main' || state.activePlayer !== owner)) {

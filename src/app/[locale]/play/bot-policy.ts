@@ -8,8 +8,7 @@ import {
   getCounterPlayError,
   getEquipmentAttachmentError,
   getFriendlyUnitsInPlay,
-  getManualPlayCost,
-  getModifiedPlayCost,
+  getModifiedManualPlayCost,
   getPlayCostError,
   getReadySupplyCount,
   isCounterCard,
@@ -56,9 +55,7 @@ function sortByHighestPlayValue(cards: GameCardInstance[]): GameCardInstance[] {
 }
 
 function getPlayableCost(state: GameState, instance: GameCardInstance, toZone: ZoneId, faceDown = false): number {
-  return isTacticCard(instance.card)
-    ? getModifiedPlayCost(state, 'opponent', instance.card)
-    : getManualPlayCost(instance.card, toZone, { faceDown });
+  return getModifiedManualPlayCost(state, 'opponent', instance.card, toZone, { faceDown });
 }
 
 function hasReadySupplyFor(state: GameState, instance: GameCardInstance, toZone: ZoneId, faceDown = false): boolean {

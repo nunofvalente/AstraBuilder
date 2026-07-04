@@ -31,6 +31,7 @@ export type GameCardInstance = {
   card: Card;
   ready: boolean;
   faceDown: boolean;
+  faceDownEnteredTurn?: number;
   attachedToInstanceId: string | null;
   damage: number;
   retreatLockedUntilNextTurn: boolean;
@@ -45,8 +46,15 @@ export type GameCardInstance = {
   temporaryHealthBonus?: number;
   temporaryStatsExpireAfterTurn?: number;
   combatAttackBonus?: number;
+  abilitiesSuppressedUntilTurn?: number;
+  protectedFromEnemyTacticsUntilTurn?: number;
+  skipNextReady?: boolean;
   progressCounters?: number;
+  startTurnAbilityResolvedTurn?: number;
   endTurnAbilityResolvedTurn?: number;
+  abandonLabBanishOnDeathUntilTurn?: number;
+  abandonLabReturnController?: Owner;
+  abandonLabReturnAfterTurn?: number;
 };
 
 export type LogEntry = {
@@ -105,6 +113,7 @@ export type PendingChoice =
       sourceInstanceId: string;
       availableCardInstanceIds: string[];
       sourceName: string;
+      resumeTurnAdvance?: boolean;
     }
   | {
       kind: 'noxTarget';
@@ -124,6 +133,48 @@ export type PendingChoice =
       availableInstanceIds: string[];
       optional?: boolean;
       resumeTurnAdvance?: boolean;
+    }
+  | {
+      kind: 'caelumTarget';
+      owner: 'player';
+      sourceInstanceId: string;
+      sourceName: string;
+      prompt: string;
+      effect:
+        | 'airdrop'
+        | 'abandonLab'
+        | 'archiveReturn'
+        | 'confessionDamage'
+        | 'discard'
+        | 'fortifyDiscard'
+        | 'droneReveal'
+        | 'enforcerExhaust'
+        | 'inquisitorSuppress'
+        | 'leviathanReturn'
+        | 'renataProtect'
+        | 'renataReady'
+        | 'skybreakerDamage'
+        | 'strategistDiscard'
+        | 'valeriaExhaust'
+        | 'valeriaRetreat'
+        | 'voidWarp'
+        | 'wingshieldSupply'
+        | 'freightModuleSupply'
+        | 'unyieldingStormSweep';
+      availableInstanceIds: string[];
+      optional?: boolean;
+      contextInstanceIds?: string[];
+      resumeTurnAdvance?: boolean;
+    }
+  | {
+      kind: 'caelumZone';
+      owner: 'player';
+      sourceInstanceId: string;
+      sourceName: string;
+      prompt: string;
+      effect: 'unyieldingStormMove';
+      availableZoneIds: ZoneId[];
+      resumeTurnStart?: boolean;
     }
   | {
       kind: 'luxTarget';
@@ -183,6 +234,7 @@ export type GameState = {
   winner: Owner | null;
   pendingCombat: PendingCombat | null;
   pendingChoice: PendingChoice | null;
+  scoreLocks?: Array<{ zone: ZoneId; blockedOwner: Owner; expiresAtStartOfOwner: Owner }>;
   zones: Record<ZoneId, GameCardInstance[]>;
   opponentZones: PrivateZones;
   log: LogEntry[];

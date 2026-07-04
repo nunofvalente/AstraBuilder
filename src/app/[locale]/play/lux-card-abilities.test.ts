@@ -123,6 +123,15 @@ describe('Lux card abilities', () => {
     expect(getBattlefieldAttackError(state, 'player', attacker.instanceId, 'battlefieldCenter')).toContain('Provoke');
     expect(getBattlefieldAttackError(state, 'player', attacker.instanceId, 'battlefieldLeft')).toBeNull();
 
+    const suppressedProvoke = {
+      ...state,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [{ ...provoke, abilitiesSuppressedUntilTurn: state.turn }],
+      },
+    };
+    expect(getBattlefieldAttackError(suppressedProvoke, 'player', attacker.instanceId, 'battlefieldCenter')).toBeNull();
+
     const withoutProvoke = {
       ...state,
       zones: { ...state.zones, battlefieldLeft: [] },

@@ -1,12 +1,14 @@
 import type { Card, DeckEntry } from '../create/deck-builder/types';
 import type { MoveCardOptions } from './game-actions';
 import {
-  getManualPlayCost,
+  getModifiedManualPlayCost,
   isItemCard,
   isTerritoryCard,
   isTacticCard,
   isUnitCard,
   type GameCardInstance,
+  type GameState,
+  type PendingChoice,
   type SavedDeck,
   type ZoneId,
 } from './game-rules';
@@ -43,6 +45,53 @@ export type BattlefieldAction = {
   options?: MoveCardOptions;
   disabled?: boolean;
 };
+
+export function getPendingChoiceTargetCards(gameState: GameState, pendingChoice: PendingChoice | null): GameCardInstance[] {
+  if (!pendingChoice) {
+    return [];
+  }
+
+  if (pendingChoice.kind === 'lucilleScore') {
+    return gameState.zones.staging.filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId));
+  }
+
+  if (pendingChoice.kind === 'nerezzaSacrifice') {
+    return [
+      ...gameState.zones.staging,
+      ...gameState.zones.battlefieldLeft,
+      ...gameState.zones.battlefieldCenter,
+      ...gameState.zones.battlefieldRight,
+    ].filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId));
+  }
+
+  if (pendingChoice.kind === 'nerezzaSteal' || pendingChoice.kind === 'nocturneMark') {
+    return ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'].flatMap((zone) =>
+      gameState.zones[zone as ZoneId].filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId))
+    );
+  }
+
+  if (pendingChoice.kind === 'forcedDiscard') {
+    return gameState.zones.hand.filter((instance) => pendingChoice.availableCardInstanceIds.includes(instance.instanceId));
+  }
+
+  if (pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget') {
+    return [
+      ...gameState.zones.deck,
+      ...gameState.zones.hand,
+      ...gameState.zones.staging,
+      ...gameState.zones.supply,
+      ...gameState.zones.graveyard,
+      ...gameState.opponentZones.staging,
+      ...gameState.opponentZones.supply,
+      ...gameState.opponentZones.graveyard,
+      ...gameState.zones.battlefieldLeft,
+      ...gameState.zones.battlefieldCenter,
+      ...gameState.zones.battlefieldRight,
+    ].filter((instance) => pendingChoice.availableInstanceIds.includes(instance.instanceId));
+  }
+
+  return [];
+}
 
 export const ZONE_LABELS: Record<ZoneId, string> = {
   deck: 'Deck',
@@ -172,6 +221,7 @@ export function getHandActions(
   {
     canSupplyFromHand,
     canPlayFromHand,
+    gameState,
     graveyardCards,
     handCards,
     friendlyUnitsInPlay,
@@ -182,6 +232,7 @@ export function getHandActions(
   }: {
     canSupplyFromHand: boolean;
     canPlayFromHand: boolean;
+    gameState: GameState;
     graveyardCards: GameCardInstance[];
     handCards: GameCardInstance[];
     friendlyUnitsInPlay: GameCardInstance[];
@@ -192,7 +243,8 @@ export function getHandActions(
   }
 ): HandAction[] {
   const actions: HandAction[] = [];
-  const canPayForStagingPlay = readySupplyCount >= getManualPlayCost(instance.card, 'staging');
+  const canPayForStagingPlay =
+    readySupplyCount >= getModifiedManualPlayCost(gameState, 'player', instance.card, 'staging');
   const hasSacrificeTarget = friendlyUnitsInPlay.length > 0;
   const hasDiscardTarget = handCards.some((candidate) => candidate.instanceId !== instance.instanceId);
   const hasReanimateTarget = graveyardCards.some(
@@ -200,8 +252,7 @@ export function getHandActions(
   );
   const tacticPlayCost = Math.max(
     0,
-    getManualPlayCost(instance.card, 'graveyard') -
-      (friendlyUnitsInPlay.some((unit) => unit.card.id === 'IMP003') ? 1 : 0)
+    getModifiedManualPlayCost(gameState, 'player', instance.card, 'graveyard')
   );
 
   if (isUnitCard(instance.card)) {
@@ -242,7 +293,9 @@ export function getHandActions(
           label: `${ZONE_LABELS[zone]} face up`,
           target: zone,
           options: { faceDown: false },
-          disabled: !canPlayFromHand || readySupplyCount < getManualPlayCost(instance.card, zone, { faceDown: false }),
+          disabled:
+            !canPlayFromHand ||
+            readySupplyCount < getModifiedManualPlayCost(gameState, 'player', instance.card, zone, { faceDown: false }),
         },
         {
           key: `${zone}-face-down`,

@@ -13,6 +13,7 @@ import {
   isTerritoryCard,
   isUnitCard,
   type GameCardInstance,
+  type GameState,
   type Owner,
   type ZoneId,
 } from './game-rules';
@@ -43,6 +44,25 @@ export type AttackArrowState = {
   from: { x: number; y: number };
   to: { x: number; y: number };
 };
+
+const READY_ACTIVATED_ABILITY_CARD_IDS = new Set(['IMP016', 'IMP066', 'IMP073', 'IMP079']);
+
+function canShowActivatedAbilityAction(
+  instance: GameCardInstance | null,
+  onActivate?: ActivateAbilityHandler,
+  options: { inCombatZone?: boolean } = {}
+): boolean {
+  return Boolean(
+    instance &&
+    getCardController(instance) === 'player' &&
+    onActivate &&
+    (instance.card.id !== 'IMP079' || options.inCombatZone) &&
+    (
+      (instance.card.id === 'IMP001' && !instance.ready) ||
+      (READY_ACTIVATED_ABILITY_CARD_IDS.has(instance.card.id) && instance.ready)
+    )
+  );
+}
 export function DamageBadge({ instance }: { instance: GameCardInstance }) {
   const damage = Number(instance.damage);
 
@@ -115,6 +135,62 @@ export function QuarantineProgressBadge({ instance }: { instance: GameCardInstan
   );
 }
 
+export function EffectSourceBadges({
+  instance,
+  zoneCards = [],
+}: {
+  instance: GameCardInstance;
+  zoneCards?: GameCardInstance[];
+}) {
+  if (instance.faceDown || !isUnitCard(instance.card)) {
+    return null;
+  }
+
+  const badges: Array<{ key: string; label: string; title: string }> = [];
+
+  if (instance.protectedFromEnemyTacticsUntilTurn !== undefined) {
+    badges.push({
+      key: 'renata',
+      label: "Can't be targeted by enemy tactics",
+      title: "Can't be targeted by enemy tactics until end of turn",
+    });
+  }
+
+  const hasRadarBeaconAura = zoneCards.some(
+    (card) =>
+      card.card.id === 'IMP094' &&
+      !card.faceDown &&
+      isTerritoryCard(card.card) &&
+      getCardController(card) === getCardController(instance)
+  );
+  if (hasRadarBeaconAura) {
+    badges.push({
+      key: 'radar',
+      label: 'On Defend: Ready',
+      title: 'On Defend: Ready this unit',
+    });
+  }
+
+  if (badges.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="absolute left-1 top-1 z-20 flex max-w-[70%] flex-col items-start gap-1">
+      {badges.map((badge) => (
+        <span
+          key={badge.key}
+          className="rounded border border-white/15 bg-black/65 px-1.5 py-0.5 text-[0.48rem] font-semibold leading-tight text-white shadow-md backdrop-blur-[1px]"
+          title={badge.title}
+          aria-label={badge.title}
+        >
+          {badge.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function CurrentInfluenceBadge({
   instance,
   attachedCards = [],
@@ -178,6 +254,7 @@ export function BattlefieldPanel({
   onActivate,
   disabled = false,
   canFlipFaceUp = false,
+  currentTurn,
   readySupplyCount = 0,
   currentCombatStatsByInstanceId = {},
   cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
@@ -188,6 +265,7 @@ export function BattlefieldPanel({
   onActivate?: ActivateAbilityHandler;
   disabled?: boolean;
   canFlipFaceUp?: boolean;
+  currentTurn?: number;
   readySupplyCount?: number;
   currentCombatStatsByInstanceId?: CurrentCombatStatsByInstanceId;
   cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
@@ -205,17 +283,13 @@ export function BattlefieldPanel({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const actions = activeInstance
     ? getBattlefieldActions(zone, activeInstance, {
-        canFlipFaceUp: canFlipFaceUp && readySupplyCount >= getPlayCost(activeInstance.card),
+        canFlipFaceUp:
+          canFlipFaceUp &&
+          readySupplyCount >= getPlayCost(activeInstance.card) &&
+          activeInstance.faceDownEnteredTurn !== currentTurn,
       })
     : [];
-  const canActivate =
-    activeInstance &&
-    getCardController(activeInstance) === 'player' &&
-    (
-      (activeInstance.card.id === 'IMP001' && !activeInstance.ready) ||
-      (activeInstance.card.id === 'IMP016' && activeInstance.ready)
-    ) &&
-    Boolean(onActivate);
+  const canActivate = canShowActivatedAbilityAction(activeInstance, onActivate, { inCombatZone: true });
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [triggerRef, menuRef], () => setActiveInstanceId(null));
 
@@ -310,6 +384,7 @@ export function BattlefieldPanel({
             attachedCards={getAttachedCards(cards, instance.instanceId)}
             cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
           />
+          <EffectSourceBadges instance={instance} zoneCards={cards} />
           <DamageBadge instance={instance} />
           <CombatStatsBadge
             instance={instance}
@@ -427,6 +502,7 @@ export function CombinedStagingSupplyPanel({
   battlefieldCardsByZone,
   disabled = false,
   temporarySupplyCount = 0,
+  canInspectSupplyCards = false,
   currentCombatStatsByInstanceId = {},
   cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
 }: {
@@ -443,6 +519,7 @@ export function CombinedStagingSupplyPanel({
   battlefieldCardsByZone?: Record<BattlefieldZoneId, GameCardInstance[]>;
   disabled?: boolean;
   temporarySupplyCount?: number;
+  canInspectSupplyCards?: boolean;
   currentCombatStatsByInstanceId?: CurrentCombatStatsByInstanceId;
   cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
 }) {
@@ -466,14 +543,7 @@ export function CombinedStagingSupplyPanel({
   const stagingTargets: BattlefieldZoneId[] = activeStagingCard?.ready && isUnitCard(activeStagingCard.card) && onAttack
     ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']
     : [];
-  const canActivateActiveStagingCard =
-    activeStagingCard &&
-    getCardController(activeStagingCard) === 'player' &&
-    (
-      (activeStagingCard.card.id === 'IMP001' && !activeStagingCard.ready) ||
-      (activeStagingCard.card.id === 'IMP016' && activeStagingCard.ready)
-    ) &&
-    Boolean(onActivate);
+  const canActivateActiveStagingCard = canShowActivatedAbilityAction(activeStagingCard, onActivate);
   const rowsClassName = compact
     ? mirror
       ? 'grid-rows-[minmax(5.25rem,0.42fr)_minmax(9.5rem,0.82fr)]'
@@ -515,6 +585,11 @@ export function CombinedStagingSupplyPanel({
   function openEquipmentPreview(instance: GameCardInstance) {
     cancelPreviewClear();
     setPreviewCards([instance]);
+  }
+
+  function openSupplyPreview(instance: GameCardInstance) {
+    cancelPreviewClear();
+    setPreviewCards([{ ...instance, faceDown: false }]);
   }
 
   function schedulePreviewClear(instanceId: string) {
@@ -595,10 +670,7 @@ export function CombinedStagingSupplyPanel({
                         return;
                       }
 
-                      if (
-                        !instance.ready &&
-                        !(instance.card.id === 'IMP001' && onActivate)
-                      ) {
+                      if (!instance.ready && !canShowActivatedAbilityAction(instance, onActivate)) {
                         closeStagingMenu();
                         return;
                       }
@@ -609,14 +681,7 @@ export function CombinedStagingSupplyPanel({
                       const horizontalPadding = 12;
                       const menuItemHeight = 36;
                       const menuVerticalPadding = 8;
-                      const abilityActionCount =
-                        (
-                          (instance.card.id === 'IMP001' && !instance.ready) ||
-                          (instance.card.id === 'IMP016' && instance.ready)
-                        ) &&
-                        onActivate
-                          ? 1
-                          : 0;
+                      const abilityActionCount = canShowActivatedAbilityAction(instance, onActivate) ? 1 : 0;
                       const menuHeight = (stagingTargets.length + abilityActionCount) * menuItemHeight + menuVerticalPadding;
                       const viewportWidth = window.innerWidth;
                       const viewportHeight = window.innerHeight;
@@ -653,6 +718,7 @@ export function CombinedStagingSupplyPanel({
                       attachedCards={attachedItems}
                       cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
                     />
+                    <EffectSourceBadges instance={instance} zoneCards={stagingCards} />
                     <DamageBadge instance={instance} />
                     <CombatStatsBadge
                       instance={instance}
@@ -719,11 +785,25 @@ export function CombinedStagingSupplyPanel({
                     <div
                       key={instance.instanceId}
                       className="flex h-20 w-20 flex-none items-center justify-center"
-                      aria-hidden="true"
+                      aria-hidden={canInspectSupplyCards ? undefined : 'true'}
                     >
-                      <div className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
-                        <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
-                      </div>
+                      {canInspectSupplyCards ? (
+                        <button
+                          type="button"
+                          className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+                          aria-label={`Inspect supply card ${instance.card.name}`}
+                          onMouseEnter={() => openSupplyPreview(instance)}
+                          onFocus={() => openSupplyPreview(instance)}
+                          onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
+                          onBlur={() => schedulePreviewClear(instance.instanceId)}
+                        >
+                          <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
+                        </button>
+                      ) : (
+                        <div className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
+                          <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </>
@@ -871,6 +951,7 @@ export function CombinedStagingSupplyPanel({
 
 export function HandStrip({
   cards,
+  gameState,
   onMove,
   disabled = false,
   canSupplyFromHand,
@@ -883,6 +964,7 @@ export function HandStrip({
   battlefieldCardsByZone,
 }: {
   cards: GameCardInstance[];
+  gameState: GameState;
   onMove: MoveCardHandler;
   disabled?: boolean;
   canSupplyFromHand: boolean;
@@ -903,6 +985,7 @@ export function HandStrip({
     ? getHandActions(activeInstance, {
         canSupplyFromHand,
         canPlayFromHand,
+        gameState,
         graveyardCards,
         handCards: cards,
         friendlyUnitsInPlay,
