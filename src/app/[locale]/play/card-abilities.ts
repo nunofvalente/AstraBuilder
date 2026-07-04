@@ -1,4 +1,5 @@
 import type { Card } from '../create/deck-builder/types';
+import { createCaelumAbilityHandlers } from './caelum-card-ability-handlers';
 import { createCaelumCardAbilityRegistry } from './caelum-card-abilities';
 import {
   recordCardsDrawn,
@@ -160,11 +161,12 @@ const PRINTED_TRIGGER_PATTERNS: Array<{ trigger: AbilityTrigger; pattern: RegExp
 
 const noxHandlers = createNoxAbilityHandlers();
 const luxHandlers = createLuxAbilityHandlers();
+const caelumHandlers = createCaelumAbilityHandlers();
 
 export const CARD_ABILITY_REGISTRY: Record<string, CardAbilityDefinition> = {
   ...createNoxCardAbilityRegistry(noxHandlers),
   ...createLuxCardAbilityRegistry(luxHandlers),
-  ...createCaelumCardAbilityRegistry(createDrawCardsAbility(1)),
+  ...createCaelumCardAbilityRegistry(caelumHandlers),
   ...createSolaraCardAbilityRegistry(createDrawCardsAbility(1)),
 };
 

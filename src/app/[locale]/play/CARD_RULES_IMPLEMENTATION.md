@@ -22,6 +22,12 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Nox cards `IMP001` through `IMP032` are registered and integrated with the simulator.
 - Lux cards `IMP033` through `IMP063` are registered and integrated with the simulator.
 - Lux integration includes Provoke, combat stat modifiers, damage prevention, Drone creation, targeted tactics and counters, graveyard recovery, temporary supply, end-turn choices, and Quarantine Zone rules.
+- Caelum cards `IMP064` through `IMP095` are registered.
+- Caelum integration includes targeted unit return, draw and draw-discard effects, Caelum unit cost reduction, temporary influence/stat bonuses, tactic-play stat triggers, ability suppression, skip-ready effects, face-down territory reveal/return, force retreat, combat-zone score locks, extra draw, supply-to-hand choices, territory destruction, combat-card bounce, top-deck removal, delayed death banish-and-return, activated destroy, Disruption Staff equipped-unit death discard, Drifter's Necklace unoccupied-zone rewards, Freight Module equipped-unit score supply, Archive Ruins tactic recovery on scoring, Jamming Tower enemy-score discard, Radar Beacon readying, on-retreat damage, and Unyielding Storm turn-start/end-turn behavior with player destination choices.
+- Caelum partial implementations:
+  - `IMP073` prevents Caelum tactic targeting through implemented Caelum targeted tactics; cross-affinity tactic targeting protection is limited by each affinity handler's current targeting filters.
+  - `IMP083` returns combat units and loose items to hand, sends attached equipment to graveyard with its host leaving combat, and destroys territories.
+  - `IMP095` prompts the player for a different combat-zone destination at turn start; bot-controlled copies choose the first legal destination deterministically.
 
 ## Simulator Status
 
@@ -33,7 +39,7 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Attached equipment is rendered tucked under its host unit instead of as a separate free-standing staging card.
 - Attachment state is stabilized after board moves; equipment without a legal same-zone unit host is sent to graveyard automatically.
 - Territories can be played face down to a battlefield at 0 cost.
-- Face-down territories can be flipped face up during your main phase by paying their printed supply cost.
+- Face-down territories can be flipped face up on a later turn during your main phase by paying their printed supply cost.
 - Manual moves to deck, hand, graveyard, and banish are blocked unless a future card ability implements them.
 - Combat, death, scoring, counter windows, targeted choices, token creation, and turn-duration effects are active.
 

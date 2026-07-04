@@ -73,17 +73,17 @@ describe('card abilities', () => {
     });
     expect(getImplementedAbilitiesForTrigger('IMP001', 'activated')).toHaveLength(1);
 
-    expect(getRegisteredCardAbilities('IMP066')).toMatchObject({
-      cardId: 'IMP066',
+    expect(getRegisteredCardAbilities('IMP065')).toMatchObject({
+      cardId: 'IMP065',
       abilities: [
         {
-          id: 'IMP066-on-death-draw-card',
+          id: 'IMP065-draw-card',
           trigger: 'onDeath',
           timing: 'automatic',
         },
       ],
     });
-    expect(getImplementedAbilitiesForTrigger('IMP066', 'onDeath')).toHaveLength(1);
+    expect(getImplementedAbilitiesForTrigger('IMP065', 'onDeath')).toHaveLength(1);
 
     expect(getRegisteredCardAbilities('IMP010')).toMatchObject({
       cardId: 'IMP010',
@@ -218,7 +218,7 @@ describe('card abilities', () => {
     );
     const courier = makeInstance(
       'courier',
-      createTestCard({ id: 'IMP066', name: 'Courier Drone', type: 'Unit', rulesText: 'On Death: Draw a card.' })
+      createTestCard({ id: 'IMP065', name: 'Courier Drone', type: 'Unit', rulesText: 'On Death: Draw a card.' })
     );
     const drawnCard = makeInstance('drawn-card');
     const baseState = buildInitialGameState(makeDeck(), null);

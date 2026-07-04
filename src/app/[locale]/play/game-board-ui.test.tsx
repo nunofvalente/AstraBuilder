@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
 import { CARD_BACK_IMAGE_SRC } from './game-client-support';
@@ -105,6 +105,65 @@ describe('CombinedStagingSupplyPanel', () => {
     expect(container.querySelectorAll('[data-temporary-supply]')).toHaveLength(3);
   });
 
+  it('zooms inspectable supply cards face up while keeping the board card back face down', () => {
+    const supplyCard: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'player-supply-card',
+      card: createTestCard({
+        id: 'player-supply-card',
+        name: 'Player Supply Card',
+        imageSrc: '/player-supply-card.webp',
+      }),
+      faceDown: true,
+    };
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[]}
+        supplyCards={[supplyCard]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        canInspectSupplyCards
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /inspect supply card player supply card/i }));
+
+    const preview = container.querySelector('[data-card-zoom-preview]');
+    const previewImage = preview?.querySelector('img');
+    const boardBack = screen.getByRole('button', { name: /inspect supply card player supply card/i }).querySelector('img');
+
+    expect(previewImage).toHaveAttribute('src', expect.stringContaining('player-supply-card.webp'));
+    expect(previewImage).not.toHaveAttribute('src', expect.stringContaining(encodeURIComponent(CARD_BACK_IMAGE_SRC)));
+    expect(boardBack).toHaveAttribute('src', expect.stringContaining(encodeURIComponent(CARD_BACK_IMAGE_SRC)));
+  });
+
+  it('does not expose supply cards unless inspection is enabled', () => {
+    const supplyCard: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'opponent-supply-card',
+      owner: 'opponent',
+      card: createTestCard({
+        id: 'opponent-supply-card',
+        name: 'Opponent Supply Card',
+        imageSrc: '/opponent-supply-card.webp',
+      }),
+      faceDown: true,
+    };
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[]}
+        supplyCards={[supplyCard]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /inspect supply card opponent supply card/i })).not.toBeInTheDocument();
+    expect(container.querySelector('[data-card-zoom-preview]')).not.toBeInTheDocument();
+  });
+
   it('shows current modified attack and health on staging units', () => {
     const unit: GameCardInstance = {
       ...makeInstance(),
@@ -136,6 +195,86 @@ describe('CombinedStagingSupplyPanel', () => {
     expect(stats).toHaveAttribute('data-combat-stats-modified', 'true');
     expect(stats).toHaveClass('bg-black/80', 'border-amber-300/90');
     expect(stats).toHaveAttribute('title', 'Current stats: 5 attack, 7 health (printed 4/6)');
+  });
+
+  it('shows an effect badge on protected staging units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'renata-protected-staging-unit',
+      card: createTestCard({ id: 'renata-protected-staging-unit', name: 'Renata Protected Staging Unit', type: 'Unit' }),
+      protectedFromEnemyTacticsUntilTurn: 3,
+    };
+
+    render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[unit]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+      />,
+    );
+
+    expect(screen.getByLabelText("Can't be targeted by enemy tactics until end of turn")).toHaveTextContent("Can't be targeted by enemy tactics");
+  });
+
+  it('offers Genesis III activated ability from staging', () => {
+    const genesis: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'genesis',
+      card: createTestCard({
+        id: 'IMP066',
+        name: 'Genesis III, Deus Volare',
+        type: 'Renowned Unit',
+        affinity: 'Caelum',
+      }),
+      ready: true,
+    };
+    const onActivate = vi.fn();
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[genesis]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        onActivate={onActivate}
+      />,
+    );
+
+    fireEvent.click(container.querySelector('[data-card-instance-id="genesis"]')!);
+    fireEvent.click(screen.getByRole('menuitem', { name: /activate ability/i }));
+
+    expect(onActivate).toHaveBeenCalledWith(expect.objectContaining({ instanceId: 'genesis' }));
+  });
+
+  it('does not offer Valrathian Dreadnought activated ability from staging', () => {
+    const dreadnought: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'dreadnought',
+      card: createTestCard({
+        id: 'IMP079',
+        name: 'Valrathian Dreadnought',
+        type: 'Unit',
+        affinity: 'Caelum',
+      }),
+      ready: true,
+    };
+
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[dreadnought]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        onActivate={() => undefined}
+      />,
+    );
+
+    fireEvent.click(container.querySelector('[data-card-instance-id="dreadnought"]')!);
+
+    expect(screen.queryByRole('menuitem', { name: /activate ability/i })).not.toBeInTheDocument();
   });
 
   it('places the opponent deck above the banish pile', () => {
@@ -275,6 +414,49 @@ describe('BattlefieldPanel', () => {
     expect(screen.queryByText('+1 INF')).not.toBeInTheDocument();
   });
 
+  it('shows an effect badge on protected battlefield units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'renata-protected-unit',
+      card: createTestCard({ id: 'renata-protected-unit', name: 'Renata Protected Unit', type: 'Unit' }),
+      protectedFromEnemyTacticsUntilTurn: 3,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText("Can't be targeted by enemy tactics until end of turn")).toHaveTextContent("Can't be targeted by enemy tactics");
+  });
+
+  it('shows a Radar Beacon effect badge on friendly units in its zone', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'radar-unit',
+      card: createTestCard({ id: 'radar-unit', name: 'Radar Unit', type: 'Unit' }),
+    };
+    const beacon: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'radar-beacon',
+      card: createTestCard({ id: 'IMP094', name: 'Radar Beacon', type: 'Territory' }),
+      ready: true,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit, beacon]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('On Defend: Ready this unit')).toHaveTextContent('On Defend: Ready');
+  });
+
   it('shows Vermillion current influence on battlefield units capped at three', () => {
     const unit: GameCardInstance = {
       ...makeInstance(),
@@ -297,6 +479,28 @@ describe('BattlefieldPanel', () => {
     );
 
     expect(screen.getByLabelText('Vermillion, Ghastly Researcher has 3 influence')).toHaveTextContent('3');
+  });
+
+  it('offers retreat for exhausted battlefield units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'exhausted-battlefield-unit',
+      card: createTestCard({ id: 'exhausted-battlefield-unit', name: 'Exhausted Battlefield Unit', type: 'Unit' }),
+      ready: false,
+    };
+    const onMove = vi.fn();
+    const { container } = render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit]}
+        onMove={onMove}
+      />,
+    );
+
+    fireEvent.click(container.querySelector('[data-card-instance-id="exhausted-battlefield-unit"]')!);
+    fireEvent.click(screen.getByRole('menuitem', { name: /retreat to staging/i }));
+
+    expect(onMove).toHaveBeenCalledWith(unit.instanceId, 'battlefieldLeft', 'staging', { enterExhausted: true });
   });
 
   it('shows Quarantine Zone progress and remaining turns', () => {

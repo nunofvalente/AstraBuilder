@@ -62,6 +62,7 @@ import {
   CARD_BACK_IMAGE_SRC,
   MATCH_SESSION_STORAGE_KEY,
   ZONE_LABELS,
+  getPendingChoiceTargetCards,
   mapDeckRows,
   type DeckRow,
   type MoveCardOptions,
@@ -597,7 +598,13 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         return previous;
       }
 
-      const result = resolvePendingChoice(previous, selectNone ? [] : pendingLucilleSacrificeIds);
+      const selectedIds =
+        !selectNone &&
+        previous.pendingChoice?.kind === 'caelumTarget' &&
+        previous.pendingChoice.effect === 'airdrop'
+          ? previous.pendingChoice.availableInstanceIds.slice(0, 1)
+          : pendingLucilleSacrificeIds;
+      const result = resolvePendingChoice(previous, selectNone ? [] : selectedIds);
 
       if ('error' in result) {
         return {
@@ -611,6 +618,34 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     });
 
     setPendingLucilleSacrificeIds([]);
+
+    const resolvedState = nextResolvedState as GameState | null;
+
+    if (resolvedState?.activePlayer === 'opponent' && !resolvedState.pendingChoice) {
+      playAutomaticBotTurn(resolvedState);
+    }
+  }
+
+  function confirmPendingZoneChoice(zoneId: ZoneId) {
+    let nextResolvedState: GameState | null = null;
+
+    setGameState((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      const result = resolvePendingChoice(previous, [zoneId]);
+
+      if ('error' in result) {
+        return {
+          ...previous,
+          log: addLogEntry(previous, { suffix: result.error }),
+        };
+      }
+
+      nextResolvedState = result;
+      return result;
+    });
 
     const resolvedState = nextResolvedState as GameState | null;
 
@@ -1093,7 +1128,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     const pendingAbilitySource =
       friendlyUnitsInPlay.find((instance) => instance.instanceId === pendingAbilitySourceId) ?? null;
     const pendingAbilityTargets = pendingAbilitySource
-      ? friendlyUnitsInPlay.filter((instance) => instance.instanceId !== pendingAbilitySource.instanceId)
+      ? pendingAbilitySource.card.id === 'IMP066'
+        ? friendlyUnitsInPlay
+        : pendingAbilitySource.card.id === 'IMP073'
+          ? friendlyUnitsInPlay.filter((instance) =>
+              ['drone', 'vehicle'].includes(instance.card.subtype.trim().toLowerCase())
+            )
+          : pendingAbilitySource.card.id === 'IMP079'
+            ? getUnitsInPlay(gameState)
+            : friendlyUnitsInPlay.filter((instance) => instance.instanceId !== pendingAbilitySource.instanceId)
       : [];
     const canFlipFaceUp = canPlayFromHand;
     const canSupplyFromHand =
@@ -1114,35 +1157,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         : pendingHandPlaySource
           ? gameState.zones.hand.filter((instance) => instance.instanceId !== pendingHandPlaySource.instanceId)
           : [];
-    const pendingChoiceTargets =
-      pendingChoice?.kind === 'lucilleScore'
-        ? gameState.zones.staging.filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId))
-        : pendingChoice?.kind === 'nerezzaSacrifice'
-          ? [
-              ...gameState.zones.staging,
-              ...gameState.zones.battlefieldLeft,
-              ...gameState.zones.battlefieldCenter,
-              ...gameState.zones.battlefieldRight,
-            ].filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId))
-        : pendingChoice?.kind === 'nerezzaSteal' || pendingChoice?.kind === 'nocturneMark'
-          ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'].flatMap((zone) =>
-              gameState.zones[zone as ZoneId].filter((instance) => pendingChoice.availableUnitInstanceIds.includes(instance.instanceId))
-            )
-          : pendingChoice?.kind === 'forcedDiscard'
-            ? gameState.zones.hand.filter((instance) => pendingChoice.availableCardInstanceIds.includes(instance.instanceId))
-            : pendingChoice?.kind === 'noxTarget' || pendingChoice?.kind === 'luxTarget'
-              ? [
-                  ...gameState.zones.deck,
-                  ...gameState.zones.hand,
-                  ...gameState.zones.staging,
-                  ...gameState.zones.graveyard,
-                  ...gameState.opponentZones.staging,
-                  ...gameState.opponentZones.graveyard,
-                  ...gameState.zones.battlefieldLeft,
-                  ...gameState.zones.battlefieldCenter,
-                  ...gameState.zones.battlefieldRight,
-                ].filter((instance) => pendingChoice.availableInstanceIds.includes(instance.instanceId))
-            : [];
+    const pendingChoiceTargets = getPendingChoiceTargetCards(gameState, pendingChoice);
     const pendingCounterTargetSource = pendingCounterTargetSourceId
       ? gameState.zones.hand.find((instance) => instance.instanceId === pendingCounterTargetSourceId) ?? null
       : null;
@@ -1159,7 +1174,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
           ? 'Your staging'
           : getCardController(target) === 'opponent' && gameState.opponentZones.staging.some((instance) => instance.instanceId === target.instanceId)
             ? 'Enemy staging'
-            : 'In play';
+            : getCardController(target) === 'player' && gameState.zones.supply.some((instance) => instance.instanceId === target.instanceId)
+              ? 'Your supply'
+              : getCardController(target) === 'opponent' && gameState.opponentZones.supply.some((instance) => instance.instanceId === target.instanceId)
+                ? 'Enemy supply'
+                : 'In play';
       return `${getCardController(target) === 'player' ? 'Yours' : 'Enemy'} · ${zoneLabel} · ${target.instanceId.slice(-4)}`;
     };
 
@@ -1318,9 +1337,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               }}
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1329,6 +1348,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               banishCards={gameState.zones.banish}
               deckCards={gameState.zones.deck}
               temporarySupplyCount={gameState.playerTemporarySupply}
+              canInspectSupplyCards
               currentCombatStatsByInstanceId={currentCombatStatsByInstanceId}
               onMove={moveCard}
               onAttack={attackBattlefield}
@@ -1361,7 +1381,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                     ? 'Nerezza, Umbrasco Scion'
                     : pendingChoice.kind === 'nocturneMark'
                       ? 'Nocturne Agent'
-                      : pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget'
+                      : pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'caelumZone'
                         ? pendingChoice.sourceName
                       : 'Discard a card'}
               </h2>
@@ -1376,11 +1396,43 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         ? 'Choose an enemy unit in a combat zone. If it dies this turn, its controller discards a card.'
                         : pendingChoice.kind === 'noxTarget'
                           ? 'Choose a valid target to resolve this card ability.'
-                          : pendingChoice.kind === 'luxTarget'
+                          : pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'caelumZone'
                             ? pendingChoice.prompt
                         : 'Choose exactly one card to discard.'}
               </p>
-              {pendingChoiceTargets.length > 0 ? (
+              {pendingChoice.kind === 'caelumTarget' && pendingChoice.effect === 'airdrop' ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
+                  {pendingChoiceTargets.slice(0, 1).map((target) => (
+                    <div
+                      key={target.instanceId}
+                      className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2"
+                    >
+                      <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
+                        {target.card.imageSrc ? (
+                          <Image src={target.card.imageSrc} alt="" fill sizes="112px" className="object-cover" />
+                        ) : null}
+                      </span>
+                      <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                    </div>
+                  ))}
+                  <p className="text-sm font-semibold text-[color:var(--text-secondary)]">
+                    Choose where to put the revealed top card.
+                  </p>
+                </div>
+              ) : pendingChoice.kind === 'caelumZone' ? (
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  {pendingChoice.availableZoneIds.map((zoneId) => (
+                    <button
+                      key={zoneId}
+                      type="button"
+                      onClick={() => confirmPendingZoneChoice(zoneId)}
+                      className="inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-3 text-sm font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                    >
+                      {ZONE_LABELS[zoneId]}
+                    </button>
+                  ))}
+                </div>
+              ) : pendingChoiceTargets.length > 0 ? (
                 <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
                   {pendingChoiceTargets.map((target) => {
                     const isSelected = pendingLucilleSacrificeIds.includes(target.instanceId);
@@ -1426,28 +1478,33 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </div>
               ) : (
                 <p className="mt-4 rounded-md border border-dashed border-[color:var(--border)] p-4 text-center text-sm text-[color:var(--text-secondary)]">
-                  {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget'
+                  {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget'
                     ? pendingChoice.kind === 'forcedDiscard'
                       ? 'No cards are available to discard.'
                       : 'No valid targets are available.'
                     : 'No valid choices are available.'}
                 </p>
               )}
-              <div className={`mt-4 grid gap-2 ${pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget') && pendingChoice.optional) ? 'sm:grid-cols-2' : ''}`}>
-                {pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget') && pendingChoice.optional) ? (
+              {pendingChoice.kind === 'caelumZone' ? null : (
+              <div className={`mt-4 grid gap-2 ${pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget') && pendingChoice.optional) ? 'sm:grid-cols-2' : ''}`}>
+                {pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget') && pendingChoice.optional) ? (
                   <button
                     type="button"
                     onClick={() => confirmPendingLucilleChoice(true)}
                     className="inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                   >
-                    {pendingChoice.kind === 'lucilleScore' ? 'Do not sacrifice' : 'Do not use ability'}
+                    {pendingChoice.kind === 'lucilleScore'
+                      ? 'Do not sacrifice'
+                      : pendingChoice.kind === 'caelumTarget' && pendingChoice.effect === 'airdrop'
+                        ? 'Put into supply exhausted'
+                        : 'Do not use ability'}
                   </button>
                 ) : null}
                 <button
                   type="button"
                   onClick={() => confirmPendingLucilleChoice(false)}
                   disabled={
-                    (pendingChoice.kind === 'nerezzaSteal' || pendingChoice.kind === 'nocturneMark' || pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget') &&
+                    (pendingChoice.kind === 'nerezzaSteal' || pendingChoice.kind === 'nocturneMark' || pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || (pendingChoice.kind === 'caelumTarget' && pendingChoice.effect !== 'airdrop')) &&
                     pendingLucilleSacrificeIds.length !== 1 ||
                     pendingChoice.kind === 'luxTarget' &&
                     (
@@ -1457,9 +1514,12 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   }
                   className="inline-flex w-full items-center justify-center rounded-md bg-[color:var(--accent)] px-3 py-2 text-sm font-bold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
-                  Confirm {pendingLucilleSacrificeIds.length > 0 ? `(${pendingLucilleSacrificeIds.length})` : ''}
+                  {pendingChoice.kind === 'caelumTarget' && pendingChoice.effect === 'airdrop'
+                    ? 'Put into hand'
+                    : `Confirm ${pendingLucilleSacrificeIds.length > 0 ? `(${pendingLucilleSacrificeIds.length})` : ''}`}
                 </button>
               </div>
+              )}
             </div>
           </div>
         ) : null}
@@ -1747,6 +1807,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         <OpponentHandStrip cards={gameState.opponentZones.hand} />
         <HandStrip
           cards={gameState.zones.hand}
+          gameState={gameState}
           onMove={moveCard}
           disabled={!canUseBoardActions}
           canSupplyFromHand={canSupplyFromHand}

@@ -33,6 +33,7 @@ function makeInstance(overrides: Partial<GameCardInstance> = {}): GameCardInstan
     card,
     ready: overrides.ready ?? false,
     faceDown: overrides.faceDown ?? false,
+    faceDownEnteredTurn: overrides.faceDownEnteredTurn,
     attachedToInstanceId: overrides.attachedToInstanceId ?? null,
     damage: overrides.damage ?? 0,
     retreatLockedUntilNextTurn: overrides.retreatLockedUntilNextTurn ?? false,
@@ -137,6 +138,40 @@ describe('deterministic player card actions', () => {
     expect(suppliedAgain.error).toBe('You have already supplied a card this turn.');
   });
 
+  it('does not reveal the card name when the bot supplies a card', () => {
+    const secretSupply = makeInstance({
+      instanceId: 'bot-secret-supply',
+      owner: 'opponent',
+      card: createTestCard({ id: 'bot-secret-supply', name: 'Secret Bot Card' }),
+    });
+    const replacement = makeInstance({ instanceId: 'bot-replacement', owner: 'opponent' });
+    const baseState = makePlayerTurn({
+      activePlayer: 'opponent',
+      opponentSuppliedThisTurn: false,
+    });
+    const state = {
+      ...baseState,
+      opponentZones: {
+        ...baseState.opponentZones,
+        hand: [secretSupply],
+        deck: [replacement],
+        supply: [],
+      },
+    };
+
+    const supplied = applyCardAction(state, {
+      owner: 'opponent',
+      instanceId: secretSupply.instanceId,
+      fromZone: 'hand',
+      toZone: 'supply',
+    });
+
+    expect(supplied.applied).toBe(true);
+    expect(supplied.state.opponentZones.supply[0]?.instanceId).toBe(secretSupply.instanceId);
+    expect(supplied.state.log[0]?.suffix).toBe('Bot supplied a card and drew 1 card.');
+    expect(JSON.stringify(supplied.state.log[0])).not.toContain('Secret Bot Card');
+  });
+
   it('plays a territory face down for free and face up by paying its cost', () => {
     const faceDownTerritory = makeInstance({
       instanceId: 'face-down-territory',
@@ -174,10 +209,68 @@ describe('deterministic player card actions', () => {
     expect(faceDownPlay.state.zones.battlefieldLeft[0]).toMatchObject({
       instanceId: faceDownTerritory.instanceId,
       faceDown: true,
+      faceDownEnteredTurn: faceDownPlay.state.turn,
     });
     expect(faceDownPlay.state.zones.supply[0]?.ready).toBe(true);
     expect(faceUpPlay.state.zones.battlefieldCenter[0]?.faceDown).toBe(false);
     expect(faceUpPlay.state.zones.supply[0]?.ready).toBe(false);
+  });
+
+  it('does not let a face-down territory flip on the same turn it was played', () => {
+    const territory = makeInstance({
+      instanceId: 'hidden-territory',
+      card: createTestCard({ id: 'hidden-territory', name: 'Hidden Territory', type: 'Territory', cost: 1 }),
+    });
+    const supply = makeInstance({ instanceId: 'supply', ready: true });
+    const baseState = makePlayerTurn({ turn: 3 });
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [territory],
+        supply: [supply],
+      },
+    };
+
+    const played = applyPlayerCardAction(state, {
+      instanceId: territory.instanceId,
+      fromZone: 'hand',
+      toZone: 'battlefieldLeft',
+      options: { faceDown: true },
+    });
+
+    expect(played.applied).toBe(true);
+    expect(played.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: territory.instanceId,
+      faceDown: true,
+      faceDownEnteredTurn: 3,
+    });
+
+    const sameTurnFlip = applyPlayerCardAction(played.state, {
+      instanceId: territory.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'battlefieldLeft',
+      options: { faceDown: false },
+    });
+
+    expect(sameTurnFlip.applied).toBe(false);
+    expect(sameTurnFlip.error).toBe('Territories can only be flipped face up on a later turn after they are played face down.');
+    expect(sameTurnFlip.state.zones.battlefieldLeft[0]?.faceDown).toBe(true);
+
+    const laterTurnFlip = applyPlayerCardAction({ ...played.state, turn: 4 }, {
+      instanceId: territory.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'battlefieldLeft',
+      options: { faceDown: false },
+    });
+
+    expect(laterTurnFlip.applied).toBe(true);
+    expect(laterTurnFlip.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: territory.instanceId,
+      faceDown: false,
+    });
+    expect(laterTurnFlip.state.zones.battlefieldLeft[0]?.faceDownEnteredTurn).toBeUndefined();
+    expect(laterTurnFlip.state.zones.supply[0]?.ready).toBe(false);
   });
 
   it('plays a unit to staging exhausted and pays its cost', () => {
@@ -372,6 +465,11 @@ describe('deterministic player card actions', () => {
     });
     expect(tacticResult.applied).toBe(true);
     expect(tacticResult.state.playerDemonicAdvanceActive).toBe(true);
+    expect(tacticResult.state.log.some((entry) =>
+      entry.prefix === 'Played ' &&
+      entry.cardName === 'Demonic Advance' &&
+      entry.suffix === '.'
+    )).toBe(true);
 
     const unitResult = applyPlayerCardAction(tacticResult.state, {
       instanceId: unit.instanceId,
@@ -775,7 +873,7 @@ describe('deterministic player card actions', () => {
   });
 
   it('retreats a battlefield unit exhausted with its attached equipment', () => {
-    const unit = makeInstance({ instanceId: 'retreating-unit', ready: true, damage: 1 });
+    const unit = makeInstance({ instanceId: 'retreating-unit', ready: false, damage: 1 });
     const equipment = makeInstance({
       instanceId: 'attached-equipment',
       ready: true,
@@ -808,7 +906,7 @@ describe('deterministic player card actions', () => {
     );
   });
 
-  it('does not let a unit retreat on the same turn it captured through combat', () => {
+  it('lets an exhausted unit retreat on the same turn it captured through combat', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
@@ -841,11 +939,15 @@ describe('deterministic player card actions', () => {
       instanceId: attacker.instanceId,
       fromZone: 'battlefieldLeft',
       toZone: 'staging',
+      options: { enterExhausted: true },
     });
 
-    expect(retreatResult.applied).toBe(false);
-    expect(retreatResult.error).toBe(
-      'That unit cannot retreat until your next turn because it captured the battlefield through combat this turn.'
+    expect(retreatResult.applied).toBe(true);
+    expect(retreatResult.state.zones.battlefieldLeft).toEqual([]);
+    expect(retreatResult.state.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instanceId: attacker.instanceId, ready: false, retreatLockedUntilNextTurn: false }),
+      ])
     );
   });
 

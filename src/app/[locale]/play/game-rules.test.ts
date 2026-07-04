@@ -779,7 +779,7 @@ describe('game rules', () => {
     const state = startGameAfterSetup({ ...buildInitialGameState(makeDeck(12), makeDeck(12)), playerStartingSupplyPlaced: true }, 'player');
     const source = makeInstance({
       card: createTestCard({
-        id: 'IMP066',
+        id: 'IMP065',
         name: 'Courier Drone',
         rulesText: 'On Death: Draw a card.',
       }),
@@ -892,7 +892,7 @@ describe('game rules', () => {
       'Only units in your staging area can attack.'
     );
     expect(getBattlefieldAttackError(state, 'player', attacker.instanceId, 'battlefieldLeft')).toBe(
-      'battlefieldLeft is already occupied by your unit.'
+      'Battlefield 1 is already occupied by your unit.'
     );
   });
 
@@ -930,6 +930,16 @@ describe('game rules', () => {
     expect(result.captured).toBe(true);
     expect(result.scoredVictoryPoints).toBe(0);
     expect(result.state.playerVictoryPoints).toBe(0);
+    expect(result.state.log[1]).toMatchObject({
+      prefix: 'Attacked ',
+      cardName: 'Attacker',
+      suffix: ' into Battlefield 1.',
+    });
+    expect(result.state.log[0]).toMatchObject({
+      prefix: 'Captured ',
+      cardName: 'Attacker',
+      suffix: ' took Battlefield 1.',
+    });
     expect(result.state.zones.staging).toEqual([]);
     expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
       instanceId: attacker.instanceId,
@@ -981,6 +991,119 @@ describe('game rules', () => {
     expect(getBattlefieldAttackError(declared.state, 'player', attacker.instanceId, 'battlefieldCenter')).toBe(
       'Resolve the pending combat before declaring another attack.'
     );
+  });
+
+  it('offers Fortify for an exhausted Caelum defender by discarding a same-affinity card', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'skyfortress',
+      owner: 'player',
+      ready: false,
+      card: createTestCard({ id: 'IMP067', name: 'Imperial Skyfortress', type: 'Unit', attack: 4, health: 7, affinity: 'Caelum' }),
+    });
+    const matchingDiscard = makeInstance({
+      instanceId: 'matching-discard',
+      card: createTestCard({ id: 'matching-discard', name: 'Matching Discard', type: 'Tactic', affinity: 'Caelum' }),
+    });
+    const offAffinity = makeInstance({
+      instanceId: 'off-affinity',
+      card: createTestCard({ id: 'off-affinity', name: 'Off Affinity', type: 'Tactic', affinity: 'Lux' }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      zones: {
+        ...state.zones,
+        hand: [matchingDiscard, offAffinity],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        staging: [attacker],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'opponent', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(declared.state.pendingChoice).toMatchObject({
+      kind: 'caelumTarget',
+      effect: 'fortifyDiscard',
+      sourceInstanceId: defender.instanceId,
+      availableInstanceIds: [matchingDiscard.instanceId],
+    });
+
+    const resolved = resolvePendingChoice(declared.state, [matchingDiscard.instanceId]);
+    expect('error' in resolved ? resolved.error : null).toBeNull();
+    if ('error' in resolved) {
+      return;
+    }
+
+    expect(resolved.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: defender.instanceId,
+      ready: true,
+    });
+    expect(resolved.zones.graveyard[0]?.instanceId).toBe(matchingDiscard.instanceId);
+    expect(resolved.zones.hand.some((card) => card.instanceId === matchingDiscard.instanceId)).toBe(false);
+  });
+
+  it('has the bot use Fortify automatically for exhausted Caelum defenders', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'dreadnought',
+      owner: 'opponent',
+      ready: false,
+      card: createTestCard({ id: 'IMP079', name: 'Valrathian Dreadnought', type: 'Unit', attack: 7, health: 9, affinity: 'Caelum' }),
+    });
+    const matchingDiscard = makeInstance({
+      instanceId: 'bot-matching-discard',
+      owner: 'opponent',
+      card: createTestCard({ id: 'bot-matching-discard', name: 'Bot Matching Discard', type: 'Tactic', affinity: 'Caelum' }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [matchingDiscard],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(declared.state.pendingChoice).toBeNull();
+    expect(declared.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: defender.instanceId,
+      ready: true,
+    });
+    expect(declared.state.opponentZones.graveyard[0]?.instanceId).toBe(matchingDiscard.instanceId);
+    expect(declared.state.opponentZones.hand).toEqual([]);
   });
 
   it('triggers Hellfire Ravager on attack declaration by marking the defending unit immediately', () => {
@@ -1381,6 +1504,104 @@ describe('game rules', () => {
     expect(playerPassed.state.opponentZones.graveyard.some((card) => card.instanceId === defender.instanceId)).toBe(true);
     expect(playerPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
     expect(playerPassed.state.zones.graveyard[0]?.instanceId).toBe(quash.instanceId);
+  });
+
+  it('captures the battlefield uncontested when a later counter removes the defender before combat damage', () => {
+    const attacker = makeInstance({
+      instanceId: 'imperial-fortress',
+      ready: true,
+      card: createTestCard({ id: 'imperial-fortress', name: 'Imperial Fortress', type: 'Unit', attack: 4, health: 5 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'drone',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'drone', name: 'Drone', type: 'Unit', attack: 1, health: 1 }),
+    });
+    const medic = makeInstance({
+      instanceId: 'medic',
+      owner: 'opponent',
+      card: createTestCard({
+        id: 'IMP045',
+        name: 'Nekora Medic',
+        type: 'Unit',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'Swift. On Enter: Prevent combat damage.',
+      }),
+    });
+    const voidWarp = makeInstance({
+      instanceId: 'void-warp',
+      owner: 'player',
+      card: createTestCard({
+        id: 'IMP088',
+        name: 'Void Warp',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: "Put target unit in a combat zone on top of its owner's deck.",
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        hand: [voidWarp],
+        staging: [attacker],
+        battlefieldCenter: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [medic],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldCenter');
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    const medicPlayed = playCounterCard(declared.state, 'opponent', medic.instanceId, {
+      targetInstanceId: defender.instanceId,
+    });
+    expect('error' in medicPlayed ? medicPlayed.error : null).toBeNull();
+    if ('error' in medicPlayed) {
+      return;
+    }
+
+    const warpPlayed = playCounterCard(medicPlayed.state, 'player', voidWarp.instanceId, {
+      targetInstanceId: defender.instanceId,
+    });
+    expect('error' in warpPlayed ? warpPlayed.error : null).toBeNull();
+    if ('error' in warpPlayed) {
+      return;
+    }
+
+    const opponentPassed = passCounterPriority(warpPlayed.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.state.pendingCombat).toBeNull();
+    expect(playerPassed.state.zones.staging.some((card) => card.instanceId === attacker.instanceId)).toBe(false);
+    expect(playerPassed.state.zones.battlefieldCenter[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      damage: 0,
+    });
+    expect(playerPassed.state.opponentZones.deck[0]?.instanceId).toBe(defender.instanceId);
+    expect(playerPassed.state.opponentZones.staging.some((card) => card.instanceId === medic.instanceId)).toBe(true);
+    expect(playerPassed.state.log.some((entry) => entry.cardName === 'Imperial Fortress' && entry.prefix === 'Attacked ')).toBe(true);
   });
 
   it('lets Quash Insurrection target a cheap attacking unit', () => {
@@ -2327,7 +2548,7 @@ describe('game rules', () => {
     expect(result.captured).toBe(true);
     expect(result.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
     expect(result.state.zones.battlefieldLeft[0]?.ready).toBe(false);
-    expect(result.state.zones.battlefieldLeft[0]?.retreatLockedUntilNextTurn).toBe(true);
+    expect(result.state.zones.battlefieldLeft[0]?.retreatLockedUntilNextTurn).toBe(false);
     expect(result.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
   });
 
