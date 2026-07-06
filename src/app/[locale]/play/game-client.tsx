@@ -1192,7 +1192,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         <h2 id="simulator-bot-deck-label" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">
                           {lobbyCopy.botDeck}
                         </h2>
-                        <div ref={botDeckMenuRef} className="relative mt-2">
+                        <div ref={botDeckMenuRef} className="relative mt-4">
                           <button
                             id="simulator-bot-deck"
                             type="button"
@@ -1203,7 +1203,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                               setIsBotDeckMenuOpen((isOpen) => !isOpen);
                               setIsPlayerDeckMenuOpen(false);
                             }}
-                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/15 px-3 py-2 text-left text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:border-white/35 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/15 px-3 py-3 text-left text-white shadow-xl shadow-black/25 transition hover:border-white/35 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                             style={{
                               background: selectedBotDeck
                                 ? selectedBotDeckBannerBackground
@@ -1211,14 +1211,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             }}
                           >
                             <span className="flex min-w-0 items-center gap-2">
-                              <span className="flex h-7 min-w-7 items-center justify-center gap-1 rounded-md border border-white/15 bg-black/25 px-1 text-white shadow-inner">
+                              <span className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-white/15 bg-black/25 px-1.5 text-white shadow-inner">
                                 {selectedBotDeck ? <DeckAffinityIcons affinities={selectedBotDeckBannerAffinities} /> : <Bot className="h-4 w-4" aria-hidden="true" />}
                               </span>
                               <span className="min-w-0">
-                              <span className="block truncate">{selectedBotDeck?.title?.trim() || lobbyCopy.chooseBotDeck}</span>
-                              <span className="mt-0.5 block text-xs font-semibold text-[color:var(--text-secondary)]">
-                                {selectedBotDeck ? lobbyCopy.cardCount(selectedBotDeck.cardCount) : lobbyCopy.pickSavedDeckForPractice}
-                              </span>
+                                <span className="block truncate text-sm font-bold">{selectedBotDeck?.title?.trim() || lobbyCopy.chooseBotDeck}</span>
+                                <span className="mt-0.5 block text-xs font-semibold text-white/78">
+                                  {selectedBotDeck ? lobbyCopy.cardCount(selectedBotDeck.cardCount) : lobbyCopy.pickSavedDeckForPractice}
+                                </span>
                               </span>
                             </span>
                             <ChevronDown className={`h-4 w-4 shrink-0 text-white/85 transition ${isBotDeckMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
