@@ -906,11 +906,11 @@ describe('deterministic player card actions', () => {
     );
   });
 
-  it('lets an exhausted unit retreat on the same turn it captured through combat', () => {
+  it('blocks a unit from manually retreating on the same turn it captured through combat', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
-      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+      card: createTestCard({ id: 'IMP107', name: 'Reckless Warrior', type: 'Unit', attack: 3, health: 3 }),
     });
     const defender = makeInstance({
       instanceId: 'defender',
@@ -942,11 +942,11 @@ describe('deterministic player card actions', () => {
       options: { enterExhausted: true },
     });
 
-    expect(retreatResult.applied).toBe(true);
-    expect(retreatResult.state.zones.battlefieldLeft).toEqual([]);
-    expect(retreatResult.state.zones.staging).toEqual(
+    expect(retreatResult.applied).toBe(false);
+    expect(retreatResult.error).toBe('Reckless Warrior cannot retreat on the same turn it captured a battlefield.');
+    expect(retreatResult.state.zones.battlefieldLeft).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ instanceId: attacker.instanceId, ready: false, retreatLockedUntilNextTurn: false }),
+        expect.objectContaining({ instanceId: attacker.instanceId, retreatLockedUntilNextTurn: true }),
       ])
     );
   });

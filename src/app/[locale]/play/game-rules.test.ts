@@ -2548,7 +2548,7 @@ describe('game rules', () => {
     expect(result.captured).toBe(true);
     expect(result.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
     expect(result.state.zones.battlefieldLeft[0]?.ready).toBe(false);
-    expect(result.state.zones.battlefieldLeft[0]?.retreatLockedUntilNextTurn).toBe(false);
+    expect(result.state.zones.battlefieldLeft[0]?.retreatLockedUntilNextTurn).toBe(true);
     expect(result.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
   });
 

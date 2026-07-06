@@ -271,6 +271,7 @@ describe('Nox card abilities', () => {
     const mist = makeCard('IMP025', 'Blinding Mist', 'Prevent combat damage.');
     const prevented = triggerCardAbilities(combatState, 'onPlay', { source: mist, controller: 'player', zone: null });
     expect(prevented.zones.battlefieldLeft[0]?.preventNextCombatDamageThisTurn).toBe(true);
+    expect(prevented.log[0]?.suffix).toBe('Blinding Mist will prevent the next combat damage dealt to defender.');
 
     const killing = makeCard('IMP026', 'Killing Blow', 'Destroy target combat unit.');
     const killingPending = triggerCardAbilities(combatState, 'onPlay', { source: killing, controller: 'player', zone: 'graveyard' });

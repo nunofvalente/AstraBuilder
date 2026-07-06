@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import type { Card } from '../create/deck-builder/types';
+import { hasCardKeyword } from './card-definitions';
 import {
   getAttachedCards,
   getCardController,
@@ -45,7 +46,7 @@ export type AttackArrowState = {
   to: { x: number; y: number };
 };
 
-const READY_ACTIVATED_ABILITY_CARD_IDS = new Set(['IMP016', 'IMP066', 'IMP073', 'IMP079']);
+const READY_ACTIVATED_ABILITY_CARD_IDS = new Set(['IMP016', 'IMP066', 'IMP073', 'IMP079', 'IMP139', 'IMP160']);
 
 function canShowActivatedAbilityAction(
   instance: GameCardInstance | null,
@@ -135,6 +136,28 @@ export function QuarantineProgressBadge({ instance }: { instance: GameCardInstan
   );
 }
 
+export function RuinsProgressBadge({ instance }: { instance: GameCardInstance }) {
+  if (instance.card.id !== 'IMP125' || instance.faceDown) {
+    return null;
+  }
+
+  const progress = Math.min(3, Math.max(0, Number(instance.progressCounters ?? 0)));
+
+  if (progress <= 0) {
+    return null;
+  }
+
+  return (
+    <span
+      className="absolute left-1 top-1 z-20 grid h-6 min-w-8 place-items-center rounded border border-orange-100/70 bg-orange-700/95 px-1 text-[0.62rem] font-black leading-none text-white shadow-md"
+      title={`${progress} of 3 dig counters`}
+      aria-label={`${instance.card.name} has ${progress} of 3 dig counters`}
+    >
+      {progress}/3
+    </span>
+  );
+}
+
 export function EffectSourceBadges({
   instance,
   zoneCards = [],
@@ -147,12 +170,69 @@ export function EffectSourceBadges({
   }
 
   const badges: Array<{ key: string; label: string; title: string }> = [];
+  const attachedItems = getAttachedCards(zoneCards, instance.instanceId).filter((card) => !card.faceDown);
 
   if (instance.protectedFromEnemyTacticsUntilTurn !== undefined) {
     badges.push({
       key: 'renata',
       label: "Can't be targeted by enemy tactics",
       title: "Can't be targeted by enemy tactics until end of turn",
+    });
+  }
+
+  if (instance.destroyOnNextDamageUntilTurn !== undefined) {
+    badges.push({
+      key: 'mark-of-death',
+      label: 'Marked',
+      title: 'Mark of Death: next damage destroys this unit',
+    });
+  }
+
+  if ((instance.temporaryGloryBonus ?? 0) > 0) {
+    badges.push({
+      key: 'temporary-glory',
+      label: `Glory ${instance.temporaryGloryBonus}`,
+      title: `Granted Glory ${instance.temporaryGloryBonus} until end of turn`,
+    });
+  }
+
+  if (instance.preventNextCombatDamageThisTurn) {
+    badges.push({
+      key: 'prevent-combat-damage',
+      label: 'Prevent dmg',
+      title: 'Next combat damage to this unit is prevented this turn',
+    });
+  }
+
+  if (instance.abilitiesSuppressedUntilTurn !== undefined) {
+    badges.push({
+      key: 'abilities-suppressed',
+      label: 'No abilities',
+      title: 'Abilities are suppressed this turn',
+    });
+  }
+
+  if (instance.skipNextReady) {
+    badges.push({
+      key: 'skip-ready',
+      label: 'Skip ready',
+      title: "Won't ready during its next ready phase",
+    });
+  }
+
+  if (instance.gainVictoryPointOnDeathUntilTurn !== undefined) {
+    badges.push({
+      key: 'brand-vp',
+      label: 'Death: +1 VP',
+      title: 'If this unit dies this turn, the marked player gains 1 victory point',
+    });
+  }
+
+  if (instance.abandonLabBanishOnDeathUntilTurn !== undefined) {
+    badges.push({
+      key: 'abandon-lab',
+      label: 'Death: return',
+      title: 'If this unit would die this turn, banish it and return it next main phase',
     });
   }
 
@@ -169,6 +249,83 @@ export function EffectSourceBadges({
       label: 'On Defend: Ready',
       title: 'On Defend: Ready this unit',
     });
+  }
+
+  for (const item of attachedItems) {
+    switch (item.card.id) {
+      case 'IMP028':
+        badges.push({
+          key: item.instanceId,
+          label: "Can't score",
+          title: `${item.card.name}: equipped unit can't score`,
+        });
+        break;
+      case 'IMP029':
+        badges.push({
+          key: item.instanceId,
+          label: 'Death: 3 dmg',
+          title: `${item.card.name}: when equipped unit dies in combat, deal 3 damage to units in that zone`,
+        });
+        break;
+      case 'IMP060':
+        badges.push({
+          key: item.instanceId,
+          label: 'Provoke',
+          title: `${item.card.name}: equipped unit gains Provoke`,
+        });
+        break;
+      case 'IMP089':
+        badges.push({
+          key: item.instanceId,
+          label: 'Death: discard',
+          title: `${item.card.name}: when equipped unit dies, target opponent discards a card`,
+        });
+        break;
+      case 'IMP090':
+        badges.push({
+          key: item.instanceId,
+          label: 'Capture: +1 VP',
+          title: `${item.card.name}: when equipped unit takes an unoccupied zone, return this and gain 1 victory point`,
+        });
+        break;
+      case 'IMP091':
+        badges.push({
+          key: item.instanceId,
+          label: 'Score: supply',
+          title: `${item.card.name}: when equipped unit scores, this may move to supply exhausted`,
+        });
+        break;
+      case 'IMP122':
+        badges.push({
+          key: item.instanceId,
+          label: 'Glory 1',
+          title: `${item.card.name}: equipped unit gains Glory 1`,
+        });
+        break;
+      case 'IMP123':
+        badges.push({
+          key: item.instanceId,
+          label: 'Vengeance',
+          title: `${item.card.name}: when equipped unit dies while attacking, this may return to hand`,
+        });
+        break;
+      case 'IMP152':
+        badges.push({
+          key: item.instanceId,
+          label: 'Impede 1',
+          title: `${item.card.name}: equipped unit gains Impede 1`,
+        });
+        break;
+      case 'IMP153':
+        badges.push({
+          key: item.instanceId,
+          label: 'Defend death: top deck',
+          title: `${item.card.name}: when equipped unit dies while defending, it may return to the top of its deck`,
+        });
+        break;
+      default:
+        break;
+    }
   }
 
   if (badges.length === 0) {
@@ -252,6 +409,8 @@ export function BattlefieldPanel({
   cards,
   onMove,
   onActivate,
+  onAttack,
+  battlefieldCardsByZone,
   disabled = false,
   canFlipFaceUp = false,
   currentTurn,
@@ -263,6 +422,8 @@ export function BattlefieldPanel({
   cards: GameCardInstance[];
   onMove: MoveCardHandler;
   onActivate?: ActivateAbilityHandler;
+  onAttack?: AttackBattlefieldHandler;
+  battlefieldCardsByZone?: Record<BattlefieldZoneId, GameCardInstance[]>;
   disabled?: boolean;
   canFlipFaceUp?: boolean;
   currentTurn?: number;
@@ -290,6 +451,21 @@ export function BattlefieldPanel({
       })
     : [];
   const canActivate = canShowActivatedAbilityAction(activeInstance, onActivate, { inCombatZone: true });
+  const flankingTargets: BattlefieldZoneId[] =
+    activeInstance &&
+    isUnitCard(activeInstance.card) &&
+    getCardController(activeInstance) === 'player' &&
+    activeInstance.ready &&
+    hasCardKeyword(activeInstance.card, 'flanking') &&
+    onAttack
+      ? (['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] as BattlefieldZoneId[]).filter(
+          (target) =>
+            target !== zone &&
+            !battlefieldCardsByZone?.[target]?.some(
+              (card) => isUnitCard(card.card) && getCardController(card) === 'player'
+            )
+        )
+      : [];
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [triggerRef, menuRef], () => setActiveInstanceId(null));
 
@@ -391,6 +567,7 @@ export function BattlefieldPanel({
             currentStats={currentCombatStatsByInstanceId[instance.instanceId]}
           />
           <QuarantineProgressBadge instance={instance} />
+          <RuinsProgressBadge instance={instance} />
         </span>
       </button>
     );
@@ -454,7 +631,7 @@ export function BattlefieldPanel({
         <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
         {renderTerritoryColumn('Enemy territory', opponentTerritory)}
       </div>
-      {activeInstance && !disabled && (actions.length > 0 || canActivate) ? (
+      {activeInstance && !disabled && (actions.length > 0 || canActivate || flankingTargets.length > 0) ? (
         <div ref={menuRef} className="absolute left-1/2 top-2 z-40 w-36 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl">
           {actions.map((action) => (
             <button
@@ -482,6 +659,21 @@ export function BattlefieldPanel({
               Activate ability
             </button>
           ) : null}
+          {flankingTargets.map((target) => (
+            <button
+              key={`flanking-${target}`}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onAttack?.(activeInstance.instanceId, target);
+                setActiveInstanceId(null);
+                setPreviewCards(null);
+              }}
+              className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
+            >
+              Flank {ZONE_LABELS[target]}
+            </button>
+          ))}
         </div>
       ) : null}
     </section>
@@ -536,6 +728,7 @@ export function CombinedStagingSupplyPanel({
   } | null>(null);
   const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
   const [isGraveyardOpen, setIsGraveyardOpen] = useState(false);
+  const [isBanishOpen, setIsBanishOpen] = useState(false);
   const previewClearTimeoutRef = useRef<number | null>(null);
   const activeStagingTriggerRef = useRef<HTMLButtonElement | null>(null);
   const stagingMenuRef = useRef<HTMLDivElement | null>(null);
@@ -619,7 +812,7 @@ export function CombinedStagingSupplyPanel({
       <CardZoomPreview
         cards={previewCards}
         interactive
-        zIndexClassName={isGraveyardOpen ? 'z-[100]' : 'z-50'}
+        zIndexClassName={isGraveyardOpen || isBanishOpen ? 'z-[100]' : 'z-50'}
         onMouseEnter={cancelPreviewClear}
         onMouseLeave={() => {
           cancelPreviewClear();
@@ -737,6 +930,7 @@ export function CombinedStagingSupplyPanel({
                 label={mirror ? 'Deck' : 'Banish'}
                 cards={mirror ? deckCards : banishCards}
                 faceDown={mirror}
+                onClick={mirror ? undefined : () => setIsBanishOpen(true)}
               />
             </div>
             <div className="mx-2 h-px bg-[color:var(--border)]/70" aria-hidden="true" />
@@ -745,6 +939,7 @@ export function CombinedStagingSupplyPanel({
                 label={mirror ? 'Banish' : 'Deck'}
                 cards={mirror ? banishCards : deckCards}
                 faceDown={!mirror}
+                onClick={mirror ? () => setIsBanishOpen(true) : undefined}
               />
             </div>
           </div>
@@ -767,17 +962,17 @@ export function CombinedStagingSupplyPanel({
                 <>
                   {Array.from({ length: visibleTemporarySupplyCount }, (_, index) => (
                     <div
-                      key={`fortuna-temporary-supply-${index}`}
+                      key={`temporary-supply-${index}`}
                       className="flex h-20 w-20 flex-none items-center justify-center"
                       data-temporary-supply
                     >
                       <div
                         className="relative flex aspect-[5/7] h-20 flex-col items-center justify-center overflow-hidden rounded-md border-2 border-amber-200/80 bg-amber-600 text-white shadow-md shadow-amber-950/30"
-                        title="Temporary supply from Fortuna Bank"
-                        aria-label={`Fortuna temporary supply ${index + 1} of ${visibleTemporarySupplyCount}`}
+                        title="Temporary supply"
+                        aria-label={`Temporary supply ${index + 1} of ${visibleTemporarySupplyCount}`}
                       >
                         <span className="text-lg font-black leading-none">+1</span>
-                        <span className="mt-1 text-[0.48rem] font-black uppercase leading-none">Fortuna</span>
+                        <span className="mt-1 text-[0.48rem] font-black uppercase leading-none">Supply</span>
                       </div>
                     </div>
                   ))}
@@ -945,6 +1140,96 @@ export function CombinedStagingSupplyPanel({
           </div>
         </div>
       ) : null}
+      {isBanishOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 py-6" role="presentation">
+          <div role="dialog" aria-modal="true" aria-labelledby="banish-title" className="grid max-h-full w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl">
+            <header className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
+              <div>
+                <h2 id="banish-title" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">Banish</h2>
+                <p className="mt-0.5 text-xs text-[color:var(--text-secondary)]">{banishCards.length} {banishCards.length === 1 ? 'card' : 'cards'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBanishOpen(false);
+                  setPreviewCards(null);
+                }}
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+              >
+                Close
+              </button>
+            </header>
+            <div className="deck-builder-scroll min-h-0 overflow-y-auto p-4">
+              {banishCards.length === 0 ? (
+                <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed border-[color:var(--border)] text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  Banish is empty
+                </div>
+              ) : (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
+                  {banishCards.map((instance) => {
+                    const canPlayFromBanish =
+                      !mirror &&
+                      onMove &&
+                      !disabled &&
+                      getCardController(instance) === 'player' &&
+                      instance.lingyiPlayableFromBanishOnce;
+
+                    return (
+                      <article
+                        key={instance.instanceId}
+                        className="min-w-0"
+                        onMouseEnter={() => openEquipmentPreview(instance)}
+                        onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
+                      >
+                        {canPlayFromBanish ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onMove(instance.instanceId, 'banish', 'staging');
+                              setIsBanishOpen(false);
+                              setPreviewCards(null);
+                            }}
+                            onFocus={() => openEquipmentPreview(instance)}
+                            onBlur={() => schedulePreviewClear(instance.instanceId)}
+                            className="w-full rounded-md text-left transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                          >
+                            <div className="relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface-muted)] shadow-md">
+                              {instance.card.imageSrc ? (
+                                <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                              ) : null}
+                              <CurrentInfluenceBadge instance={instance} />
+                              <CombatStatsBadge instance={instance} />
+                            </div>
+                            <p className="mt-1 truncate text-center text-[0.65rem] font-semibold text-[color:var(--text-secondary)]" title={instance.card.name}>
+                              {instance.card.name}
+                            </p>
+                            <p className="mt-0.5 text-center text-[0.58rem] font-black uppercase tracking-wide text-[color:var(--accent)]">
+                              Play from banish
+                            </p>
+                          </button>
+                        ) : (
+                          <>
+                            <div className="relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface-muted)] shadow-md">
+                              {instance.card.imageSrc ? (
+                                <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
+                              ) : null}
+                              <CurrentInfluenceBadge instance={instance} />
+                              <CombatStatsBadge instance={instance} />
+                            </div>
+                            <p className="mt-1 truncate text-center text-[0.65rem] font-semibold text-[color:var(--text-secondary)]" title={instance.card.name}>
+                              {instance.card.name}
+                            </p>
+                          </>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1014,9 +1299,9 @@ export function HandStrip({
   }
 
   return (
-    <section className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2 xl:left-[13.5rem] xl:right-4">
+    <section className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pt-2 xl:left-[13.5rem] xl:right-4">
       {activeInstance ? (
-        <div ref={handMenuRef} className="absolute bottom-[5.75rem] left-1/2 z-50 w-[min(94vw,32rem)] -translate-x-1/2 overflow-hidden rounded-xl border-2 border-[color:var(--accent)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
+        <div ref={handMenuRef} className="pointer-events-auto absolute bottom-[5.75rem] left-1/2 z-50 w-[min(94vw,32rem)] -translate-x-1/2 overflow-hidden rounded-xl border-2 border-[color:var(--accent)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
           <button
             type="button"
             onClick={closeHandMenu}
@@ -1097,7 +1382,7 @@ export function HandStrip({
                 onFocus={() => setPreviewCard(instance.card)}
                 onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
                 onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-                className="group flex w-28 translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] rounded-md focus:outline-none transition-transform duration-200 hover:translate-y-6 hover:rotate-0 focus-visible:translate-y-6 focus-visible:rotate-0"
+                className="pointer-events-auto group flex w-28 translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] rounded-md focus:outline-none transition-transform duration-200 hover:translate-y-6 hover:rotate-0 focus-visible:translate-y-6 focus-visible:rotate-0"
                 style={handCardStyle}
                 aria-expanded={activeCardId === instance.instanceId}
                 aria-haspopup={disabled ? undefined : 'menu'}
@@ -1115,6 +1400,15 @@ export function HandStrip({
                   ) : null}
                   <CurrentInfluenceBadge instance={instance} />
                   <CombatStatsBadge instance={instance} />
+                  {instance.solaraRevealedFromDeckUntilTurn !== undefined ? (
+                    <span
+                      className="absolute left-1 top-1 rounded bg-amber-300/95 px-1.5 py-0.5 text-[0.55rem] font-black uppercase tracking-wide text-black shadow shadow-black/40"
+                      aria-label={`${instance.card.name} can be played or supplied until end of turn`}
+                      title="Revealed by Solara: play it or use it to extend supply this turn"
+                    >
+                      EOT
+                    </span>
+                  ) : null}
                 </span>
               </button>
             </article>

@@ -36,6 +36,7 @@ import {
   type PrivateZones,
   type ZoneId,
 } from './game-rules';
+import { applyOvergrownFactoryLeave } from './terra-card-ability-handlers';
 
 export type MoveCardOptions = {
   faceDown?: boolean;
@@ -445,8 +446,13 @@ function moveCard(
   options: MoveCardOptions
 ): CardActionResult {
   const ownerZones = getOwnerZoneMap(state, owner);
+  const isLingyiBanishPlay =
+    fromZone === 'banish' &&
+    toZone === 'staging' &&
+    isUnitCard(card.card) &&
+    card.lingyiPlayableFromBanishOnce === true;
 
-  if (fromZone === 'hand' && toZone === 'staging') {
+  if ((fromZone === 'hand' || isLingyiBanishPlay) && toZone === 'staging') {
     if (isUnitCard(card.card)) {
       const placementError = getStagingPlacementError(card);
 
@@ -496,6 +502,14 @@ function moveCard(
   ) {
     return rejected(state, 'Units cannot retreat from a Quarantine Zone.');
   }
+  if (
+    BATTLEFIELD_ZONES.has(fromZone) &&
+    toZone === 'staging' &&
+    isUnitCard(card.card) &&
+    card.retreatLockedUntilNextTurn
+  ) {
+    return rejected(state, `${card.card.name} cannot retreat on the same turn it captured a battlefield.`);
+  }
 
   if (isUnitCard(card.card) && (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone))) {
     const sourceIsAlreadyInPlay = fromZone === 'staging' || BATTLEFIELD_ZONES.has(fromZone);
@@ -523,7 +537,7 @@ function moveCard(
     fromZone === 'graveyard' &&
     toZone === 'staging' &&
     (card.card.id === 'IMP007' || card.card.id === 'IMP009');
-  const isPaidPlay = isPaidPlayFromHand || isPaidPlayFromGraveyard;
+  const isPaidPlay = isPaidPlayFromHand || isPaidPlayFromGraveyard || isLingyiBanishPlay;
 
   if (isPaidPlay) {
     if (state.phase !== 'main' || state.activePlayer !== owner) {
@@ -611,6 +625,8 @@ function moveCard(
     enterReady:
       isDemonicAdvanceUnitPlay
         ? true
+        : isLingyiBanishPlay && card.lingyiGrantedBlitz
+          ? true
         :
       fromZone === 'hand' && isItemCard(card.card)
         ? true
@@ -619,6 +635,10 @@ function moveCard(
           : undefined,
     attachToInstanceId: isItemCard(card.card) ? options.attachToInstanceId ?? card.attachedToInstanceId : null,
   });
+  if (isLingyiBanishPlay) {
+    movedCard.lingyiPlayableFromBanishOnce = undefined;
+    movedCard.lingyiGrantedBlitz = undefined;
+  }
   if (fromZone === 'graveyard' && (card.card.id === 'IMP007' || card.card.id === 'IMP009')) {
     movedCard.banishOnDeath = true;
   }
@@ -681,7 +701,7 @@ function moveCard(
   }
 
   const playTriggeredState =
-    fromZone === 'hand'
+    fromZone === 'hand' || isLingyiBanishPlay
       ? triggerCardAbilities(movedState, 'onPlay', {
           source: movedCard,
           controller: owner,
@@ -714,6 +734,7 @@ function moveCard(
       controller: owner,
       zone: fromZone,
     });
+    enteredState = applyOvergrownFactoryLeave(enteredState, movedCard, fromZone);
   }
 
   return applied(enteredState);
@@ -781,11 +802,16 @@ export function applyCardAction(
     fromZone === 'graveyard' &&
     toZone === 'staging' &&
     (card.card.id === 'IMP007' || card.card.id === 'IMP009');
+  const isSpecialBanishPlay =
+    fromZone === 'banish' &&
+    toZone === 'staging' &&
+    isUnitCard(card.card) &&
+    card.lingyiPlayableFromBanishOnce === true;
   const isRetreat =
     BATTLEFIELD_ZONES.has(fromZone) &&
     toZone === 'staging';
 
-  if (!isHandPlay && !isRetreat && !isSpecialGraveyardPlay) {
+  if (!isHandPlay && !isRetreat && !isSpecialGraveyardPlay && !isSpecialBanishPlay) {
     return rejected(state, `Cards cannot be moved from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]} manually.`);
   }
 
@@ -793,7 +819,7 @@ export function applyCardAction(
     return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only retreat units during ${owner === 'player' ? 'your' : 'its'} main turn.`);
   }
 
-  if (isSpecialGraveyardPlay && (state.phase !== 'main' || state.activePlayer !== owner)) {
+  if ((isSpecialGraveyardPlay || isSpecialBanishPlay) && (state.phase !== 'main' || state.activePlayer !== owner)) {
     return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only play cards during ${owner === 'player' ? 'your' : 'its'} main turn.`);
   }
 

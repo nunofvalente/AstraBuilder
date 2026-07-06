@@ -647,6 +647,18 @@ body.simulator-route-active .app-top-bar {
     var(--background);
 }
 
+.play-simulator-workspace {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--background) 68%, black) 0%, color-mix(in srgb, var(--background) 78%, black) 62%, color-mix(in srgb, var(--accent) 34%, black) 100%);
+}
+
+.play-simulator-workspace > * {
+  position: relative;
+  z-index: 1;
+}
+
 .deck-builder-pane {
   border-color: color-mix(in srgb, var(--border) 72%, var(--accent));
   box-shadow:

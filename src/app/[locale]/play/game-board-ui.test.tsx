@@ -5,8 +5,25 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
 import { CARD_BACK_IMAGE_SRC } from './game-client-support';
-import { BattlefieldPanel, CombinedStagingSupplyPanel } from './game-board-ui';
-import type { GameCardInstance } from './game-rules';
+import { BattlefieldPanel, CombinedStagingSupplyPanel, HandStrip } from './game-board-ui';
+import {
+  buildInitialGameState,
+  type GameCardInstance,
+  type GameState,
+  type SavedDeck,
+} from './game-rules';
+
+function makeDeck(): SavedDeck {
+  return { id: 'ui-test', title: 'UI Test', cardCount: 0, entries: [] };
+}
+
+function makeGameState(): GameState {
+  return {
+    ...buildInitialGameState(makeDeck(), makeDeck()),
+    phase: 'main',
+    activePlayer: 'player',
+  };
+}
 
 function makeInstance(): GameCardInstance {
   return {
@@ -20,6 +37,39 @@ function makeInstance(): GameCardInstance {
     retreatLockedUntilNextTurn: false,
   };
 }
+
+describe('HandStrip', () => {
+  it('does not block pointer events over the lower board outside actual hand cards', () => {
+    const handCard: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'hand-card',
+      card: createTestCard({ id: 'hand-card', name: 'Hand Card', type: 'Unit' }),
+    };
+
+    const { container } = render(
+      <HandStrip
+        cards={[handCard]}
+        gameState={makeGameState()}
+        onMove={() => undefined}
+        canSupplyFromHand
+        canPlayFromHand
+        friendlyUnitsInPlay={[]}
+        graveyardCards={[]}
+        readySupplyCount={0}
+        stagingUnits={[]}
+        demonicAdvanceActive={false}
+        battlefieldCardsByZone={{
+          battlefieldLeft: [],
+          battlefieldCenter: [],
+          battlefieldRight: [],
+        }}
+      />,
+    );
+
+    expect(container.querySelector('section')).toHaveClass('pointer-events-none');
+    expect(container.querySelector('button')).toHaveClass('pointer-events-auto');
+  });
+});
 
 describe('CombinedStagingSupplyPanel', () => {
   it('zooms graveyard cards on hover above the graveyard dialog', () => {
@@ -88,7 +138,7 @@ describe('CombinedStagingSupplyPanel', () => {
     expect(screen.getByLabelText('Vermillion, Ghastly Researcher has 2 influence')).toHaveTextContent('2');
   });
 
-  it('renders Fortuna temporary supply as distinct supply cards', () => {
+  it('renders generic temporary supply as distinct supply cards', () => {
     const { container } = render(
       <CombinedStagingSupplyPanel
         stagingCards={[]}
@@ -101,7 +151,8 @@ describe('CombinedStagingSupplyPanel', () => {
     );
 
     expect(screen.getByLabelText('3 total supply, including 3 temporary')).toBeInTheDocument();
-    expect(screen.getAllByTitle('Temporary supply from Fortuna Bank')).toHaveLength(3);
+    expect(screen.getAllByTitle('Temporary supply')).toHaveLength(3);
+    expect(screen.getAllByText('Supply')).toHaveLength(3);
     expect(container.querySelectorAll('[data-temporary-supply]')).toHaveLength(3);
   });
 
@@ -218,6 +269,39 @@ describe('CombinedStagingSupplyPanel', () => {
     expect(screen.getByLabelText("Can't be targeted by enemy tactics until end of turn")).toHaveTextContent("Can't be targeted by enemy tactics");
   });
 
+  it('shows implemented item ability badges on equipped staging units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'equipped-staging-unit',
+      card: createTestCard({ id: 'equipped-staging-unit', name: 'Equipped Staging Unit', type: 'Unit' }),
+    };
+    const glorybringer: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'glorybringer',
+      attachedToInstanceId: unit.instanceId,
+      card: createTestCard({ id: 'IMP122', name: 'Glorybringer', type: 'Item Equipment' }),
+    };
+    const vengeance: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'vengeance',
+      attachedToInstanceId: unit.instanceId,
+      card: createTestCard({ id: 'IMP123', name: 'Vengeance', type: 'Item Equipment' }),
+    };
+
+    render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[unit, glorybringer, vengeance]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+      />,
+    );
+
+    expect(screen.getByLabelText('Glorybringer: equipped unit gains Glory 1')).toHaveTextContent('Glory 1');
+    expect(screen.getByLabelText('Vengeance: when equipped unit dies while attacking, this may return to hand')).toHaveTextContent('Vengeance');
+  });
+
   it('offers Genesis III activated ability from staging', () => {
     const genesis: GameCardInstance = {
       ...makeInstance(),
@@ -293,9 +377,86 @@ describe('CombinedStagingSupplyPanel', () => {
     const banishLabel = screen.getByText('Banish');
     expect(deckLabel.compareDocumentPosition(banishLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('opens the banish pile and plays a Lingyi-marked unit from the modal', () => {
+    const onMove = vi.fn();
+    const banished = {
+      ...makeInstance(),
+      instanceId: 'lingyi-unit',
+      card: createTestCard({ id: 'lingyi-unit', name: 'Lingyi Unit', type: 'Unit' }),
+      lingyiPlayableFromBanishOnce: true,
+    };
+    render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[banished]}
+        deckCards={[]}
+        onMove={onMove}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /banish/i }));
+    expect(screen.getByRole('dialog', { name: /banish/i })).toBeInTheDocument();
+    expect(onMove).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /lingyi unit/i }));
+    expect(onMove).toHaveBeenCalledWith(banished.instanceId, 'banish', 'staging');
+  });
+
+  it('opens a read-only banish pile modal for inspecting banished cards', () => {
+    const banished = {
+      ...makeInstance(),
+      instanceId: 'banished-card',
+      card: createTestCard({ id: 'banished-card', name: 'Banished Subject', type: 'Unit' }),
+    };
+    render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[banished]}
+        deckCards={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /banish/i }));
+
+    expect(screen.getByRole('dialog', { name: /banish/i })).toBeInTheDocument();
+    expect(screen.getByText('Banished Subject')).toBeInTheDocument();
+    expect(screen.queryByText('Play from banish')).not.toBeInTheDocument();
+  });
 });
 
 describe('BattlefieldPanel', () => {
+  it('offers Flanking attacks from a combat zone', () => {
+    const onAttack = vi.fn();
+    const flanker = {
+      ...makeInstance(),
+      instanceId: 'flanker',
+      ready: true,
+      card: createTestCard({ id: 'flanker', name: 'Flanker', type: 'Unit', rulesText: 'Flanking' }),
+    };
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[flanker]}
+        onMove={() => undefined}
+        onAttack={onAttack}
+        battlefieldCardsByZone={{
+          battlefieldLeft: [flanker],
+          battlefieldCenter: [],
+          battlefieldRight: [],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /open flanker actions/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /flank battlefield 2/i }));
+    expect(onAttack).toHaveBeenCalledWith(flanker.instanceId, 'battlefieldCenter');
+  });
+
   it('zooms face-down player territories face up', () => {
     const territory: GameCardInstance = {
       ...makeInstance(),
@@ -433,6 +594,75 @@ describe('BattlefieldPanel', () => {
     expect(screen.getByLabelText("Can't be targeted by enemy tactics until end of turn")).toHaveTextContent("Can't be targeted by enemy tactics");
   });
 
+  it('shows a Mark of Death effect badge on marked battlefield units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'marked-unit',
+      card: createTestCard({ id: 'marked-unit', name: 'Marked Unit', type: 'Unit' }),
+      destroyOnNextDamageUntilTurn: 3,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('Mark of Death: next damage destroys this unit')).toHaveTextContent('Marked');
+  });
+
+  it('shows granted ability and turn-duration effect badges on battlefield units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'granted-effects-unit',
+      card: createTestCard({ id: 'granted-effects-unit', name: 'Granted Effects Unit', type: 'Unit' }),
+      temporaryGloryBonus: 1,
+      temporaryGloryExpiresAfterTurn: 3,
+      preventNextCombatDamageThisTurn: true,
+      abilitiesSuppressedUntilTurn: 3,
+      skipNextReady: true,
+      gainVictoryPointOnDeathUntilTurn: 3,
+      gainVictoryPointOnDeathOwner: 'player',
+      abandonLabBanishOnDeathUntilTurn: 3,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('Granted Glory 1 until end of turn')).toHaveTextContent('Glory 1');
+    expect(screen.getByLabelText('Next combat damage to this unit is prevented this turn')).toHaveTextContent('Prevent dmg');
+    expect(screen.getByLabelText('Abilities are suppressed this turn')).toHaveTextContent('No abilities');
+    expect(screen.getByLabelText("Won't ready during its next ready phase")).toHaveTextContent('Skip ready');
+    expect(screen.getByLabelText('If this unit dies this turn, the marked player gains 1 victory point')).toHaveTextContent('Death: +1 VP');
+    expect(screen.getByLabelText('If this unit would die this turn, banish it and return it next main phase')).toHaveTextContent('Death: return');
+  });
+
+  it('does not show Ashfang Raider entry restrictions as an ongoing effect badge', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'ashfang-raider',
+      card: createTestCard({ id: 'IMP097', name: 'Ashfang Raider', type: 'Unit' }),
+      attackOnlyUnoccupiedUntilTurn: 3,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByText('Unoccupied only')).not.toBeInTheDocument();
+  });
+
   it('shows a Radar Beacon effect badge on friendly units in its zone', () => {
     const unit: GameCardInstance = {
       ...makeInstance(),
@@ -503,6 +733,54 @@ describe('BattlefieldPanel', () => {
     expect(onMove).toHaveBeenCalledWith(unit.instanceId, 'battlefieldLeft', 'staging', { enterExhausted: true });
   });
 
+  it('shows implemented item ability badges on equipped battlefield units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'equipped-battlefield-unit',
+      card: createTestCard({ id: 'equipped-battlefield-unit', name: 'Equipped Battlefield Unit', type: 'Unit' }),
+    };
+    const caltrops: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'caltrops',
+      attachedToInstanceId: unit.instanceId,
+      card: createTestCard({ id: 'IMP152', name: 'Caltrops', type: 'Item Equipment' }),
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit, caltrops]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('Caltrops: equipped unit gains Impede 1')).toHaveTextContent('Impede 1');
+  });
+
+  it('disables manual retreat for units that captured this turn', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'locked-battlefield-unit',
+      card: createTestCard({ id: 'IMP107', name: 'Reckless Warrior', type: 'Unit' }),
+      ready: false,
+      retreatLockedUntilNextTurn: true,
+    };
+    const onMove = vi.fn();
+    const { container } = render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit]}
+        onMove={onMove}
+      />,
+    );
+
+    fireEvent.click(container.querySelector('[data-card-instance-id="locked-battlefield-unit"]')!);
+
+    expect(screen.getByRole('menuitem', { name: /retreat to staging/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole('menuitem', { name: /retreat to staging/i }));
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
   it('shows Quarantine Zone progress and remaining turns', () => {
     const quarantine: GameCardInstance = {
       ...makeInstance(),
@@ -551,5 +829,54 @@ describe('BattlefieldPanel', () => {
 
     expect(screen.queryByText('1/2')).not.toBeInTheDocument();
     expect(screen.queryByText('1 turn left')).not.toBeInTheDocument();
+  });
+
+  it('shows Ruins of the Precursors dig counters while face up', () => {
+    const ruins: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'ruins-of-the-precursors',
+      card: createTestCard({
+        id: 'IMP125',
+        name: 'Ruins of the Precursors',
+        type: 'Territory',
+      }),
+      progressCounters: 2,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[ruins]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('2/3')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ruins of the Precursors has 2 of 3 dig counters')).toBeInTheDocument();
+  });
+
+  it('does not reveal Ruins of the Precursors dig counters while face down', () => {
+    const ruins: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'hidden-ruins-of-the-precursors',
+      card: createTestCard({
+        id: 'IMP125',
+        name: 'Ruins of the Precursors',
+        type: 'Territory',
+      }),
+      faceDown: true,
+      progressCounters: 2,
+    };
+
+    render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[ruins]}
+        onMove={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByText('2/3')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ruins of the Precursors has 2 of 3 dig counters')).not.toBeInTheDocument();
   });
 });

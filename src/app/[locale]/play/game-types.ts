@@ -45,6 +45,22 @@ export type GameCardInstance = {
   temporaryAttackBonus?: number;
   temporaryHealthBonus?: number;
   temporaryStatsExpireAfterTurn?: number;
+  temporaryGloryBonus?: number;
+  temporaryGloryExpiresAfterTurn?: number;
+  attackOnlyUnoccupiedUntilTurn?: number;
+  destroyOnNextDamageUntilTurn?: number;
+  gainVictoryPointOnDeathUntilTurn?: number;
+  gainVictoryPointOnDeathOwner?: Owner;
+  flankingOriginZone?: ZoneId;
+  flankingAttackUsedTurn?: number;
+  lingyiPlayableFromBanishOnce?: boolean;
+  lingyiGrantedBlitz?: boolean;
+  solaraRevealedFromDeckUntilTurn?: number;
+  terraLastStandExpiresAtStartOfOwner?: Owner;
+  terraLastStandAttackBonus?: number;
+  terraLastStandHealthBonus?: number;
+  overgrownFactoryUsedTurn?: number;
+  skipCurrentCombat?: boolean;
   combatAttackBonus?: number;
   abilitiesSuppressedUntilTurn?: number;
   protectedFromEnemyTacticsUntilTurn?: number;
@@ -75,6 +91,7 @@ export type PendingCombat = {
   attackerInstanceId: string;
   targetZone: ZoneId;
   defenderInstanceId: string | null;
+  flankingOriginZone?: ZoneId;
   priorityOwner: Owner;
   lastPassedOwner: Owner | null;
   counterStack: GameCardInstance[];
@@ -206,6 +223,88 @@ export type PendingChoice =
       maxSelections?: number;
       contextInstanceIds?: string[];
       resumeTurnAdvance?: boolean;
+    }
+  | {
+      kind: 'solaraTarget';
+      owner: 'player';
+      sourceInstanceId: string;
+      sourceName: string;
+      prompt: string;
+      effect:
+        | 'pillagerSupply'
+        | 'lingyiBanish'
+        | 'grantGlory'
+        | 'rockjawRetreat'
+        | 'varenthusSacrifice'
+        | 'varenthusDestroy'
+        | 'brandDamage'
+        | 'lavaSacrifice'
+        | 'markOfDeath'
+        | 'ransackDestroy'
+        | 'rocketDamage'
+        | 'uprisingBuff'
+        | 'uprisingExhaust'
+        | 'enrageReady'
+        | 'vengeanceReturn'
+        | 'wyvernAttack'
+        | 'peaksRetreat';
+      availableInstanceIds: string[];
+      optional?: boolean;
+      minSelections?: number;
+      maxSelections?: number;
+      contextInstanceIds?: string[];
+      resumeTurnAdvance?: boolean;
+    }
+  | {
+      kind: 'terraTarget';
+      owner: 'player';
+      sourceInstanceId: string;
+      sourceName: string;
+      prompt: string;
+      effect:
+        | 'gaiaFreePlay'
+        | 'shamanUnit'
+        | 'ravenRetreat'
+        | 'rallierBuff'
+        | 'wyrmDamage'
+        | 'illusionistUnit'
+        | 'coordinatedExhaust'
+        | 'coordinatedDamage'
+        | 'predatoryBuff'
+        | 'predatoryDamage'
+        | 'sporeExhaust'
+        | 'lastStand'
+        | 'swiftRetreat'
+        | 'katanaReturn'
+        | 'escapeRoutePay'
+        | 'factoryDraw';
+      availableInstanceIds: string[];
+      optional?: boolean;
+      minSelections?: number;
+      maxSelections?: number;
+      contextInstanceIds?: string[];
+      effectAmount?: number;
+      resumeTurnAdvance?: boolean;
+    }
+  | {
+      kind: 'terraZone';
+      owner: 'player';
+      sourceInstanceId: string;
+      sourceName: string;
+      prompt: string;
+      effect: 'gaiaTerritory' | 'illusionistAttack';
+      availableZoneIds: ZoneId[];
+      contextInstanceIds?: string[];
+    }
+  | {
+      kind: 'neutralTarget';
+      owner: 'player';
+      sourceInstanceId: string;
+      sourceName: string;
+      prompt: string;
+      effect: 'excavatorDestroy';
+      availableInstanceIds: string[];
+      optional?: boolean;
     };
 
 export type GameState = {

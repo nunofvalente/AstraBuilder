@@ -6,6 +6,7 @@ import type {
 } from './card-abilities';
 import {
   BATTLEFIELD_ZONE_IDS,
+  dealDamageToUnit,
   addLogEntry,
   adjustVictoryPoints,
   exhaustSupplyForCost,
@@ -325,16 +326,7 @@ function forceRetreatUnit(state: GameState, target: GameCardInstance): GameState
 }
 
 function damageUnit(state: GameState, target: GameCardInstance, amount: number): GameState {
-  const damagedState = updateCardInPlay(state, target.instanceId, (unit) => ({
-    ...unit,
-    damage: unit.damage + amount,
-  }));
-  const damagedTarget = findCardInstance(damagedState, target.instanceId);
-  if (!damagedTarget || damagedTarget.damage < getCurrentUnitHealth(damagedState, damagedTarget)) {
-    return damagedState;
-  }
-  const removed = removeUnitFromPlay(damagedState, target.instanceId);
-  return 'error' in removed ? damagedState : removed.state;
+  return dealDamageToUnit(state, target.instanceId, amount);
 }
 
 function resolveSingleTarget(
@@ -378,13 +370,30 @@ function canEnemyTacticTarget(state: GameState, event: AbilityEvent, unit: GameC
   );
 }
 
-const returnUnit = resolveSingleTarget(
-  'leviathanReturn',
-  "Choose a unit to return to its owner's hand.",
-  (state) => getUnitsInPlay(state),
-  (state, _event, target) => removeCardToHand(state, target),
-  true
-);
+const cloudbreachLeviathan: AbilityHandler = ({ state, event }) => {
+  const targets = getUnitsInPlay(state);
+  if (targets.length === 0) return { state, resolved: false };
+  const selected = selectedEventTarget(event, targets);
+  if (!selected && event.controller === 'player') {
+    return {
+      state: createPlayerChoice(
+        state,
+        event,
+        'leviathanReturn',
+        targets,
+        "Choose a unit to return to its owner's hand.",
+        { optional: true }
+      ),
+      resolved: false,
+    };
+  }
+  const target = selected ?? targets[0]!;
+  return {
+    state: removeCardToHand(state, target),
+    resolved: true,
+    message: `${event.source.card.name} returned ${target.card.name} to its owner's hand.`,
+  };
+};
 
 const rebound = resolveSingleTarget(
   'leviathanReturn',
@@ -433,12 +442,23 @@ const valeriaRetreat = resolveSingleTarget(
   true
 );
 
-const valeriaAttack = resolveSingleTarget(
-  'valeriaExhaust',
-  'Choose a unit in a combat zone to exhaust.',
-  (state) => BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]).filter((card) => isUnitCard(card.card)),
-  (state, _event, target) => updateCardInPlay(state, target.instanceId, (unit) => ({ ...unit, ready: false }))
-);
+const valeriaAttack: AbilityHandler = ({ state, event }) => {
+  const targets = BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]).filter((card) => isUnitCard(card.card));
+  if (targets.length === 0) return { state, resolved: false };
+  const selected = selectedEventTarget(event, targets);
+  if (!selected && event.controller === 'player') {
+    return {
+      state: createPlayerChoice(state, event, 'valeriaExhaust', targets, 'Choose a unit in a combat zone to exhaust.'),
+      resolved: false,
+    };
+  }
+  const target = selected ?? targets[0]!;
+  return {
+    state: updateCardInPlay(state, target.instanceId, (unit) => ({ ...unit, ready: false })),
+    resolved: true,
+    message: `${event.source.card.name} exhausted ${target.card.name} on attack.`,
+  };
+};
 
 const skybreaker = resolveSingleTarget(
   'skybreakerDamage',
@@ -798,7 +818,7 @@ export function resolveCaelumTargetChoice(
       break;
     case 'leviathanReturn':
       nextState = removeCardToHand(nextState, selected);
-      nextState = logAbilityOutcome(nextState, pendingChoice.sourceName, `${selected.card.name} returned to its owner's hand.`);
+      nextState = logAbilityOutcome(nextState, pendingChoice.sourceName, `returned ${selected.card.name} to its owner's hand.`);
       break;
     case 'renataProtect':
       nextState = updateCardInPlay(nextState, selected.instanceId, (unit) => ({ ...unit, protectedFromEnemyTacticsUntilTurn: state.turn }));
@@ -820,7 +840,7 @@ export function resolveCaelumTargetChoice(
       break;
     case 'valeriaExhaust':
       nextState = updateCardInPlay(nextState, selected.instanceId, (unit) => ({ ...unit, ready: false }));
-      nextState = logAbilityOutcome(nextState, pendingChoice.sourceName, `${selected.card.name} was exhausted.`);
+      nextState = logAbilityOutcome(nextState, pendingChoice.sourceName, `exhausted ${selected.card.name} on attack.`);
       break;
     case 'valeriaRetreat':
       nextState = forceRetreatUnit(nextState, selected);
@@ -986,7 +1006,7 @@ export function createCaelumAbilityHandlers() {
     abandonTheLab: resolveAbandonTheLab,
     airdrop: resolveAirdrop,
     breachTheDam: resolveBreachTheDam,
-    cloudbreachLeviathan: returnUnit,
+    cloudbreachLeviathan,
     complexStratagem: resolveComplexStratagem,
     courierDrone: resolveCourierDrone,
     forcedConfession,

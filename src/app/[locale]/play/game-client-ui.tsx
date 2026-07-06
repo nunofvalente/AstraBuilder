@@ -242,6 +242,7 @@ export function OpponentHandStrip({ cards }: { cards: GameCardInstance[] }) {
               '--opponent-hand-card-rotation': `${rotation}deg`,
               transformOrigin: '50% -15%',
             } as CSSProperties;
+            const revealedUntilEndOfTurn = instance.solaraRevealedFromDeckUntilTurn !== undefined;
 
             return (
               <article
@@ -253,7 +254,22 @@ export function OpponentHandStrip({ cards }: { cards: GameCardInstance[] }) {
                   className="relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
                   style={handCardStyle}
                 >
-                  <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="112px" className="object-cover" />
+                  <Image
+                    src={revealedUntilEndOfTurn ? instance.card.imageSrc : CARD_BACK_IMAGE_SRC}
+                    alt=""
+                    fill
+                    sizes="112px"
+                    className="object-cover"
+                  />
+                  {revealedUntilEndOfTurn ? (
+                    <span
+                      className="absolute left-1 top-1 rounded bg-amber-300/95 px-1.5 py-0.5 text-[0.55rem] font-black uppercase tracking-wide text-black shadow shadow-black/40"
+                      aria-label={`${instance.card.name} was revealed until end of turn`}
+                      title={`${instance.card.name} was revealed until end of turn`}
+                    >
+                      Revealed
+                    </span>
+                  ) : null}
                 </div>
               </article>
             );

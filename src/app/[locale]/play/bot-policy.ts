@@ -21,6 +21,7 @@ import {
   type ZoneId,
 } from './game-rules';
 import type { CardAction } from './game-actions';
+import { hasCardKeyword } from './card-definitions';
 
 export type BotTurnStep = 'supply' | 'stageUnit' | 'attackBattlefield';
 
@@ -219,7 +220,10 @@ function chooseBotDemonicAdvanceUnitPlay(state: GameState): BotCommand | null {
 
 function chooseBotUnitPlay(state: GameState): BotCommand | null {
   const selectedUnit = sortByHighestPlayValue(
-    state.opponentZones.hand.filter((instance) => isUnitCard(instance.card) && canBotPlayCardToZone(state, instance, 'staging'))
+    [
+      ...state.opponentZones.hand,
+      ...state.opponentZones.banish.filter((instance) => instance.lingyiPlayableFromBanishOnce),
+    ].filter((instance) => isUnitCard(instance.card) && canBotPlayCardToZone(state, instance, 'staging'))
   )[0] ?? null;
 
   return selectedUnit
@@ -228,7 +232,9 @@ function chooseBotUnitPlay(state: GameState): BotCommand | null {
         action: {
           owner: 'opponent',
           instanceId: selectedUnit.instanceId,
-          fromZone: 'hand',
+          fromZone: state.opponentZones.banish.some((card) => card.instanceId === selectedUnit.instanceId)
+            ? 'banish'
+            : 'hand',
           toZone: 'staging',
           options: getCardActionOptions(state, selectedUnit) ?? {},
         },
@@ -312,7 +318,16 @@ export function getBotBattlefieldAttackChoice(state: GameState): BotBattlefieldA
     return null;
   }
 
-  const readyAttackers = state.opponentZones.staging.filter((instance) => instance.ready && isUnitCard(instance.card));
+  const readyAttackers = [
+    ...state.opponentZones.staging,
+    ...BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]).filter(
+      (instance) =>
+        getCardController(instance) === 'opponent' &&
+        isUnitCard(instance.card) &&
+        hasCardKeyword(instance.card, 'flanking') &&
+        instance.flankingAttackUsedTurn !== state.turn
+    ),
+  ].filter((instance) => instance.ready && isUnitCard(instance.card));
   const targetZones = [
     ...BATTLEFIELD_ZONE_IDS.filter((zone) =>
       state.zones[zone].some((instance) => getCardController(instance) === 'player' && isUnitCard(instance.card))

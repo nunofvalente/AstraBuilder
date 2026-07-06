@@ -209,6 +209,13 @@ describe('Caelum card abilities', () => {
     expect(bouncePending.pendingChoice).toMatchObject({ kind: 'caelumTarget', effect: 'leviathanReturn' });
     const bounced = resolvePendingChoice(bouncePending, [enemy.instanceId]);
     expect('error' in bounced ? null : bounced.opponentZones.hand[0]?.instanceId).toBe(enemy.instanceId);
+    expect('error' in bounced ? [] : bounced.log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          suffix: "Cloudbreach Leviathan: returned enemy to its owner's hand.",
+        }),
+      ])
+    );
 
     const lockdownPending = triggerCardAbilities(state, 'onEnter', {
       source: enforcer,
@@ -530,6 +537,17 @@ describe('Caelum card abilities', () => {
     const valeriaPending = triggerCardAbilities(state, 'onEnter', { source: valeria, controller: 'player', zone: 'staging' });
     const retreated = resolvePendingChoice(valeriaPending, [target.instanceId]);
     expect('error' in retreated ? null : retreated.opponentZones.staging[0]?.instanceId).toBe(target.instanceId);
+
+    const valeriaAttackPending = triggerCardAbilities(state, 'onAttack', { source: valeria, controller: 'player', zone: 'battlefieldLeft' });
+    const exhausted = resolvePendingChoice(valeriaAttackPending, [target.instanceId]);
+    expect('error' in exhausted ? null : exhausted.zones.battlefieldLeft[0]?.ready).toBe(false);
+    expect('error' in exhausted ? [] : exhausted.log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          suffix: 'Valeria: exhausted target on attack.',
+        }),
+      ])
+    );
 
     const reboundPending = triggerCardAbilities(state, 'onPlay', { source: rebound, controller: 'player', zone: 'graveyard' });
     const rebounded = resolvePendingChoice(reboundPending, [target.instanceId]);
