@@ -74,7 +74,7 @@ export function getPendingChoiceTargetCards(gameState: GameState, pendingChoice:
     return gameState.zones.hand.filter((instance) => pendingChoice.availableCardInstanceIds.includes(instance.instanceId));
   }
 
-  if (pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget') {
+  if (pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'solaraTarget' || pendingChoice.kind === 'terraTarget' || pendingChoice.kind === 'neutralTarget') {
     return [
       ...gameState.zones.deck,
       ...gameState.zones.hand,
@@ -91,6 +91,25 @@ export function getPendingChoiceTargetCards(gameState: GameState, pendingChoice:
   }
 
   return [];
+}
+
+export function getDefaultPendingChoiceSelectionIds(pendingChoice: PendingChoice | null): string[] {
+  if (pendingChoice?.kind === 'terraTarget' && pendingChoice.effect === 'ravenRetreat') {
+    return pendingChoice.availableInstanceIds.slice(0, 1);
+  }
+
+  return [];
+}
+
+export function isPrivateOpponentSupplyChoiceTarget(
+  gameState: GameState,
+  pendingChoice: PendingChoice | null,
+  target: GameCardInstance,
+): boolean {
+  return Boolean(
+    pendingChoice?.owner === 'player' &&
+      gameState.opponentZones.supply.some((instance) => instance.instanceId === target.instanceId),
+  );
 }
 
 export const ZONE_LABELS: Record<ZoneId, string> = {
@@ -212,6 +231,7 @@ export function getBattlefieldActions(
       label: 'Retreat to Staging',
       target: 'staging',
       options: { enterExhausted: true },
+      disabled: instance.retreatLockedUntilNextTurn,
     },
   ];
 }

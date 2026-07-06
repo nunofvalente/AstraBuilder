@@ -8,6 +8,7 @@ import type {
 } from './card-abilities';
 import {
   BATTLEFIELD_ZONE_IDS,
+  dealDamageToUnit,
   addLogEntry,
   getCardController,
   getCurrentUnitHealth,
@@ -163,16 +164,7 @@ function selectedEventTarget(event: AbilityEvent, targets: GameCardInstance[]): 
 }
 
 function damageUnit(state: GameState, target: GameCardInstance, amount: number): GameState {
-  const damagedState = updateUnitInPlay(state, target.instanceId, (instance) => ({
-    ...instance,
-    damage: instance.damage + amount,
-  }));
-  const damagedTarget = findCardInstance(damagedState, target.instanceId);
-  if (!damagedTarget || damagedTarget.damage < getCurrentUnitHealth(damagedState, damagedTarget)) {
-    return damagedState;
-  }
-  const removed = removeUnitFromPlay(damagedState, target.instanceId);
-  return 'error' in removed ? damagedState : removed.state;
+  return dealDamageToUnit(state, target.instanceId, amount);
 }
 
 function resolveSingleTarget(

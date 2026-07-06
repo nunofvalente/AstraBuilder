@@ -4,10 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, ChevronsRight, Flag, Hand, Layers, Play, RotateCcw, Swords, Users } from 'lucide-react';
+import { Bot, Check, ChevronDown, ChevronsRight, Flag, Hand, Layers, Play, RotateCcw, Sparkles, Swords, Users } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
+import { getAffinityBaseColor, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
 import type { Card } from '../create/deck-builder/types';
 import { getBotBattlefieldAttackChoice } from './bot-policy';
 import { applyPlayerCardAction } from './game-actions';
@@ -62,7 +63,9 @@ import {
   CARD_BACK_IMAGE_SRC,
   MATCH_SESSION_STORAGE_KEY,
   ZONE_LABELS,
+  getDefaultPendingChoiceSelectionIds,
   getPendingChoiceTargetCards,
+  isPrivateOpponentSupplyChoiceTarget,
   mapDeckRows,
   type DeckRow,
   type MoveCardOptions,
@@ -96,6 +99,76 @@ type MatchSessionPayload = {
   mode?: 'practice' | 'multiplayer';
 };
 
+function getDeckBannerAffinities(deck: SavedDeck | null): string[] {
+  const affinityCounts = new Map<string, number>();
+
+  for (const entry of deck?.entries ?? []) {
+    const affinity = normalizeAffinity(entry.card.affinity);
+    if (!affinity) {
+      continue;
+    }
+
+    affinityCounts.set(affinity, (affinityCounts.get(affinity) ?? 0) + entry.count);
+  }
+
+  const nonNeutralAffinities = Array.from(affinityCounts.entries()).filter(
+    ([affinity]) => affinity.toLowerCase() !== 'neutral'
+  );
+
+  return (nonNeutralAffinities.length > 0 ? nonNeutralAffinities : Array.from(affinityCounts.entries()))
+    .sort(([affinityA, countA], [affinityB, countB]) => countB - countA || affinityA.localeCompare(affinityB))
+    .slice(0, 2)
+    .map(([affinity]) => affinity);
+}
+
+function getDeckBannerBackground(affinities: string[]): string {
+  if (affinities.length === 0) {
+    return 'linear-gradient(110deg, rgba(241,143,59,0.18), rgba(44,180,120,0.14))';
+  }
+
+  if (affinities.length === 1) {
+    const primaryColor = `color-mix(in srgb, ${getAffinityBaseColor(affinities[0])} 72%, black)`;
+    return [
+      'linear-gradient(110deg, rgba(255,255,255,0.12), transparent 42%, rgba(0,0,0,0.18))',
+      `linear-gradient(135deg, color-mix(in srgb, ${primaryColor} 74%, black) 0%, ${primaryColor} 100%)`,
+    ].join(', ');
+  }
+
+  const primaryColor = `color-mix(in srgb, ${getAffinityBaseColor(affinities[0])} 72%, black)`;
+  const secondaryColor = `color-mix(in srgb, ${getAffinityBaseColor(affinities[1])} 72%, black)`;
+
+  return [
+    'linear-gradient(110deg, rgba(255,255,255,0.11), transparent 42%, rgba(0,0,0,0.18))',
+    `linear-gradient(135deg, ${primaryColor} 0%, color-mix(in srgb, ${primaryColor} 68%, ${secondaryColor}) 38%, color-mix(in srgb, ${primaryColor} 50%, ${secondaryColor}) 50%, color-mix(in srgb, ${secondaryColor} 68%, ${primaryColor}) 62%, ${secondaryColor} 100%)`,
+  ].join(', ');
+}
+
+function DeckAffinityIcons({ affinities }: { affinities: string[] }) {
+  const visibleAffinities = affinities.filter((affinity) => affinity.toLowerCase() !== 'neutral');
+
+  if (visibleAffinities.length === 0) {
+    return <Swords className="h-4 w-4" aria-hidden="true" />;
+  }
+
+  return (
+    <>
+      {visibleAffinities.map((affinity) => {
+        const iconPath = getAffinityIconPath(affinity);
+        return iconPath ? (
+          <Image
+            key={affinity}
+            src={iconPath}
+            alt={`${affinity} affinity`}
+            width={18}
+            height={18}
+            className="h-[18px] w-[18px] object-contain drop-shadow"
+          />
+        ) : null;
+      })}
+    </>
+  );
+}
+
 export function GameClient({ locale, initialCards, initialError, initialMode = 'lobby' }: GameClientProps) {
   const router = useRouter();
   const [status, setStatus] = useState<LoadStatus>('idle');
@@ -104,6 +177,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [selectedQueue, setSelectedQueue] = useState<PlayQueue>('casual');
   const [selectedDeckId, setSelectedDeckId] = useState('');
   const [selectedBotDeckId, setSelectedBotDeckId] = useState('');
+  const [isPlayerDeckMenuOpen, setIsPlayerDeckMenuOpen] = useState(false);
+  const [isBotDeckMenuOpen, setIsBotDeckMenuOpen] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [pendingAbilitySourceId, setPendingAbilitySourceId] = useState<string | null>(null);
   const [pendingCounterTargetSourceId, setPendingCounterTargetSourceId] = useState<string | null>(null);
@@ -116,6 +191,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [matchSetupError, setMatchSetupError] = useState<string | null>(null);
   const botTurnTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const playerDeckMenuRef = useRef<HTMLDivElement | null>(null);
+  const botDeckMenuRef = useRef<HTMLDivElement | null>(null);
   const cardMap = useMemo(() => new Map(initialCards.map((card) => [card.id, card])), [initialCards]);
   const selectedDeck = useMemo(
     () => decks.find((deck) => deck.id === selectedDeckId) ?? null,
@@ -125,10 +202,49 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     () => decks.find((deck) => deck.id === selectedBotDeckId) ?? null,
     [decks, selectedBotDeckId]
   );
+  const selectedDeckBannerAffinities = useMemo(
+    () => getDeckBannerAffinities(selectedDeck),
+    [selectedDeck]
+  );
+  const selectedDeckBannerBackground = useMemo(
+    () => getDeckBannerBackground(selectedDeckBannerAffinities),
+    [selectedDeckBannerAffinities]
+  );
+  const selectedBotDeckBannerAffinities = useMemo(
+    () => getDeckBannerAffinities(selectedBotDeck),
+    [selectedBotDeck]
+  );
+  const selectedBotDeckBannerBackground = useMemo(
+    () => getDeckBannerBackground(selectedBotDeckBannerAffinities),
+    [selectedBotDeckBannerAffinities]
+  );
   const isMatchRoute = initialMode === 'match';
   const lobbyHref = `/${locale}/play`;
   const matchHref = `/${locale}/match`;
   const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(isMatchRoute ? matchHref : lobbyHref)}`;
+
+  useEffect(() => {
+    if (!isPlayerDeckMenuOpen && !isBotDeckMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (playerDeckMenuRef.current?.contains(target) || botDeckMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsPlayerDeckMenuOpen(false);
+      setIsBotDeckMenuOpen(false);
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => window.removeEventListener('pointerdown', handlePointerDown);
+  }, [isBotDeckMenuOpen, isPlayerDeckMenuOpen]);
 
   function clearBotTurnTimers() {
     for (const timerId of botTurnTimersRef.current) {
@@ -272,8 +388,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   }, [gameState?.pendingCombat]);
 
   useEffect(() => {
-    setPendingLucilleSacrificeIds([]);
-  }, [gameState?.pendingChoice?.kind, gameState?.pendingChoice?.sourceInstanceId]);
+    setPendingLucilleSacrificeIds(getDefaultPendingChoiceSelectionIds(gameState?.pendingChoice ?? null));
+  }, [gameState?.pendingChoice]);
 
   useEffect(() => {
     if (
@@ -655,11 +771,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   }
 
   function requestAbilityActivation(source: GameCardInstance) {
+    if (source.card.id === 'IMP160') {
+      activateAbilityWithTarget(source.instanceId, source.instanceId);
+      return;
+    }
     setPendingAbilitySourceId(source.instanceId);
   }
 
-  function activateAbilityWithTarget(targetInstanceId: string) {
-    const sourceInstanceId = pendingAbilitySourceId;
+  function activateAbilityWithTarget(targetInstanceId: string, sourceInstanceIdOverride?: string) {
+    const sourceInstanceId = sourceInstanceIdOverride ?? pendingAbilitySourceId;
 
     if (!sourceInstanceId) {
       return;
@@ -903,30 +1023,85 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center">
           <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-2xl shadow-black/20">
             <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-3 rounded-lg border border-[color:var(--border)] bg-[linear-gradient(110deg,rgba(241,143,59,0.18),rgba(44,180,120,0.14))] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div
+                className="flex flex-col gap-3 rounded-lg border border-[color:var(--border)] px-5 py-4 shadow-inner shadow-white/5 sm:flex-row sm:items-center sm:justify-between"
+                style={{ background: selectedDeckBannerBackground }}
+              >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[color:var(--accent)]/20 text-[color:var(--accent)]">
-                    <Swords className="h-4 w-4" aria-hidden="true" />
+                  <span className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-white/15 bg-black/25 px-1.5 text-white shadow-inner">
+                    <DeckAffinityIcons affinities={selectedDeckBannerAffinities} />
                   </span>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <h2 className="min-w-0 truncate text-base font-bold text-[color:var(--text-primary)]">
                       {selectedDeck?.title?.trim() || 'Untitled deck'}
                     </h2>
-                    <label className="relative inline-flex cursor-pointer items-center rounded-md border border-[color:var(--border)] bg-black/20 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)]">
-                      Change
-                      <select
-                        aria-label="Change deck"
-                        value={selectedDeckId}
-                        onChange={(event) => setSelectedDeckId(event.target.value)}
-                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    <div ref={playerDeckMenuRef} className="relative">
+                      <button
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded={isPlayerDeckMenuOpen}
+                        onClick={() => {
+                          setIsPlayerDeckMenuOpen((isOpen) => !isOpen);
+                          setIsBotDeckMenuOpen(false);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(241,143,59,0.35),rgba(255,255,255,0.08))] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] shadow-lg shadow-black/20 transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)]/20 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                       >
-                        {decks.map((deck) => (
-                          <option key={deck.id} value={deck.id}>
-                            {deck.title?.trim() || 'Untitled deck'} ({deck.cardCount})
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        Change
+                        <ChevronDown className={`h-3.5 w-3.5 transition ${isPlayerDeckMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                      </button>
+                      {isPlayerDeckMenuOpen ? (
+                        <div className="absolute left-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
+                          <div className="flex items-center gap-2 border-b border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(241,143,59,0.18),rgba(44,180,120,0.12))] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
+                            <Sparkles className="h-3.5 w-3.5 text-[color:var(--accent)]" aria-hidden="true" />
+                            Choose your deck
+                          </div>
+                          <div role="listbox" aria-label="Change deck" className="deck-builder-scroll max-h-72 overflow-y-auto p-2">
+                            {decks.length > 0 ? (
+                              decks.map((deck) => {
+                                const isSelected = deck.id === selectedDeckId;
+                                return (
+                                  <button
+                                    key={deck.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={isSelected}
+                                    onClick={() => {
+                                      setSelectedDeckId(deck.id);
+                                      setIsPlayerDeckMenuOpen(false);
+                                    }}
+                                    className={`group flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                                      isSelected
+                                        ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/20'
+                                        : 'border-transparent hover:border-[color:var(--accent)]/50 hover:bg-[color:var(--surface-muted)]/60'
+                                    }`}
+                                  >
+                                    <span className="min-w-0">
+                                      <span className="block truncate text-sm font-bold text-[color:var(--text-primary)]">
+                                        {deck.title?.trim() || 'Untitled deck'}
+                                      </span>
+                                      <span className="mt-0.5 block text-xs font-semibold text-[color:var(--text-secondary)]">
+                                        {deck.cardCount} cards
+                                      </span>
+                                    </span>
+                                    {isSelected ? (
+                                      <Check className="h-4 w-4 shrink-0 text-[color:var(--accent)]" aria-hidden="true" />
+                                    ) : (
+                                      <span className="shrink-0 rounded-full border border-[color:var(--border)] bg-black/20 px-2 py-0.5 text-[0.65rem] font-bold text-[color:var(--text-secondary)] transition group-hover:text-[color:var(--text-primary)]">
+                                        {deck.cardCount}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <div className="rounded-lg border border-dashed border-[color:var(--border)] px-3 py-4 text-sm font-semibold text-[color:var(--text-secondary)]">
+                                No saved decks found.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
                 <span className="rounded-full border border-[color:var(--border)] bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-primary)]">
@@ -1011,7 +1186,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           <div>
                             <h2 className="text-xl font-bold capitalize text-[color:var(--text-primary)]">{selectedQueue} matchmaking</h2>
                             <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                              Multiplayer is coming soon. When it is ready, this will find an online room for your selected deck.
+                              Multiplayer is coming soon.
                             </p>
                           </div>
                         </div>
@@ -1031,29 +1206,121 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         </div>
                       </div>
                       <div className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
-                        <label htmlFor="simulator-bot-deck" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                        <div id="simulator-bot-deck-label" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                           Bot deck
-                        </label>
-                        <select
-                          id="simulator-bot-deck"
-                          value={selectedBotDeckId}
-                          onChange={(event) => setSelectedBotDeckId(event.target.value)}
-                          className="mt-2 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-                        >
-                          {decks.map((deck) => (
-                            <option key={deck.id} value={deck.id}>
-                              {deck.title?.trim() || 'Untitled deck'} ({deck.cardCount})
-                            </option>
-                          ))}
-                        </select>
-                        {selectedBotDeck ? (
-                          <div className="mt-4 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3">
-                            <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
-                              {selectedBotDeck.title?.trim() || 'Untitled deck'}
-                            </p>
-                            <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{selectedBotDeck.cardCount} cards</p>
+                        </div>
+                        <div ref={botDeckMenuRef} className="relative mt-2">
+                          <button
+                            id="simulator-bot-deck"
+                            type="button"
+                            aria-labelledby="simulator-bot-deck-label simulator-bot-deck"
+                            aria-haspopup="listbox"
+                            aria-expanded={isBotDeckMenuOpen}
+                            onClick={() => {
+                              setIsBotDeckMenuOpen((isOpen) => !isOpen);
+                              setIsPlayerDeckMenuOpen(false);
+                            }}
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/15 px-3 py-2 text-left text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:border-white/35 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                            style={{
+                              background: selectedBotDeck
+                                ? selectedBotDeckBannerBackground
+                                : 'linear-gradient(135deg,rgba(255,255,255,0.08),rgba(241,143,59,0.14))',
+                            }}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="flex h-7 min-w-7 items-center justify-center gap-1 rounded-md border border-white/15 bg-black/25 px-1 text-white shadow-inner">
+                                {selectedBotDeck ? <DeckAffinityIcons affinities={selectedBotDeckBannerAffinities} /> : <Bot className="h-4 w-4" aria-hidden="true" />}
+                              </span>
+                              <span className="min-w-0">
+                              <span className="block truncate">{selectedBotDeck?.title?.trim() || 'Choose bot deck'}</span>
+                              <span className="mt-0.5 block text-xs font-semibold text-[color:var(--text-secondary)]">
+                                {selectedBotDeck ? `${selectedBotDeck.cardCount} cards` : 'Pick a saved deck for practice'}
+                              </span>
+                              </span>
+                            </span>
+                            <ChevronDown className={`h-4 w-4 shrink-0 text-white/85 transition ${isBotDeckMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                          </button>
+                          {isBotDeckMenuOpen ? (
+                            <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
+                              <div className="flex items-center gap-2 border-b border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(44,180,120,0.16),rgba(241,143,59,0.14))] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
+                                <Bot className="h-3.5 w-3.5 text-[color:var(--accent)]" aria-hidden="true" />
+                                Bot opponent
+                              </div>
+                              <div role="listbox" aria-label="Bot deck" className="deck-builder-scroll max-h-72 overflow-y-auto p-2">
+                                {decks.length > 0 ? (
+                                  decks.map((deck) => {
+                                    const isSelected = deck.id === selectedBotDeckId;
+                                    return (
+                                      <button
+                                        key={deck.id}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={isSelected}
+                                        onClick={() => {
+                                          setSelectedBotDeckId(deck.id);
+                                          setIsBotDeckMenuOpen(false);
+                                        }}
+                                        className={`group flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                                          isSelected
+                                            ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/20'
+                                            : 'border-transparent hover:border-[color:var(--accent)]/50 hover:bg-[color:var(--surface-muted)]/60'
+                                        }`}
+                                      >
+                                        <span className="min-w-0">
+                                          <span className="block truncate text-sm font-bold text-[color:var(--text-primary)]">
+                                            {deck.title?.trim() || 'Untitled deck'}
+                                          </span>
+                                          <span className="mt-0.5 block text-xs font-semibold text-[color:var(--text-secondary)]">
+                                            {deck.cardCount} cards
+                                          </span>
+                                        </span>
+                                        {isSelected ? (
+                                          <Check className="h-4 w-4 shrink-0 text-[color:var(--accent)]" aria-hidden="true" />
+                                        ) : (
+                                          <span className="shrink-0 rounded-full border border-[color:var(--border)] bg-black/20 px-2 py-0.5 text-[0.65rem] font-bold text-[color:var(--text-secondary)] transition group-hover:text-[color:var(--text-primary)]">
+                                            {deck.cardCount}
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="rounded-lg border border-dashed border-[color:var(--border)] px-3 py-4 text-sm font-semibold text-[color:var(--text-secondary)]">
+                                    No saved decks found.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="mt-4 border-t border-[color:var(--border)] pt-4">
+                          <label
+                            htmlFor="simulator-bot-difficulty"
+                            className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]"
+                          >
+                            Bot difficulty
+                          </label>
+                          <div className="relative mt-2">
+                            <Sparkles
+                              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--accent)]"
+                              aria-hidden="true"
+                            />
+                            <select
+                              id="simulator-bot-difficulty"
+                              defaultValue="standard"
+                              className="w-full appearance-none rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] py-2 pl-10 pr-9 text-sm font-semibold text-[color:var(--text-primary)] shadow-inner focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                            >
+                              <option value="standard">Standard</option>
+                            </select>
+                            <ChevronDown
+                              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--text-secondary)]"
+                              aria-hidden="true"
+                            />
                           </div>
-                        ) : null}
+                          <p className="mt-2 text-xs text-[color:var(--text-secondary)]">
+                            Uses the default balanced bot strategy.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1065,7 +1332,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         <div>
                           <h2 className="text-xl font-bold text-[color:var(--text-primary)]">Room lobby</h2>
                           <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                            Create a custom game and invite a friend with a room code.
+                            Create a custom game and invite a friend with a room code. Coming soon.
                           </p>
                         </div>
                       </div>
@@ -1076,11 +1343,24 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 <aside className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
                   <h2 className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">Your deck</h2>
                   {selectedDeck ? (
-                    <div className="mt-4 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3">
-                      <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">
-                        {selectedDeck.title?.trim() || 'Untitled deck'}
-                      </p>
-                      <p className="mt-1 text-xs text-[color:var(--text-secondary)]">{selectedDeck.cardCount} cards selected</p>
+                    <div className="relative mt-4">
+                      <div className="absolute inset-x-4 -bottom-2 h-5 rounded-full bg-[color:var(--accent)]/35 blur-xl" aria-hidden="true" />
+                      <div
+                        className="relative overflow-hidden rounded-lg border border-white/15 px-3 py-3 text-white shadow-xl shadow-black/25"
+                        style={{ background: selectedDeckBannerBackground }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-white/15 bg-black/25 px-1.5 shadow-inner">
+                            <DeckAffinityIcons affinities={selectedDeckBannerAffinities} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold">
+                              {selectedDeck.title?.trim() || 'Untitled deck'}
+                            </p>
+                            <p className="mt-0.5 text-xs font-semibold text-white/78">{selectedDeck.cardCount} cards selected</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
                 </aside>
@@ -1125,10 +1405,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         },
       ])
     );
+    const battlefieldCardsByZone = {
+      battlefieldLeft: gameState.zones.battlefieldLeft,
+      battlefieldCenter: gameState.zones.battlefieldCenter,
+      battlefieldRight: gameState.zones.battlefieldRight,
+    };
     const pendingAbilitySource =
       friendlyUnitsInPlay.find((instance) => instance.instanceId === pendingAbilitySourceId) ?? null;
     const pendingAbilityTargets = pendingAbilitySource
-      ? pendingAbilitySource.card.id === 'IMP066'
+      ? pendingAbilitySource.card.id === 'IMP066' || pendingAbilitySource.card.id === 'IMP139'
         ? friendlyUnitsInPlay
         : pendingAbilitySource.card.id === 'IMP073'
           ? friendlyUnitsInPlay.filter((instance) =>
@@ -1237,7 +1522,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             </aside>
           </div>
           <div className="relative grid min-h-[42rem] grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
-            {pendingCombat ? (
+            {pendingCombat && !pendingCounterTargetSource ? (
               <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/45 px-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">
                   <p id="counter-window-title" className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">Counter window</p>
@@ -1337,9 +1622,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               }}
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1381,7 +1666,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                     ? 'Nerezza, Umbrasco Scion'
                     : pendingChoice.kind === 'nocturneMark'
                       ? 'Nocturne Agent'
-                      : pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'caelumZone'
+                      : pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'caelumZone' || pendingChoice.kind === 'solaraTarget' || pendingChoice.kind === 'terraTarget' || pendingChoice.kind === 'terraZone' || pendingChoice.kind === 'neutralTarget'
                         ? pendingChoice.sourceName
                       : 'Discard a card'}
               </h2>
@@ -1396,7 +1681,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         ? 'Choose an enemy unit in a combat zone. If it dies this turn, its controller discards a card.'
                         : pendingChoice.kind === 'noxTarget'
                           ? 'Choose a valid target to resolve this card ability.'
-                          : pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'caelumZone'
+                          : pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'caelumZone' || pendingChoice.kind === 'solaraTarget' || pendingChoice.kind === 'terraTarget' || pendingChoice.kind === 'terraZone' || pendingChoice.kind === 'neutralTarget'
                             ? pendingChoice.prompt
                         : 'Choose exactly one card to discard.'}
               </p>
@@ -1419,7 +1704,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                     Choose where to put the revealed top card.
                   </p>
                 </div>
-              ) : pendingChoice.kind === 'caelumZone' ? (
+              ) : pendingChoice.kind === 'caelumZone' || pendingChoice.kind === 'terraZone' ? (
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
                   {pendingChoice.availableZoneIds.map((zoneId) => (
                     <button
@@ -1436,6 +1721,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
                   {pendingChoiceTargets.map((target) => {
                     const isSelected = pendingLucilleSacrificeIds.includes(target.instanceId);
+                    const hideCardDetails = isPrivateOpponentSupplyChoiceTarget(gameState, pendingChoice, target);
 
                     return (
                       <button
@@ -1444,7 +1730,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         onClick={() => {
                           if (
                             pendingChoice.kind === 'lucilleScore' ||
-                            (pendingChoice.kind === 'luxTarget' && (pendingChoice.maxSelections ?? 1) > 1)
+                            ((pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'solaraTarget' || pendingChoice.kind === 'terraTarget') && (pendingChoice.maxSelections ?? 1) > 1)
                           ) {
                             togglePendingLucilleSacrifice(target.instanceId);
                             return;
@@ -1459,16 +1745,24 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         }`}
                       >
                         <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
-                          {target.card.imageSrc ? (
+                          {hideCardDetails ? (
+                            <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="128px" className="object-cover" />
+                          ) : target.card.imageSrc ? (
                             <Image src={target.card.imageSrc} alt="" fill sizes="128px" className="object-cover" />
                           ) : null}
-                          <DamageBadge instance={target} />
-                          <CombatStatsBadge
-                            instance={target}
-                            currentStats={currentCombatStatsByInstanceId[target.instanceId]}
-                          />
+                          {hideCardDetails ? null : (
+                            <>
+                              <DamageBadge instance={target} />
+                              <CombatStatsBadge
+                                instance={target}
+                                currentStats={currentCombatStatsByInstanceId[target.instanceId]}
+                              />
+                            </>
+                          )}
                         </span>
-                        <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                        <span className="mt-1 block truncate text-xs font-semibold">
+                          {hideCardDetails ? 'Supply card' : target.card.name}
+                        </span>
                         <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                           {getTargetLocationLabel(target)}
                         </span>
@@ -1478,16 +1772,16 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </div>
               ) : (
                 <p className="mt-4 rounded-md border border-dashed border-[color:var(--border)] p-4 text-center text-sm text-[color:var(--text-secondary)]">
-                  {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget'
+                  {pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'solaraTarget' || pendingChoice.kind === 'terraTarget' || pendingChoice.kind === 'neutralTarget'
                     ? pendingChoice.kind === 'forcedDiscard'
                       ? 'No cards are available to discard.'
                       : 'No valid targets are available.'
                     : 'No valid choices are available.'}
                 </p>
               )}
-              {pendingChoice.kind === 'caelumZone' ? null : (
-              <div className={`mt-4 grid gap-2 ${pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget') && pendingChoice.optional) ? 'sm:grid-cols-2' : ''}`}>
-                {pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget') && pendingChoice.optional) ? (
+              {pendingChoice.kind === 'caelumZone' || pendingChoice.kind === 'terraZone' ? null : (
+              <div className={`mt-4 grid gap-2 ${pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'solaraTarget' || pendingChoice.kind === 'terraTarget' || pendingChoice.kind === 'neutralTarget') && pendingChoice.optional) ? 'sm:grid-cols-2' : ''}`}>
+                {pendingChoice.kind === 'lucilleScore' || pendingChoice.kind === 'nerezzaSacrifice' || ((pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'luxTarget' || pendingChoice.kind === 'caelumTarget' || pendingChoice.kind === 'solaraTarget' || pendingChoice.kind === 'terraTarget' || pendingChoice.kind === 'neutralTarget') && pendingChoice.optional) ? (
                   <button
                     type="button"
                     onClick={() => confirmPendingLucilleChoice(true)}
@@ -1504,11 +1798,25 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   type="button"
                   onClick={() => confirmPendingLucilleChoice(false)}
                   disabled={
-                    (pendingChoice.kind === 'nerezzaSteal' || pendingChoice.kind === 'nocturneMark' || pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || (pendingChoice.kind === 'caelumTarget' && pendingChoice.effect !== 'airdrop')) &&
+                    (pendingChoice.kind === 'nerezzaSteal' || pendingChoice.kind === 'nocturneMark' || pendingChoice.kind === 'forcedDiscard' || pendingChoice.kind === 'noxTarget' || pendingChoice.kind === 'neutralTarget' || (pendingChoice.kind === 'caelumTarget' && pendingChoice.effect !== 'airdrop')) &&
                     pendingLucilleSacrificeIds.length !== 1 ||
                     pendingChoice.kind === 'luxTarget' &&
                     (
                       (!pendingChoice.optional && pendingLucilleSacrificeIds.length === 0) ||
+                      pendingLucilleSacrificeIds.length > (pendingChoice.maxSelections ?? 1)
+                    )
+                    ||
+                    pendingChoice.kind === 'solaraTarget' &&
+                    (
+                      (!pendingChoice.optional && pendingLucilleSacrificeIds.length === 0) ||
+                      pendingLucilleSacrificeIds.length < (pendingChoice.minSelections ?? (pendingChoice.optional ? 0 : 1)) ||
+                      pendingLucilleSacrificeIds.length > (pendingChoice.maxSelections ?? 1)
+                    )
+                    ||
+                    pendingChoice.kind === 'terraTarget' &&
+                    (
+                      (!pendingChoice.optional && pendingLucilleSacrificeIds.length === 0) ||
+                      pendingLucilleSacrificeIds.length < (pendingChoice.minSelections ?? (pendingChoice.optional ? 0 : 1)) ||
                       pendingLucilleSacrificeIds.length > (pendingChoice.maxSelections ?? 1)
                     )
                   }
@@ -1516,6 +1824,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 >
                   {pendingChoice.kind === 'caelumTarget' && pendingChoice.effect === 'airdrop'
                     ? 'Put into hand'
+                    : pendingChoice.kind === 'terraTarget' && pendingChoice.effect === 'ravenRetreat'
+                      ? 'Retreat Raven'
                     : `Confirm ${pendingLucilleSacrificeIds.length > 0 ? `(${pendingLucilleSacrificeIds.length})` : ''}`}
                 </button>
               </div>
@@ -1828,7 +2138,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   })();
 
   return (
-    <main className="deck-builder-workspace flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 text-[color:var(--text-primary)] lg:px-6">
+    <main className="play-simulator-workspace flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 text-[color:var(--text-primary)] lg:px-6">
       {content}
     </main>
   );

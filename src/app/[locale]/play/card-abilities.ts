@@ -13,6 +13,11 @@ import { createNoxCardAbilityRegistry } from './nox-card-abilities';
 import { createLuxAbilityHandlers } from './lux-card-ability-handlers';
 import { createLuxCardAbilityRegistry } from './lux-card-abilities';
 import { createSolaraCardAbilityRegistry } from './solara-card-abilities';
+import { createSolaraAbilityHandlers } from './solara-card-ability-handlers';
+import { createTerraAbilityHandlers } from './terra-card-ability-handlers';
+import { createTerraCardAbilityRegistry } from './terra-card-abilities';
+import { createNeutralAbilityHandlers } from './neutral-card-ability-handlers';
+import { createNeutralCardAbilityRegistry } from './neutral-card-abilities';
 
 export type AbilityTrigger =
   | 'onPlay'
@@ -162,12 +167,17 @@ const PRINTED_TRIGGER_PATTERNS: Array<{ trigger: AbilityTrigger; pattern: RegExp
 const noxHandlers = createNoxAbilityHandlers();
 const luxHandlers = createLuxAbilityHandlers();
 const caelumHandlers = createCaelumAbilityHandlers();
+const solaraHandlers = createSolaraAbilityHandlers();
+const terraHandlers = createTerraAbilityHandlers();
+const neutralHandlers = createNeutralAbilityHandlers();
 
 export const CARD_ABILITY_REGISTRY: Record<string, CardAbilityDefinition> = {
   ...createNoxCardAbilityRegistry(noxHandlers),
   ...createLuxCardAbilityRegistry(luxHandlers),
   ...createCaelumCardAbilityRegistry(caelumHandlers),
-  ...createSolaraCardAbilityRegistry(createDrawCardsAbility(1)),
+  ...createSolaraCardAbilityRegistry(solaraHandlers),
+  ...createTerraCardAbilityRegistry(terraHandlers),
+  ...createNeutralCardAbilityRegistry(neutralHandlers),
 };
 
 export function getPrintedAbilityTriggers(card: Card): AbilityTrigger[] {

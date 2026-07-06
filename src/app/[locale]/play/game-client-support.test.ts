@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
-import { getPendingChoiceTargetCards } from './game-client-support';
+import {
+  getDefaultPendingChoiceSelectionIds,
+  getPendingChoiceTargetCards,
+  isPrivateOpponentSupplyChoiceTarget,
+} from './game-client-support';
 import {
   buildInitialGameState,
   type GameCardInstance,
@@ -27,6 +31,21 @@ function makeInstance(id: string): GameCardInstance {
 }
 
 describe('game client support', () => {
+  it('preselects Raven for its optional self-retreat score choice', () => {
+    const pendingChoice: PendingChoice = {
+      kind: 'terraTarget',
+      owner: 'player',
+      sourceInstanceId: 'raven',
+      sourceName: 'Raven Moonwhisper',
+      prompt: 'Retreat Raven Moonwhisper after scoring?',
+      effect: 'ravenRetreat',
+      availableInstanceIds: ['raven'],
+      optional: true,
+    };
+
+    expect(getDefaultPendingChoiceSelectionIds(pendingChoice)).toEqual(['raven']);
+  });
+
   it('includes supply cards for Wingshield Transport target choices', () => {
     const supplyCard = makeInstance('supply-choice');
     const state = {
@@ -48,5 +67,39 @@ describe('game client support', () => {
     };
 
     expect(getPendingChoiceTargetCards(state, pendingChoice)).toEqual([supplyCard]);
+  });
+
+  it('marks opponent supply targets as private for player pending choices', () => {
+    const base = buildInitialGameState(makeDeck(), makeDeck());
+    const playerSupply = makeInstance('player-supply');
+    const opponentSupply: GameCardInstance = {
+      ...makeInstance('opponent-supply'),
+      owner: 'opponent',
+      card: createTestCard({ id: 'secret-supply-card', name: 'Secret Supply Card' }),
+    };
+    const state = {
+      ...base,
+      zones: {
+        ...base.zones,
+        supply: [playerSupply],
+      },
+      opponentZones: {
+        ...base.opponentZones,
+        supply: [opponentSupply],
+      },
+    };
+    const pendingChoice: PendingChoice = {
+      kind: 'solaraTarget',
+      owner: 'player',
+      sourceInstanceId: 'pillager',
+      sourceName: 'Ashfang Pillager',
+      prompt: 'Choose a supply card to exhaust and lock for its next ready phase.',
+      effect: 'pillagerSupply',
+      availableInstanceIds: [playerSupply.instanceId, opponentSupply.instanceId],
+    };
+
+    expect(getPendingChoiceTargetCards(state, pendingChoice)).toEqual([playerSupply, opponentSupply]);
+    expect(isPrivateOpponentSupplyChoiceTarget(state, pendingChoice, opponentSupply)).toBe(true);
+    expect(isPrivateOpponentSupplyChoiceTarget(state, pendingChoice, playerSupply)).toBe(false);
   });
 });

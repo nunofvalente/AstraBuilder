@@ -715,13 +715,14 @@ function resolveBlindingMist({ state, event }: AbilityContext): AbilityResolutio
   if (!defenderId) {
     return { state, resolved: false };
   }
+  const defender = findCardInstance(state, defenderId);
   return {
     state: updateUnitInPlay(state, defenderId, (instance) => ({
       ...instance,
       preventNextCombatDamageThisTurn: true,
     })),
     resolved: true,
-    message: `${event.source.card.name} will prevent the next combat damage dealt to the defending unit.`,
+    message: `${event.source.card.name} will prevent the next combat damage dealt to ${defender?.card.name ?? 'the defending unit'}.`,
   };
 }
 
