@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, ChevronDown, ChevronsRight, Flag, Hand, Layers, Play, RotateCcw, Sparkles, Swords, Users } from 'lucide-react';
+import { Bot, Check, ChevronDown, ChevronsRight, Flag, Play, RotateCcw, Sparkles, Swords, Users } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
@@ -45,7 +45,6 @@ import {
   isUnitCard,
   passCounterPriority,
   playCounterCard,
-  recordCardsDrawn,
   resolvePendingChoice,
   resolveBattlefieldAttack,
   rollFirstPlayer,
@@ -77,6 +76,7 @@ import {
   OpponentHandStrip,
   RequiredActionToast,
 } from './game-client-ui';
+import { getPlayBoardCopy, getPlayControlsCopy, getPlayLobbyCopy } from './play-localization';
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'auth' | 'error';
 type PlayMode = 'matchmaking' | 'lobby' | 'practice';
@@ -170,6 +170,9 @@ function DeckAffinityIcons({ affinities }: { affinities: string[] }) {
 }
 
 export function GameClient({ locale, initialCards, initialError, initialMode = 'lobby' }: GameClientProps) {
+  const playCopy = getPlayBoardCopy(locale);
+  const controlsCopy = getPlayControlsCopy(locale);
+  const lobbyCopy = getPlayLobbyCopy(locale);
   const router = useRouter();
   const [status, setStatus] = useState<LoadStatus>('idle');
   const [decks, setDecks] = useState<SavedDeck[]>([]);
@@ -521,7 +524,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
     const storedPayload = window.sessionStorage.getItem(MATCH_SESSION_STORAGE_KEY);
     if (!storedPayload) {
-      setMatchSetupError('Start a practice room from the Play lobby first.');
+      setMatchSetupError(lobbyCopy.pickSavedDeckForPractice);
       return;
     }
 
@@ -530,7 +533,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       payload = JSON.parse(storedPayload) as MatchSessionPayload;
     } catch {
       window.sessionStorage.removeItem(MATCH_SESSION_STORAGE_KEY);
-      setMatchSetupError('The saved match setup could not be opened. Please start a new room from the Play lobby.');
+      setMatchSetupError(lobbyCopy.openMatchRoom);
       return;
     }
 
@@ -538,7 +541,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     const matchBotDeck = payload.botDeckId ? decks.find((deck) => deck.id === payload.botDeckId) ?? null : null;
 
     if (!matchDeck || !matchBotDeck) {
-      setMatchSetupError('One of the selected decks is no longer available. Please start a new room from the Play lobby.');
+      setMatchSetupError(lobbyCopy.noSavedDecks);
       return;
     }
 
@@ -547,7 +550,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     setSelectedBotDeckId(matchBotDeck.id);
     setMatchSetupError(null);
     setGameState(buildInitialGameState(matchDeck, matchBotDeck, payload.mode ?? 'practice'));
-  }, [decks, gameState, isMatchRoute, status]);
+  }, [decks, gameState, isMatchRoute, lobbyCopy.noSavedDecks, lobbyCopy.openMatchRoom, lobbyCopy.pickSavedDeckForPractice, status]);
 
   function startSelectedDeck() {
     if (!selectedDeck || !selectedBotDeck || selectedMode !== 'practice') {
@@ -611,28 +614,6 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     }
 
     setGameState(botTurnState);
-  }
-
-  function drawCards(count: number) {
-    setGameState((previous) => {
-      if (!previous || previous.winner || previous.zones.deck.length === 0) {
-        return previous;
-      }
-
-      const drawn = previous.zones.deck.slice(0, count);
-      const remainingDeck = previous.zones.deck.slice(drawn.length);
-      const label = drawn.length === 1 ? 'card' : 'cards';
-
-      return recordCardsDrawn({
-        ...previous,
-        zones: {
-          ...previous.zones,
-          deck: remainingDeck,
-          hand: [...previous.zones.hand, ...drawn],
-        },
-        log: addLogEntry(previous, { suffix: `Drew ${drawn.length} ${label}.` }),
-      }, 'player', drawn.length);
-    });
   }
 
   function moveCard(instanceId: string, fromZone: ZoneId, toZone: ZoneId, options: MoveCardOptions = {}) {
@@ -955,7 +936,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     if (status === 'loading' || status === 'idle') {
       return (
         <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center text-sm text-[color:var(--text-secondary)]">
-          Loading your decks...
+          {lobbyCopy.loadingDecks}
         </div>
       );
     }
@@ -963,12 +944,12 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     if (status === 'auth') {
       return (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
-          <p className="text-sm text-[color:var(--text-secondary)]">Sign in to simulate games with your saved decks.</p>
+          <p className="text-sm text-[color:var(--text-secondary)]">{lobbyCopy.signInPrompt}</p>
           <Link
             href={signInHref}
             className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
           >
-            Sign in
+            {lobbyCopy.signIn}
           </Link>
         </div>
       );
@@ -977,7 +958,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     if (status === 'error') {
       return (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-100">
-          {errorMessage ?? 'Unable to load decks.'}
+          {errorMessage ?? lobbyCopy.unableToLoadDecks}
         </div>
       );
     }
@@ -985,12 +966,12 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     if (decks.length === 0) {
       return (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center">
-          <p className="text-sm text-[color:var(--text-secondary)]">Save a deck before starting a simulator session.</p>
+          <p className="text-sm text-[color:var(--text-secondary)]">{lobbyCopy.saveDeckPrompt}</p>
           <Link
             href={`/${locale}/create`}
             className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
           >
-            Build a deck
+            {lobbyCopy.buildDeck}
           </Link>
         </div>
       );
@@ -1004,7 +985,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             href={lobbyHref}
             className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
           >
-            Back to Play lobby
+            {controlsCopy.backToLobby}
           </Link>
         </div>
       );
@@ -1013,7 +994,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     if (isMatchRoute && !gameState) {
       return (
         <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-8 text-center text-sm text-[color:var(--text-secondary)]">
-          Opening match room...
+          {lobbyCopy.openMatchRoom}
         </div>
       );
     }
@@ -1033,7 +1014,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   </span>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <h2 className="min-w-0 truncate text-base font-bold text-[color:var(--text-primary)]">
-                      {selectedDeck?.title?.trim() || 'Untitled deck'}
+                      {selectedDeck?.title?.trim() || lobbyCopy.untitledDeck}
                     </h2>
                     <div ref={playerDeckMenuRef} className="relative">
                       <button
@@ -1046,16 +1027,16 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         }}
                         className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(241,143,59,0.35),rgba(255,255,255,0.08))] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-[color:var(--text-primary)] shadow-lg shadow-black/20 transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent)]/20 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                       >
-                        Change
+                        {lobbyCopy.change}
                         <ChevronDown className={`h-3.5 w-3.5 transition ${isPlayerDeckMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                       </button>
                       {isPlayerDeckMenuOpen ? (
                         <div className="absolute left-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
                           <div className="flex items-center gap-2 border-b border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(241,143,59,0.18),rgba(44,180,120,0.12))] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
                             <Sparkles className="h-3.5 w-3.5 text-[color:var(--accent)]" aria-hidden="true" />
-                            Choose your deck
+                            {lobbyCopy.chooseYourDeck}
                           </div>
-                          <div role="listbox" aria-label="Change deck" className="deck-builder-scroll max-h-72 overflow-y-auto p-2">
+                          <div role="listbox" aria-label={lobbyCopy.chooseYourDeck} className="deck-builder-scroll max-h-72 overflow-y-auto p-2">
                             {decks.length > 0 ? (
                               decks.map((deck) => {
                                 const isSelected = deck.id === selectedDeckId;
@@ -1077,10 +1058,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                                   >
                                     <span className="min-w-0">
                                       <span className="block truncate text-sm font-bold text-[color:var(--text-primary)]">
-                                        {deck.title?.trim() || 'Untitled deck'}
+                                        {deck.title?.trim() || lobbyCopy.untitledDeck}
                                       </span>
                                       <span className="mt-0.5 block text-xs font-semibold text-[color:var(--text-secondary)]">
-                                        {deck.cardCount} cards
+                                        {lobbyCopy.cardCount(deck.cardCount)}
                                       </span>
                                     </span>
                                     {isSelected ? (
@@ -1095,7 +1076,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                               })
                             ) : (
                               <div className="rounded-lg border border-dashed border-[color:var(--border)] px-3 py-4 text-sm font-semibold text-[color:var(--text-secondary)]">
-                                No saved decks found.
+                                {lobbyCopy.noSavedDecks}
                               </div>
                             )}
                           </div>
@@ -1105,11 +1086,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   </div>
                 </div>
                 <span className="rounded-full border border-[color:var(--border)] bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-primary)]">
-                  {selectedDeck?.cardCount ?? 0} cards
+                  {lobbyCopy.cardCount(selectedDeck?.cardCount ?? 0)}
                 </span>
               </div>
 
-              <div className="rounded-full border border-[color:var(--border)] bg-black/20 p-1" role="tablist" aria-label="Play mode">
+              <div className="rounded-full border border-[color:var(--border)] bg-black/20 p-1" role="tablist" aria-label={playCopy.setup}>
                 <div className="grid gap-1 sm:grid-cols-3">
                 <button
                   type="button"
@@ -1123,7 +1104,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   }`}
                 >
                   <Swords className="h-4 w-4" aria-hidden="true" />
-                  Matchmaking
+                  {lobbyCopy.matchmaking}
                 </button>
                 <button
                   type="button"
@@ -1137,7 +1118,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   }`}
                 >
                   <Users className="h-4 w-4" aria-hidden="true" />
-                  Lobby
+                  {controlsCopy.lobby}
                 </button>
                 <button
                   type="button"
@@ -1151,7 +1132,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   }`}
                 >
                   <Bot className="h-4 w-4" aria-hidden="true" />
-                  Practice
+                  {lobbyCopy.practice}
                 </button>
                 </div>
               </div>
@@ -1167,13 +1148,13 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                               key={queue}
                               type="button"
                               onClick={() => setSelectedQueue(queue)}
-                              className={`rounded-full px-4 py-3 text-sm font-bold capitalize transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                              className={`rounded-full px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
                                 selectedQueue === queue
                                   ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
                                   : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
                               }`}
                             >
-                              {queue}
+                              {queue === 'ranked' ? lobbyCopy.ranked : lobbyCopy.casual}
                             </button>
                           ))}
                         </div>
@@ -1184,9 +1165,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             <Users className="h-5 w-5" aria-hidden="true" />
                           </span>
                           <div>
-                            <h2 className="text-xl font-bold capitalize text-[color:var(--text-primary)]">{selectedQueue} matchmaking</h2>
+                            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
+                              {lobbyCopy.matchmakingTitle(selectedQueue === 'ranked' ? lobbyCopy.ranked : lobbyCopy.casual)}
+                            </h2>
                             <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                              Multiplayer is coming soon.
+                              {lobbyCopy.multiplayerComingSoon}
                             </p>
                           </div>
                         </div>
@@ -1200,14 +1183,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             <Bot className="h-5 w-5" aria-hidden="true" />
                           </span>
                           <div>
-                            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">Practice vs Bot</h2>
-                            <p className="mt-1 text-sm text-[color:var(--text-secondary)]">Choose one of your saved decks for the bot opponent.</p>
+                            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">{lobbyCopy.practiceVsBot}</h2>
+                            <p className="mt-1 text-sm text-[color:var(--text-secondary)]">{lobbyCopy.chooseBotDeckDescription}</p>
                           </div>
                         </div>
                       </div>
                       <div className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
                         <div id="simulator-bot-deck-label" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                          Bot deck
+                          {lobbyCopy.botDeck}
                         </div>
                         <div ref={botDeckMenuRef} className="relative mt-2">
                           <button
@@ -1232,9 +1215,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                                 {selectedBotDeck ? <DeckAffinityIcons affinities={selectedBotDeckBannerAffinities} /> : <Bot className="h-4 w-4" aria-hidden="true" />}
                               </span>
                               <span className="min-w-0">
-                              <span className="block truncate">{selectedBotDeck?.title?.trim() || 'Choose bot deck'}</span>
+                              <span className="block truncate">{selectedBotDeck?.title?.trim() || lobbyCopy.chooseBotDeck}</span>
                               <span className="mt-0.5 block text-xs font-semibold text-[color:var(--text-secondary)]">
-                                {selectedBotDeck ? `${selectedBotDeck.cardCount} cards` : 'Pick a saved deck for practice'}
+                                {selectedBotDeck ? lobbyCopy.cardCount(selectedBotDeck.cardCount) : lobbyCopy.pickSavedDeckForPractice}
                               </span>
                               </span>
                             </span>
@@ -1244,9 +1227,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
                               <div className="flex items-center gap-2 border-b border-[color:var(--border)] bg-[linear-gradient(135deg,rgba(44,180,120,0.16),rgba(241,143,59,0.14))] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
                                 <Bot className="h-3.5 w-3.5 text-[color:var(--accent)]" aria-hidden="true" />
-                                Bot opponent
+                                {lobbyCopy.botOpponent}
                               </div>
-                              <div role="listbox" aria-label="Bot deck" className="deck-builder-scroll max-h-72 overflow-y-auto p-2">
+                              <div role="listbox" aria-label={lobbyCopy.botDeck} className="deck-builder-scroll max-h-72 overflow-y-auto p-2">
                                 {decks.length > 0 ? (
                                   decks.map((deck) => {
                                     const isSelected = deck.id === selectedBotDeckId;
@@ -1268,10 +1251,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                                       >
                                         <span className="min-w-0">
                                           <span className="block truncate text-sm font-bold text-[color:var(--text-primary)]">
-                                            {deck.title?.trim() || 'Untitled deck'}
+                                            {deck.title?.trim() || lobbyCopy.untitledDeck}
                                           </span>
                                           <span className="mt-0.5 block text-xs font-semibold text-[color:var(--text-secondary)]">
-                                            {deck.cardCount} cards
+                                            {lobbyCopy.cardCount(deck.cardCount)}
                                           </span>
                                         </span>
                                         {isSelected ? (
@@ -1286,7 +1269,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                                   })
                                 ) : (
                                   <div className="rounded-lg border border-dashed border-[color:var(--border)] px-3 py-4 text-sm font-semibold text-[color:var(--text-secondary)]">
-                                    No saved decks found.
+                                    {lobbyCopy.noSavedDecks}
                                   </div>
                                 )}
                               </div>
@@ -1298,7 +1281,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             htmlFor="simulator-bot-difficulty"
                             className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]"
                           >
-                            Bot difficulty
+                            {lobbyCopy.botDifficulty}
                           </label>
                           <div className="relative mt-2">
                             <Sparkles
@@ -1310,7 +1293,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                               defaultValue="standard"
                               className="w-full appearance-none rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] py-2 pl-10 pr-9 text-sm font-semibold text-[color:var(--text-primary)] shadow-inner focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                             >
-                              <option value="standard">Standard</option>
+                              <option value="standard">{lobbyCopy.standard}</option>
                             </select>
                             <ChevronDown
                               className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--text-secondary)]"
@@ -1318,7 +1301,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             />
                           </div>
                           <p className="mt-2 text-xs text-[color:var(--text-secondary)]">
-                            Uses the default balanced bot strategy.
+                            {lobbyCopy.usesDefaultBotStrategy}
                           </p>
                         </div>
                       </div>
@@ -1330,9 +1313,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           <Users className="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                          <h2 className="text-xl font-bold text-[color:var(--text-primary)]">Room lobby</h2>
+                          <h2 className="text-xl font-bold text-[color:var(--text-primary)]">{lobbyCopy.roomLobby}</h2>
                           <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                            Create a custom game and invite a friend with a room code. Coming soon.
+                            {lobbyCopy.createLobbyDescription}
                           </p>
                         </div>
                       </div>
@@ -1341,7 +1324,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </div>
 
                 <aside className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">Your deck</h2>
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">{lobbyCopy.yourDeck}</h2>
                   {selectedDeck ? (
                     <div className="relative mt-4">
                       <div className="absolute inset-x-4 -bottom-2 h-5 rounded-full bg-[color:var(--accent)]/35 blur-xl" aria-hidden="true" />
@@ -1355,9 +1338,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           </span>
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold">
-                              {selectedDeck.title?.trim() || 'Untitled deck'}
+                              {selectedDeck.title?.trim() || lobbyCopy.untitledDeck}
                             </p>
-                            <p className="mt-0.5 text-xs font-semibold text-white/78">{selectedDeck.cardCount} cards selected</p>
+                            <p className="mt-0.5 text-xs font-semibold text-white/78">{lobbyCopy.cardCountSelected(selectedDeck.cardCount)}</p>
                           </div>
                         </div>
                       </div>
@@ -1374,10 +1357,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               >
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {selectedMode === 'practice'
-                  ? 'Launch Practice vs Bot'
+                  ? lobbyCopy.startPractice
                   : selectedMode === 'matchmaking'
-                    ? `Find ${selectedQueue} match`
-                    : 'Create Lobby'}
+                    ? lobbyCopy.findMatch(selectedQueue === 'ranked' ? lobbyCopy.ranked : lobbyCopy.casual)
+                    : lobbyCopy.createLobby}
               </button>
             </div>
           </section>
@@ -1475,49 +1458,41 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
           <div className="flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
             <section className="rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <button type="button" onClick={returnToLobby} className="mb-2 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
-                Back to lobby
+                {controlsCopy.backToLobby}
               </button>
               <div className="mb-3 rounded-md border border-[color:var(--border)] bg-black/15 px-3 py-2 text-center">
                 <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                  {gameState.phase === 'setup' ? 'Turn 0 setup' : `Turn ${gameState.turn}`}
+                  {gameState.phase === 'setup' ? `${playCopy.turn} 0 · ${controlsCopy.setup}` : `${playCopy.turn} ${gameState.turn}`}
                 </p>
                 <p className="mt-0.5 text-sm font-black text-[color:var(--text-primary)]">
                   {gameState.phase === 'setup'
-                    ? 'Setup'
+                    ? controlsCopy.setup
                     : gameState.activePlayer === 'player'
-                      ? 'Your turn'
-                      : 'Bot turn'}
+                      ? controlsCopy.yourTurn
+                      : controlsCopy.botTurn}
                 </p>
               </div>
               <div className="mb-3 grid gap-2">
-                <VictoryPointScoreControl label="Your victory points" value={gameState.playerVictoryPoints} tone="player" />
-                <VictoryPointScoreControl label="Enemy victory points" value={gameState.opponentVictoryPoints} tone="opponent" />
+                <VictoryPointScoreControl label={controlsCopy.yourVictoryPoints} value={gameState.playerVictoryPoints} tone="player" />
+                <VictoryPointScoreControl label={controlsCopy.enemyVictoryPoints} value={gameState.opponentVictoryPoints} tone="opponent" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => drawCards(1)} disabled={Boolean(gameState.winner)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
-                  <Hand className="h-3.5 w-3.5" aria-hidden="true" />
-                  Draw 1
-                </button>
-                <button type="button" onClick={() => drawCards(7)} disabled={Boolean(gameState.winner)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
-                  <Layers className="h-3.5 w-3.5" aria-hidden="true" />
-                  Draw 7
-                </button>
                 <button type="button" onClick={() => setIsConcedeDialogOpen(true)} className="inline-flex items-center justify-center gap-1 rounded-md border border-red-500/45 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:border-red-300 focus:outline-none focus-visible:ring focus-visible:ring-red-400">
                   <Flag className="h-3.5 w-3.5" aria-hidden="true" />
-                  Concede
+                  {controlsCopy.concede}
                 </button>
                 <button type="button" onClick={requestPassTurn} disabled={Boolean(gameState.winner) || gameState.phase === 'setup' || gameState.activePlayer !== 'player' || Boolean(pendingCombat)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
                   <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  Turn
+                  {controlsCopy.passTurn}
                 </button>
               </div>
             </section>
             <aside className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <header className="border-b border-[color:var(--border)] px-4 py-3">
-                <h2 className="text-sm font-semibold uppercase tracking-wide">Action log</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-wide">{playCopy.actionLog}</h2>
               </header>
               <ol className="deck-builder-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm text-[color:var(--text-secondary)]">
-                <ActionLogList entries={gameState.log} />
+                <ActionLogList entries={gameState.log} locale={locale} />
               </ol>
             </aside>
           </div>
@@ -1525,9 +1500,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             {pendingCombat && !pendingCounterTargetSource ? (
               <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/45 px-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">
-                  <p id="counter-window-title" className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">Counter window</p>
+                  <p id="counter-window-title" className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">{controlsCopy.counterWindow}</p>
                   <div className="mt-3">
-                    <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Counter stack</p>
+                    <p className="text-xs font-semibold text-[color:var(--text-secondary)]">{controlsCopy.counterStack}</p>
                     {pendingCombat.counterStack.length > 0 ? (
                       <ol className="mt-2 grid max-h-40 gap-2 overflow-y-auto">
                         {[...pendingCombat.counterStack].reverse().map((counter, index) => (
@@ -1555,19 +1530,19 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">{counter.card.name}</p>
                               <p className="text-[0.65rem] text-[color:var(--text-secondary)]">
-                                {index === 0 ? 'Resolves next' : `Stack position ${pendingCombat.counterStack.length - index}`}
+                                {index === 0 ? controlsCopy.resolvesNext : `${controlsCopy.counterStack} ${pendingCombat.counterStack.length - index}`}
                               </p>
                             </div>
                           </li>
                         ))}
                       </ol>
                     ) : (
-                      <p className="mt-2 text-sm text-[color:var(--text-secondary)]">No counters played.</p>
+                      <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{controlsCopy.noCounters}</p>
                     )}
                   </div>
                   {pendingCombat.priorityOwner === 'player' && playablePlayerCounters.length > 0 ? (
                     <div className="mt-4 border-t border-[color:var(--border)] pt-3">
-                      <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Available counters</p>
+                      <p className="text-xs font-semibold text-[color:var(--text-secondary)]">{controlsCopy.availableCounters}</p>
                       <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto">
                         {playablePlayerCounters.map((counter) => (
                           <button
@@ -1589,7 +1564,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                             className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                           >
                             <span className="truncate text-sm font-semibold">{counter.card.name}</span>
-                            <span className="shrink-0 text-xs text-[color:var(--text-secondary)]">Cost {getModifiedPlayCost(gameState, 'player', counter.card)}</span>
+                            <span className="shrink-0 text-xs text-[color:var(--text-secondary)]">{controlsCopy.cost} {getModifiedPlayCost(gameState, 'player', counter.card)}</span>
                           </button>
                         ))}
                       </div>
@@ -1601,7 +1576,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                     disabled={pendingCombat.priorityOwner !== 'player'}
                     className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--accent)]/55 bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {pendingCombat.priorityOwner === 'player' ? 'Pass counter' : 'Waiting for bot'}
+                    {pendingCombat.priorityOwner === 'player' ? controlsCopy.passCounter : controlsCopy.waitingForBot}
                   </button>
                 </div>
               </div>
@@ -1620,11 +1595,12 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 player: gameState.playerCardsDrawnThisTurn,
                 opponent: gameState.opponentCardsDrawnThisTurn,
               }}
+              locale={locale}
             />
             <div className="grid min-h-0 gap-2 md:grid-cols-3">
-              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
-              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} />
+              <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
+              <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
+              <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
             </div>
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
@@ -1648,6 +1624,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 player: gameState.playerCardsDrawnThisTurn,
                 opponent: gameState.opponentCardsDrawnThisTurn,
               }}
+              locale={locale}
             />
           </div>
         </div>
@@ -1877,7 +1854,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 onClick={() => setPendingCounterTargetSourceId(null)}
                 className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
               >
-                Cancel
+                {controlsCopy.cancel}
               </button>
             </div>
           </div>
@@ -1997,17 +1974,17 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         {gameState.winner ? (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4" role="presentation">
             <div role="dialog" aria-modal="true" aria-labelledby="game-result-title" className="w-full max-w-sm rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 text-center shadow-2xl shadow-black/50">
-              <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">Game over</p>
+              <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">{controlsCopy.gameOver}</p>
               <h2 id="game-result-title" className="mt-2 text-2xl font-black text-[color:var(--text-primary)]">
-                {gameState.winner === 'player' ? 'You won!' : 'You lost'}
+                {gameState.winner === 'player' ? controlsCopy.youWon : controlsCopy.youLost}
               </h2>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-md border border-[color:var(--accent)]/40 bg-black/15 p-3">
-                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">You</p>
+                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">{controlsCopy.you}</p>
                   <p className="mt-1 text-3xl font-black">{gameState.playerVictoryPoints}</p>
                 </div>
                 <div className="rounded-md border border-red-400/40 bg-black/15 p-3">
-                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">Bot</p>
+                  <p className="text-xs font-semibold text-[color:var(--text-secondary)]">{controlsCopy.bot}</p>
                   <p className="mt-1 text-3xl font-black">{gameState.opponentVictoryPoints}</p>
                 </div>
               </div>
@@ -2017,7 +1994,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   onClick={returnToLobby}
                   className="inline-flex items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
-                  Lobby
+                  {controlsCopy.lobby}
                 </button>
                 <button
                   type="button"
@@ -2025,7 +2002,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--accent)] px-3 py-2 text-sm font-bold text-[color:var(--text-on-accent)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
                   <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                  Rematch
+                  {controlsCopy.rematch}
                 </button>
               </div>
             </div>
@@ -2034,9 +2011,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         {isConcedeDialogOpen ? (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-4" role="presentation">
             <div role="dialog" aria-modal="true" aria-labelledby="concede-title" className="w-full max-w-sm rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-2xl">
-              <h2 id="concede-title" className="text-lg font-semibold text-[color:var(--text-primary)]">Concede game?</h2>
+              <h2 id="concede-title" className="text-lg font-semibold text-[color:var(--text-primary)]">{controlsCopy.concedeGame}</h2>
               <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-                This will leave the current room and return you to the lobby.
+                {controlsCopy.concedeDescription}
               </p>
               <div className="mt-5 flex justify-end gap-2">
                 <button
@@ -2044,14 +2021,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   onClick={() => setIsConcedeDialogOpen(false)}
                   className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
-                  Cancel
+                  {controlsCopy.cancel}
                 </button>
                 <button
                   type="button"
                   onClick={confirmConcede}
                   className="rounded-md border border-red-500/45 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-100 transition hover:border-red-300 focus:outline-none focus-visible:ring focus-visible:ring-red-400"
                 >
-                  Concede
+                  {controlsCopy.concede}
                 </button>
               </div>
             </div>
@@ -2060,9 +2037,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         {isPassTurnDialogOpen ? (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-4" role="presentation">
             <div role="dialog" aria-modal="true" aria-labelledby="pass-turn-title" className="w-full max-w-sm rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-2xl">
-              <h2 id="pass-turn-title" className="text-lg font-semibold text-[color:var(--text-primary)]">Pass turn?</h2>
+              <h2 id="pass-turn-title" className="text-lg font-semibold text-[color:var(--text-primary)]">{controlsCopy.passTurn}?</h2>
               <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-                This will end your actions for this turn and pass priority to the bot.
+                {controlsCopy.passTurnDescription}
               </p>
               <div className="mt-5 flex justify-end gap-2">
                 <button
@@ -2070,14 +2047,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   onClick={() => setIsPassTurnDialogOpen(false)}
                   className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
-                  Cancel
+                  {controlsCopy.cancel}
                 </button>
                 <button
                   type="button"
                   onClick={confirmPassTurn}
                   className="rounded-md border border-[color:var(--accent)]/50 bg-[color:var(--accent)]/20 px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
-                  Pass turn
+                  {controlsCopy.passTurn}
                 </button>
               </div>
             </div>
@@ -2086,11 +2063,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         <RequiredActionToast
           message={
             !gameState.playerStartingSupplyPlaced
-              ? 'Choose 1 card from your hand to place as starting supply.'
+              ? controlsCopy.startingSupply
               : gameState.phase === 'setup'
                 ? gameState.sessionMode === 'multiplayer'
-                  ? 'Rolling to choose who takes the first turn.'
-                  : 'Choose who takes the first turn.'
+                  ? controlsCopy.rollingFirst
+                  : controlsCopy.chooseFirst
                 : null
           }
           actions={
@@ -2101,20 +2078,20 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   onClick={() => chooseFirstPlayer('player')}
                   className="pointer-events-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
-                  You first
+                  {controlsCopy.youFirst}
                 </button>
                 <button
                   type="button"
                   onClick={() => chooseFirstPlayer('opponent')}
                   className="pointer-events-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                 >
-                  Bot first
+                  {controlsCopy.botFirst}
                 </button>
               </>
             ) : null
           }
         />
-        <OpponentHandStrip cards={gameState.opponentZones.hand} />
+        <OpponentHandStrip cards={gameState.opponentZones.hand} locale={locale} />
         <HandStrip
           cards={gameState.zones.hand}
           gameState={gameState}
@@ -2132,6 +2109,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             battlefieldCenter: gameState.zones.battlefieldCenter,
             battlefieldRight: gameState.zones.battlefieldRight,
           }}
+          locale={locale}
         />
       </div>
     );

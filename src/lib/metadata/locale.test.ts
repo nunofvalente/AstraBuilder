@@ -15,6 +15,8 @@ describe('locale metadata helpers', () => {
       fr: '/fr/decks/42',
       de: '/de/decks/42',
       ms: '/ms/decks/42',
+      'zh-CN': '/zh-CN/decks/42',
+      ja: '/ja/decks/42',
       'x-default': '/en/decks/42',
     });
 
@@ -26,6 +28,8 @@ describe('locale metadata helpers', () => {
           fr: '/fr/collection',
           de: '/de/collection',
           ms: '/ms/collection',
+          'zh-CN': '/zh-CN/collection',
+          ja: '/ja/collection',
           'x-default': '/en/collection',
         },
       },

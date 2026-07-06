@@ -78,6 +78,14 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+body[data-locale="zh-CN"] {
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+}
+
+body[data-locale="ja"] {
+  font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans CJK JP", Arial, sans-serif;
+}
+
 button {
   font-family: inherit;
 }
@@ -89,6 +97,11 @@ h2,
 .home-showcase-link-label,
 .deck-summary-card-title {
   font-family: var(--font-cinzel), Georgia, serif;
+}
+
+body[data-locale="zh-CN"] :is(h1, h2, .font-display, .banner-text-gradient, .home-showcase-link-label, .deck-summary-card-title),
+body[data-locale="ja"] :is(h1, h2, .font-display, .banner-text-gradient, .home-showcase-link-label, .deck-summary-card-title) {
+  font-family: inherit;
 }
 
 .app-shell {
