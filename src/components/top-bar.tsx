@@ -248,8 +248,8 @@ export function TopBar({ locale = DEFAULT_LOCALE, labels, showPlay = false, onSe
   const isDecksRoute = pathname === decksHref || pathname?.startsWith(`${decksHref}/`);
   const isCollectionRoute = pathname === collectionHref || pathname?.startsWith(`${collectionHref}/`);
   const topLevelNavItems = [
-    { href: builderHref, label: labels.builder, isActive: isBuilderRoute },
     ...(showPlay ? [{ href: playHref, label: labels.play, isActive: isPlayRoute }] : []),
+    { href: builderHref, label: labels.builder, isActive: isBuilderRoute },
     { href: decksHref, label: labels.decks, isActive: isDecksRoute },
     { href: collectionHref, label: labels.collection, isActive: isCollectionRoute },
   ];
