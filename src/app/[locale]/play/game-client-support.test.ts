@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
 import {
+  getBattlefieldActions,
   getDefaultPendingChoiceSelectionIds,
+  getHandActions,
   getPendingChoiceTargetCards,
   isPrivateOpponentSupplyChoiceTarget,
 } from './game-client-support';
@@ -31,6 +33,56 @@ function makeInstance(id: string): GameCardInstance {
 }
 
 describe('game client support', () => {
+  it('localizes card actions for every supported non-English locale', () => {
+    const base = buildInitialGameState(makeDeck(), makeDeck());
+    const unit: GameCardInstance = {
+      ...makeInstance('unit'),
+      card: createTestCard({ id: 'unit', name: 'Unit', type: 'Unit', cost: 1 }),
+      faceDown: false,
+      ready: true,
+    };
+    const chineseActions = getHandActions(unit, {
+      canSupplyFromHand: true,
+      canPlayFromHand: true,
+      gameState: base,
+      graveyardCards: [],
+      handCards: [unit],
+      friendlyUnitsInPlay: [],
+      readySupplyCount: 1,
+      stagingUnits: [],
+      locale: 'zh-CN',
+    });
+
+    expect(chineseActions.map((action) => action.label)).toEqual(
+      expect.arrayContaining(['打出至集结区', '充作补给'])
+    );
+    expect(
+      getBattlefieldActions('battlefieldLeft', unit, {
+        canFlipFaceUp: false,
+        locale: 'ja',
+      })[0]?.label
+    ).toBe('ステージングへ撤退');
+
+    expect(
+      getBattlefieldActions('battlefieldLeft', unit, {
+        canFlipFaceUp: false,
+        locale: 'fr',
+      })[0]?.label
+    ).toBe('Battre en retraite vers la zone de préparation');
+    expect(
+      getBattlefieldActions('battlefieldLeft', unit, {
+        canFlipFaceUp: false,
+        locale: 'de',
+      })[0]?.label
+    ).toBe('In den Vorbereitungsbereich zurückziehen');
+    expect(
+      getBattlefieldActions('battlefieldLeft', unit, {
+        canFlipFaceUp: false,
+        locale: 'ms',
+      })[0]?.label
+    ).toBe('Berundur ke kawasan persediaan');
+  });
+
   it('preselects Raven for its optional self-retreat score choice', () => {
     const pendingChoice: PendingChoice = {
       kind: 'terraTarget',

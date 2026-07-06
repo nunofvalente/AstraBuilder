@@ -426,6 +426,8 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   fr: () => import("./locales/fr.json"),
   de: () => import("./locales/de.json"),
   ms: () => import("./locales/ms.json"),
+  "zh-CN": () => import("./locales/zh-CN.json"),
+  ja: () => import("./locales/ja.json"),
 };
 
 export type Dictionary = HomeDictionary &

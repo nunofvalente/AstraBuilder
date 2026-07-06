@@ -1,10 +1,12 @@
 'use client';
 
 import Image from 'next/image';
+import type { Locale } from '@/i18n/config';
 import { useEffect, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 import type { Card } from '../create/deck-builder/types';
 import { type GameCardInstance, type GameState } from './game-rules';
+import { getPlayBoardCopy, translateGameLogText } from './play-localization';
 import { CARD_BACK_IMAGE_SRC } from './game-client-support';
 
 export function useCloseOnOutsidePointerDown(
@@ -223,12 +225,13 @@ export function CompactZoneStack({
   );
 }
 
-export function OpponentHandStrip({ cards }: { cards: GameCardInstance[] }) {
+export function OpponentHandStrip({ cards, locale = 'en' }: { cards: GameCardInstance[]; locale?: Locale }) {
+  const copy = getPlayBoardCopy(locale);
   return (
     <section className="pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pb-2 xl:left-[13.5rem] xl:right-4">
       {cards.length === 0 ? (
         <p className="mx-auto max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-          Opponent hand
+          {copy.opponentHand}
         </p>
       ) : (
         <div className="mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
@@ -333,20 +336,21 @@ export function RequiredActionToast({
   );
 }
 
-function getLogGroupLabel(entry: GameState['log'][number]): string {
+function getLogGroupLabel(entry: GameState['log'][number], locale: Locale): string {
+  const copy = getPlayBoardCopy(locale);
   if (entry.phase === 'setup') {
-    return 'Setup';
+    return copy.setup;
   }
 
   if (typeof entry.turn === 'number') {
-    return `Turn ${entry.turn}`;
+    return `${copy.turn} ${entry.turn}`;
   }
 
-  return 'Log';
+  return copy.log;
 }
 
-function LogEntryMessage({ entry }: { entry: GameState['log'][number] }) {
-  const message = `${entry.prefix ?? ''}${entry.cardName ?? ''}${entry.suffix}`;
+function LogEntryMessage({ entry, locale }: { entry: GameState['log'][number]; locale: Locale }) {
+  const message = translateGameLogText(locale, `${entry.prefix ?? ''}${entry.cardName ?? ''}${entry.suffix}`);
   const cardNames = [...new Set([
     ...(entry.cardNames ?? []),
     ...(entry.cardName ? [entry.cardName] : []),
@@ -367,11 +371,11 @@ function LogEntryMessage({ entry }: { entry: GameState['log'][number] }) {
   ));
 }
 
-export function ActionLogList({ entries }: { entries: GameState['log'] }) {
+export function ActionLogList({ entries, locale = 'en' }: { entries: GameState['log']; locale?: Locale }) {
   const groups: Array<{ label: string; entries: GameState['log'] }> = [];
 
   for (const entry of entries) {
-    const label = getLogGroupLabel(entry);
+    const label = getLogGroupLabel(entry, locale);
     const currentGroup = groups[groups.length - 1];
 
     if (currentGroup?.label === label) {
@@ -391,7 +395,7 @@ export function ActionLogList({ entries }: { entries: GameState['log'] }) {
           <ol className="flex flex-col gap-2">
             {group.entries.map((entry) => (
               <li key={entry.id} className="rounded-md bg-[color:var(--surface-muted)]/60 px-3 py-2">
-                <LogEntryMessage entry={entry} />
+                <LogEntryMessage entry={entry} locale={locale} />
               </li>
             ))}
           </ol>

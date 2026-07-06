@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
+import type { Locale } from '@/i18n/config';
 import type { Card } from '../create/deck-builder/types';
 import { hasCardKeyword } from './card-definitions';
 import {
@@ -20,7 +21,6 @@ import {
 } from './game-rules';
 import {
   CARD_BACK_IMAGE_SRC,
-  ZONE_LABELS,
   getBattlefieldActions,
   getHandActions,
   type BattlefieldAction,
@@ -34,6 +34,7 @@ import {
   getReadyStateClassName,
   useCloseOnOutsidePointerDown,
 } from './game-client-ui';
+import { getLocalizedCardDisplay, getPlayBoardCopy } from './play-localization';
 
 export type BattlefieldZoneId = 'battlefieldLeft' | 'battlefieldCenter' | 'battlefieldRight';
 type AttackBattlefieldHandler = (attackerInstanceId: string, targetZone: ZoneId) => void;
@@ -47,6 +48,12 @@ export type AttackArrowState = {
 };
 
 const READY_ACTIVATED_ABILITY_CARD_IDS = new Set(['IMP016', 'IMP066', 'IMP073', 'IMP079', 'IMP139', 'IMP160']);
+const BATTLEFIELD_ZONE_ORDER: BattlefieldZoneId[] = ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'];
+
+function getBoardBattlefieldLabel(copy: ReturnType<typeof getPlayBoardCopy>, zone: ZoneId): string {
+  const index = BATTLEFIELD_ZONE_ORDER.indexOf(zone as BattlefieldZoneId);
+  return index >= 0 ? copy.battlefield[index]! : zone;
+}
 
 function canShowActivatedAbilityAction(
   instance: GameCardInstance | null,
@@ -417,6 +424,7 @@ export function BattlefieldPanel({
   readySupplyCount = 0,
   currentCombatStatsByInstanceId = {},
   cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
+  locale = 'en',
 }: {
   zone: ZoneId;
   cards: GameCardInstance[];
@@ -430,10 +438,12 @@ export function BattlefieldPanel({
   readySupplyCount?: number;
   currentCombatStatsByInstanceId?: CurrentCombatStatsByInstanceId;
   cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
+  locale?: Locale;
 }) {
+  const copy = getPlayBoardCopy(locale);
   const unit = cards.find((instance) => isUnitCard(instance.card)) ?? null;
   const zoneController = unit ? getCardController(unit) : null;
-  const zoneControlLabel = zoneController === 'player' ? 'CAPTURED' : zoneController === 'opponent' ? 'LOST' : null;
+  const zoneControlLabel = zoneController === 'player' ? copy.captured : zoneController === 'opponent' ? copy.lost : null;
   const playerTerritory = cards.find((instance) => instance.owner === 'player' && isTerritoryCard(instance.card)) ?? null;
   const opponentTerritory = cards.find((instance) => instance.owner === 'opponent' && isTerritoryCard(instance.card)) ?? null;
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
@@ -448,6 +458,7 @@ export function BattlefieldPanel({
           canFlipFaceUp &&
           readySupplyCount >= getPlayCost(activeInstance.card) &&
           activeInstance.faceDownEnteredTurn !== currentTurn,
+        locale,
       })
     : [];
   const canActivate = canShowActivatedAbilityAction(activeInstance, onActivate, { inCombatZone: true });
@@ -550,7 +561,7 @@ export function BattlefieldPanel({
         aria-haspopup={disabled ? undefined : 'menu'}
         aria-disabled={disabled}
       >
-        <span className="sr-only">Open {instance.card.name} actions in {ZONE_LABELS[zone]}</span>
+        <span className="sr-only">Open {instance.card.name} actions in {getBoardBattlefieldLabel(copy, zone)}</span>
         <span className="relative block h-full w-full">
           {instance.faceDown || instance.card.imageSrc ? (
             <Image src={instance.faceDown ? CARD_BACK_IMAGE_SRC : instance.card.imageSrc} alt="" fill sizes={size === 'unit' ? '88px' : '56px'} className="object-cover" />
@@ -596,7 +607,7 @@ export function BattlefieldPanel({
         }}
       />
       <p className="truncate text-center text-[0.7rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-        {ZONE_LABELS[zone]}
+        {getBoardBattlefieldLabel(copy, zone)}
         {zoneControlLabel ? (
           <>
             {' ('}
@@ -608,7 +619,7 @@ export function BattlefieldPanel({
         ) : null}
       </p>
       <div className="grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
-        {renderTerritoryColumn('Your territory', playerTerritory)}
+        {renderTerritoryColumn(copy.yourTerritory, playerTerritory)}
         <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
         <div className="flex min-h-0 items-center justify-center overflow-visible">
           <div className="relative flex h-full items-center justify-center overflow-visible">
@@ -625,11 +636,11 @@ export function BattlefieldPanel({
                 />
               </div>
             ) : null}
-            {renderSlot(unit, 'Unit', 'unit')}
+            {renderSlot(unit, copy.unit, 'unit')}
           </div>
         </div>
         <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
-        {renderTerritoryColumn('Enemy territory', opponentTerritory)}
+        {renderTerritoryColumn(copy.enemyTerritory, opponentTerritory)}
       </div>
       {activeInstance && !disabled && (actions.length > 0 || canActivate || flankingTargets.length > 0) ? (
         <div ref={menuRef} className="absolute left-1/2 top-2 z-40 w-36 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl">
@@ -656,7 +667,7 @@ export function BattlefieldPanel({
               }}
               className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
             >
-              Activate ability
+              {copy.activateAbility}
             </button>
           ) : null}
           {flankingTargets.map((target) => (
@@ -671,7 +682,7 @@ export function BattlefieldPanel({
               }}
               className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
             >
-              Flank {ZONE_LABELS[target]}
+              {copy.flank(getBoardBattlefieldLabel(copy, target))}
             </button>
           ))}
         </div>
@@ -697,6 +708,7 @@ export function CombinedStagingSupplyPanel({
   canInspectSupplyCards = false,
   currentCombatStatsByInstanceId = {},
   cardsDrawnThisTurnByOwner = { player: 0, opponent: 0 },
+  locale = 'en',
 }: {
   stagingCards: GameCardInstance[];
   supplyCards: GameCardInstance[];
@@ -714,7 +726,9 @@ export function CombinedStagingSupplyPanel({
   canInspectSupplyCards?: boolean;
   currentCombatStatsByInstanceId?: CurrentCombatStatsByInstanceId;
   cardsDrawnThisTurnByOwner?: CardsDrawnThisTurnByOwner;
+  locale?: Locale;
 }) {
+  const copy = getPlayBoardCopy(locale);
   const visibleStagingCards = stagingCards.filter(
     (instance) =>
       !instance.attachedToInstanceId ||
@@ -824,7 +838,7 @@ export function CombinedStagingSupplyPanel({
           <div className="deck-builder-scroll flex min-h-0 items-center gap-3 overflow-x-auto overflow-y-hidden px-3 py-1.5">
             {visibleStagingCards.length === 0 ? (
               <p className="flex h-full w-full items-center justify-center text-center text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                Staging
+                {copy.staging}
               </p>
             ) : (
               visibleStagingCards.map((instance) => {
@@ -927,7 +941,7 @@ export function CombinedStagingSupplyPanel({
           <div className="grid min-h-0 w-20 grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center">
             <div className="flex min-h-0 w-20 items-center justify-center">
               <CompactZoneStack
-                label={mirror ? 'Deck' : 'Banish'}
+                label={mirror ? copy.deck : copy.banish}
                 cards={mirror ? deckCards : banishCards}
                 faceDown={mirror}
                 onClick={mirror ? undefined : () => setIsBanishOpen(true)}
@@ -936,7 +950,7 @@ export function CombinedStagingSupplyPanel({
             <div className="mx-2 h-px bg-[color:var(--border)]/70" aria-hidden="true" />
             <div className="flex min-h-0 w-20 items-center justify-center">
               <CompactZoneStack
-                label={mirror ? 'Banish' : 'Deck'}
+                label={mirror ? copy.banish : copy.deck}
                 cards={mirror ? banishCards : deckCards}
                 faceDown={!mirror}
                 onClick={mirror ? () => setIsBanishOpen(true) : undefined}
@@ -956,7 +970,7 @@ export function CombinedStagingSupplyPanel({
               <div className="deck-builder-scroll flex h-full min-h-0 items-center gap-2 overflow-x-auto overflow-y-hidden pr-10">
               {totalSupplyCount === 0 ? (
                 <p className="flex h-full w-full items-center justify-center text-center text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                  Supply
+                  {copy.supply}
                 </p>
               ) : (
                 <>
@@ -972,7 +986,7 @@ export function CombinedStagingSupplyPanel({
                         aria-label={`Temporary supply ${index + 1} of ${visibleTemporarySupplyCount}`}
                       >
                         <span className="text-lg font-black leading-none">+1</span>
-                        <span className="mt-1 text-[0.48rem] font-black uppercase leading-none">Supply</span>
+                        <span className="mt-1 text-[0.48rem] font-black uppercase leading-none">{copy.supply}</span>
                       </div>
                     </div>
                   ))}
@@ -1007,7 +1021,7 @@ export function CombinedStagingSupplyPanel({
             </div>
             <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
             <div className="flex min-h-0 w-20 items-center justify-center px-0">
-              <CompactZoneStack label="Graveyard" cards={graveyardCards} onClick={() => setIsGraveyardOpen(true)} />
+              <CompactZoneStack label={copy.graveyard} cards={graveyardCards} onClick={() => setIsGraveyardOpen(true)} />
             </div>
           </div>
         </div>
@@ -1023,7 +1037,7 @@ export function CombinedStagingSupplyPanel({
             }}
           >
             <div className="border-b border-[color:var(--border)]/70 px-3 py-1.5 text-[0.62rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
-              Card actions
+              {copy.cardActions}
             </div>
             {canActivateActiveStagingCard ? (
               <button
@@ -1036,7 +1050,7 @@ export function CombinedStagingSupplyPanel({
                 }}
                 className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
               >
-                Activate ability
+                {copy.activateAbility}
               </button>
             ) : null}
             {stagingTargets.map((target) => {
@@ -1052,9 +1066,9 @@ export function CombinedStagingSupplyPanel({
                   disabled={Boolean(friendlyOccupant)}
                   className="block w-full px-3 py-2 text-left text-xs font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                 >
-                  <span className="block">Attack {ZONE_LABELS[target]}</span>
+                  <span className="block">{copy.attack(getBoardBattlefieldLabel(copy, target))}</span>
                   <span className="mt-0.5 block truncate text-[0.65rem] font-medium text-[color:var(--text-secondary)]">
-                    {friendlyOccupant ? `Occupied by ${friendlyOccupant.card.name}` : defender ? `Defender: ${defender.card.name}` : 'Open battlefield'}
+                    {friendlyOccupant ? copy.occupiedBy(friendlyOccupant.card.name) : defender ? copy.defender(defender.card.name) : copy.openBattlefield}
                   </span>
                 </button>
               );
@@ -1067,7 +1081,7 @@ export function CombinedStagingSupplyPanel({
           <div role="dialog" aria-modal="true" aria-labelledby="graveyard-title" className="grid max-h-full w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl">
             <header className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
               <div>
-                <h2 id="graveyard-title" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">Graveyard</h2>
+                <h2 id="graveyard-title" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">{copy.graveyard}</h2>
                 <p className="mt-0.5 text-xs text-[color:var(--text-secondary)]">{graveyardCards.length} {graveyardCards.length === 1 ? 'card' : 'cards'}</p>
               </div>
               <button
@@ -1084,7 +1098,7 @@ export function CombinedStagingSupplyPanel({
             <div className="deck-builder-scroll min-h-0 overflow-y-auto p-4">
               {graveyardCards.length === 0 ? (
                 <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed border-[color:var(--border)] text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                  Graveyard is empty
+                  {copy.graveyardEmpty}
                 </div>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
@@ -1145,7 +1159,7 @@ export function CombinedStagingSupplyPanel({
           <div role="dialog" aria-modal="true" aria-labelledby="banish-title" className="grid max-h-full w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl">
             <header className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
               <div>
-                <h2 id="banish-title" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">Banish</h2>
+                <h2 id="banish-title" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">{copy.banish}</h2>
                 <p className="mt-0.5 text-xs text-[color:var(--text-secondary)]">{banishCards.length} {banishCards.length === 1 ? 'card' : 'cards'}</p>
               </div>
               <button
@@ -1162,7 +1176,7 @@ export function CombinedStagingSupplyPanel({
             <div className="deck-builder-scroll min-h-0 overflow-y-auto p-4">
               {banishCards.length === 0 ? (
                 <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed border-[color:var(--border)] text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-                  Banish is empty
+                  {copy.banishEmpty}
                 </div>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
@@ -1204,7 +1218,7 @@ export function CombinedStagingSupplyPanel({
                               {instance.card.name}
                             </p>
                             <p className="mt-0.5 text-center text-[0.58rem] font-black uppercase tracking-wide text-[color:var(--accent)]">
-                              Play from banish
+                              {copy.playFromBanish}
                             </p>
                           </button>
                         ) : (
@@ -1247,6 +1261,7 @@ export function HandStrip({
   stagingUnits,
   demonicAdvanceActive,
   battlefieldCardsByZone,
+  locale = 'en',
 }: {
   cards: GameCardInstance[];
   gameState: GameState;
@@ -1260,7 +1275,9 @@ export function HandStrip({
   stagingUnits: GameCardInstance[];
   demonicAdvanceActive: boolean;
   battlefieldCardsByZone: Record<BattlefieldZoneId, GameCardInstance[]>;
+  locale?: Locale;
 }) {
+  const copy = getPlayBoardCopy(locale);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const activeHandTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -1278,8 +1295,10 @@ export function HandStrip({
         stagingUnits,
         demonicAdvanceActive,
         battlefieldCardsByZone,
+        locale,
       })
     : [];
+  const activeCardDisplay = activeInstance ? getLocalizedCardDisplay(locale, activeInstance.card) : null;
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [activeHandTriggerRef, handMenuRef], closeHandMenu);
 
@@ -1306,7 +1325,7 @@ export function HandStrip({
             type="button"
             onClick={closeHandMenu}
             className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-lg font-semibold text-white transition hover:bg-black/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-            aria-label="Close card actions"
+            aria-label={copy.closeCardActions}
           >
             ×
           </button>
@@ -1315,9 +1334,9 @@ export function HandStrip({
               <div className="rounded-lg bg-[color:var(--surface-muted)]/70 px-4 py-3">
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="truncate text-xl font-semibold text-[color:var(--text-primary)]">{activeInstance.card.name}</h3>
+                    <h3 className="truncate text-xl font-semibold text-[color:var(--text-primary)]">{activeCardDisplay?.name ?? activeInstance.card.name}</h3>
                     <p className="mt-1 truncate text-sm font-semibold text-[color:var(--text-secondary)]">
-                      {activeInstance.card.subtype || activeInstance.card.type}
+                      {activeCardDisplay?.typeLabel ?? (activeInstance.card.subtype || activeInstance.card.type)}
                     </p>
                   </div>
                   <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[color:var(--accent)] text-base font-bold text-[color:var(--text-on-accent)]">
@@ -1325,10 +1344,10 @@ export function HandStrip({
                   </span>
                 </div>
               </div>
-              {activeInstance.card.rulesText || activeInstance.card.description ? (
+              {activeCardDisplay?.rulesText || activeCardDisplay?.description ? (
                 <div className="mt-3 max-h-28 overflow-y-auto rounded-md border border-[color:var(--border)] bg-[color:var(--background)]/55 px-3 py-2 text-sm text-[color:var(--text-primary)]">
-                  {activeInstance.card.rulesText ? <p>{activeInstance.card.rulesText}</p> : null}
-                  {activeInstance.card.description ? <p className="mt-2 italic text-[color:var(--text-secondary)]">{activeInstance.card.description}</p> : null}
+                  {activeCardDisplay?.rulesText ? <p>{activeCardDisplay.rulesText}</p> : null}
+                  {activeCardDisplay?.description ? <p className="mt-2 italic text-[color:var(--text-secondary)]">{activeCardDisplay.description}</p> : null}
                 </div>
               ) : null}
               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -1353,7 +1372,7 @@ export function HandStrip({
       <CardZoomPreview card={previewCard} />
       {cards.length === 0 ? (
         <p className="mx-auto translate-y-4 max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-4 text-center text-sm text-[color:var(--text-secondary)]">
-          Draw cards to fill your hand.
+          {copy.emptyHand}
         </p>
       ) : (
         <div className="mx-auto flex h-28 max-w-4xl items-end justify-center overflow-visible px-2 pb-0">
