@@ -1189,9 +1189,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         </div>
                       </div>
                       <div className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
-                        <div id="simulator-bot-deck-label" className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                        <h2 id="simulator-bot-deck-label" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">
                           {lobbyCopy.botDeck}
-                        </div>
+                        </h2>
                         <div ref={botDeckMenuRef} className="relative mt-2">
                           <button
                             id="simulator-bot-deck"
