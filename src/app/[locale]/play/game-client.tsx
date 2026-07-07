@@ -9,6 +9,7 @@ import { Bot, Check, ChevronDown, ChevronsRight, Flag, Play, RotateCcw, Sparkles
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { getAffinityBaseColor, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
+import { isConstructedDeckSize } from '@/lib/decks/rules';
 import type { Card } from '../create/deck-builder/types';
 import { getBotBattlefieldAttackChoice } from './bot-policy';
 import { applyPlayerCardAction } from './game-actions';
@@ -196,7 +197,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [hoveredCounterPreviewCards, setHoveredCounterPreviewCards] = useState<GameCardInstance[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [matchSetupError, setMatchSetupError] = useState<string | null>(null);
-  const botTurnTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const botTurnTimersRef = useRef<number[]>([]);
   const playerDeckMenuRef = useRef<HTMLDivElement | null>(null);
   const botDeckMenuRef = useRef<HTMLDivElement | null>(null);
   const cardMap = useMemo(() => new Map(initialCards.map((card) => [card.id, card])), [initialCards]);
@@ -260,6 +261,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     botTurnTimersRef.current = [];
   }
 
+  function scheduleBotTimer(callback: () => void, delayMs: number) {
+    const timerId = window.setTimeout(() => {
+      callback();
+      botTurnTimersRef.current = botTurnTimersRef.current.filter((currentTimerId) => currentTimerId !== timerId);
+    }, delayMs);
+
+    botTurnTimersRef.current.push(timerId);
+  }
+
   function getElementCenter(element: Element): { x: number; y: number } {
     const rect = element.getBoundingClientRect();
     return {
@@ -302,7 +312,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   }
 
   function scheduleBotTurnAdvance(delayMs = BOT_POST_COMBAT_REVIEW_DELAY_MS) {
-    const timerId = setTimeout(() => {
+    scheduleBotTimer(() => {
       setGameState((previous) => {
         if (!previous || previous.phase !== 'main' || previous.activePlayer !== 'opponent' || previous.pendingCombat || previous.pendingChoice) {
           return previous;
@@ -310,69 +320,64 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
         return advanceToNextTurn(previous);
       });
-      botTurnTimersRef.current = botTurnTimersRef.current.filter((currentTimerId) => currentTimerId !== timerId);
     }, delayMs);
+  }
 
-    botTurnTimersRef.current.push(timerId);
+  function scheduleBotAttackOrAdvance(delayMs = BOT_TURN_STEP_DELAY_MS) {
+    scheduleBotTimer(() => {
+      setGameState((previous) => {
+        if (!previous || previous.phase !== 'main' || previous.activePlayer !== 'opponent' || previous.pendingCombat || previous.pendingChoice) {
+          return previous;
+        }
+
+        const choice = getBotBattlefieldAttackChoice(previous);
+
+        if (!choice) {
+          scheduleBotTurnAdvance();
+          return previous;
+        }
+
+        const arrowId = showAttackArrow(choice.attackerInstanceId, choice.targetZone, previous);
+        scheduleBotTimer(() => {
+          setGameState((current) => {
+            if (!current || current.phase !== 'main' || current.activePlayer !== 'opponent' || current.pendingCombat || current.pendingChoice) {
+              return current;
+            }
+
+            const nextState = applyBotTurnStep(current, 'attackBattlefield');
+
+            if (!nextState.pendingCombat) {
+              clearAttackArrow(arrowId);
+            }
+
+            return nextState;
+          });
+        }, 700);
+
+        return previous;
+      });
+    }, delayMs);
   }
 
   function playAutomaticBotTurn(botTurnState: GameState) {
     clearBotTurnTimers();
     setGameState(botTurnState);
 
-    for (const [index, step] of BOT_TURN_STEPS.entries()) {
-      const timerId = setTimeout(() => {
+    const setupSteps = BOT_TURN_STEPS.filter((step) => step !== 'attackBattlefield');
+
+    for (const [index, step] of setupSteps.entries()) {
+      scheduleBotTimer(() => {
         setGameState((previous) => {
           if (!previous) {
             return previous;
           }
 
-          if (step !== 'attackBattlefield') {
-            return applyBotTurnStep(previous, step);
-          }
-
-          const choice = getBotBattlefieldAttackChoice(previous);
-
-          if (!choice) {
-            return previous;
-          }
-
-          const arrowId = showAttackArrow(choice.attackerInstanceId, choice.targetZone, previous);
-          window.setTimeout(() => {
-            setGameState((current) => {
-              if (!current) {
-                return current;
-              }
-
-              const nextState = applyBotTurnStep(current, step);
-
-              if (!nextState.pendingCombat) {
-                clearAttackArrow(arrowId);
-              }
-
-              return nextState;
-            });
-          }, 700);
-
-          return previous;
+          return applyBotTurnStep(previous, step);
         });
       }, BOT_TURN_STEP_DELAY_MS * (index + 1));
-
-      botTurnTimersRef.current.push(timerId);
     }
 
-    const passTurnTimerId = setTimeout(() => {
-      setGameState((previous) => {
-        if (!previous || previous.phase !== 'main' || previous.activePlayer !== 'opponent') {
-          return previous;
-        }
-
-        return advanceToNextTurn(previous);
-      });
-      botTurnTimersRef.current = [];
-    }, BOT_TURN_STEP_DELAY_MS * (BOT_TURN_STEPS.length + 2) + BOT_POST_COMBAT_REVIEW_DELAY_MS);
-
-    botTurnTimersRef.current.push(passTurnTimerId);
+    scheduleBotAttackOrAdvance(BOT_TURN_STEP_DELAY_MS * (setupSteps.length + 1));
   }
 
   useEffect(() => clearBotTurnTimers, []);
@@ -442,7 +447,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         if (result.resolvedCombat) {
           setAttackArrow(null);
           if (result.state.activePlayer === 'opponent') {
-            scheduleBotTurnAdvance();
+            scheduleBotAttackOrAdvance(BOT_POST_COMBAT_REVIEW_DELAY_MS);
           }
           return result.state;
         }
@@ -502,7 +507,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         return;
       }
 
-      const mappedDecks = mapDeckRows((data ?? []) as DeckRow[], cardMap).filter((deck) => deck.cardCount > 0);
+      const mappedDecks = mapDeckRows((data ?? []) as DeckRow[], cardMap).filter((deck) =>
+        isConstructedDeckSize(deck.cardCount)
+      );
       setDecks(mappedDecks);
       setSelectedDeckId((previous) => previous || mappedDecks[0]?.id || '');
       setSelectedBotDeckId((previous) => previous || mappedDecks[1]?.id || mappedDecks[0]?.id || '');
