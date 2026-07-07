@@ -166,5 +166,9 @@ export function createLuxCardAbilityRegistry(
       cardId: 'IMP063',
       abilities: [staticRule('IMP063-quarantine', "Units can't attack or retreat from this zone, have no abilities, and this zone is not counted during scoring.")],
     },
+    IMP161: {
+      cardId: 'IMP161',
+      abilities: [staticRule('IMP161-zone-health', 'Friendly units occupying this zone get +0/+2.')],
+    },
   };
 }

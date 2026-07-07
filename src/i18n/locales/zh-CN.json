@@ -33,12 +33,14 @@
     "menuExport": "导出",
     "menuShare": "分享图片",
     "menuSave": "保存牌组",
+    "clearDeck": "清空",
     "importHeading": "导入牌组",
     "importInstructions": "在下方粘贴导出的 JSON，或上传文件以导入牌组。",
     "importInstructionsText": "每行输入一张卡牌，格式为“<数量> <卡牌名称>”，或上传文本文件。",
     "importPlaceholder": "[\n  {\n    \"name\": \"Card Name\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
     "importUploadLabel": "上传 JSON 文件",
+    "importUploadTextLabel": "上传 TXT 文件",
     "importButton": "导入牌组",
     "importCancel": "取消",
     "importErrorInvalid": "无法解析提供的 JSON。请检查格式后重试。",
@@ -80,7 +82,9 @@
       "updateSuccessMessage": "牌组更新成功。",
       "dismissNotice": "关闭",
       "publicLabel": "公开此牌组",
-      "publicHelp": "公开牌组可能出现在热门或趋势列表中。取消勾选则保持私密。"
+      "publicHelp": "公开牌组可能出现在热门或趋势列表中。取消勾选则保持私密。",
+      "publicStatus": "公开",
+      "privateStatus": "私密"
     }
   },
   "myDecks": {

@@ -78,6 +78,46 @@ describe('Solara card abilities', () => {
       const id = `IMP${String(number).padStart(3, '0')}`;
       expect(getRegisteredCardAbilities(id), id).not.toBeNull();
     }
+    expect(getRegisteredCardAbilities('IMP162')).not.toBeNull();
+  });
+
+  it('lets Landbreaker destroy a territory on attack and gain temporary stats', () => {
+    const landbreaker = makeCard('IMP162', 'player', {
+      card: createTestCard({
+        id: 'IMP162',
+        name: 'Landbreaker',
+        type: 'Unit',
+        attack: 5,
+        health: 6,
+        rulesText: 'Flanking. On Attack: You may destroy a territory in the same combat zone as this unit.',
+      }),
+    });
+    const territory = makeCard('territory', 'opponent', {
+      card: createTestCard({ id: 'territory', name: 'Target Territory', type: 'Territory' }),
+    });
+    const state = {
+      ...makeState(),
+      zones: { ...makeState().zones, battlefieldLeft: [landbreaker, territory] },
+    };
+
+    const pending = triggerCardAbilities(state, 'onAttack', {
+      source: landbreaker,
+      controller: 'player',
+      zone: 'battlefieldLeft',
+    });
+    expect(pending.pendingChoice).toMatchObject({
+      kind: 'solaraTarget',
+      effect: 'landbreakerDestroy',
+      availableInstanceIds: [territory.instanceId],
+    });
+
+    const resolved = resolvePendingChoice(pending, [territory.instanceId]);
+    expect(resolved).not.toHaveProperty('error');
+    if ('error' in resolved) return;
+    expect(resolved.opponentZones.graveyard[0]?.instanceId).toBe(territory.instanceId);
+    const current = resolved.zones.battlefieldLeft.find((card) => card.instanceId === landbreaker.instanceId) ?? null;
+    expect(current ? getCurrentUnitAttack(resolved, current) : null).toBe(7);
+    expect(current ? getCurrentUnitHealth(resolved, current) : null).toBe(8);
   });
 
   it('locks Ashfang Pillager supply for one ready phase and restricts Ashfang Raider for its entry turn', () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Download, HeartPulse, Save, Share2, Sparkles, Sword, Upload } from 'lucide-react';
+import { ChevronDown, Download, HeartPulse, Save, Share2, Sparkles, Sword, Trash2, Upload } from 'lucide-react';
 
 import type { Card, CostBucket, DeckEntry } from '../types';
 import { DeckCardChip } from './deck-card-chip';
@@ -316,9 +316,11 @@ export type DeckPanelProps = {
     menuExport: string;
     menuShare: string;
     menuSave: string;
+    clearDeck: string;
   };
   onAdd: (cardId: string) => void;
   onRemove: (cardId: string) => void;
+  onClearDeck: () => void;
   onZoom: (card: Card | null, variant?: 'default' | 'compact', anchor?: ZoomAnchor | null) => void;
   onMenuSelect: (action: 'import' | 'export' | 'share' | 'save') => void;
   isCostCurveVisible: boolean;
@@ -334,6 +336,7 @@ export function DeckPanel({
   labels,
   onAdd,
   onRemove,
+  onClearDeck,
   onZoom,
   onMenuSelect,
   isCostCurveVisible,
@@ -553,6 +556,15 @@ export function DeckPanel({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClearDeck}
+              disabled={totalCards === 0}
+              className="flex h-9 items-center gap-2 rounded-md border border-[color:var(--border)] px-3 text-xs font-semibold uppercase text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              <span>{labels.clearDeck}</span>
+            </button>
             <div className="flex items-center gap-2 min-[1920px]:hidden">
               <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
                 {labels.costCurveHeading}

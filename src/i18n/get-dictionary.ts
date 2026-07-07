@@ -66,12 +66,14 @@ type BuilderDictionary = {
     menuExport: string;
     menuShare: string;
     menuSave: string;
+    clearDeck: string;
     importHeading: string;
     importInstructions: string;
     importInstructionsText: string;
     importPlaceholder: string;
     importPlaceholderText: string;
     importUploadLabel: string;
+    importUploadTextLabel: string;
     importButton: string;
     importCancel: string;
     importErrorInvalid: string;
@@ -118,6 +120,8 @@ type BuilderDictionary = {
       dismissNotice: string;
       publicLabel: string;
       publicHelp: string;
+      publicStatus: string;
+      privateStatus: string;
     };
   };
 };

@@ -247,7 +247,8 @@ export type PendingChoice =
         | 'enrageReady'
         | 'vengeanceReturn'
         | 'wyvernAttack'
-        | 'peaksRetreat';
+        | 'peaksRetreat'
+        | 'landbreakerDestroy';
       availableInstanceIds: string[];
       optional?: boolean;
       minSelections?: number;
@@ -277,7 +278,8 @@ export type PendingChoice =
         | 'swiftRetreat'
         | 'katanaReturn'
         | 'escapeRoutePay'
-        | 'factoryDraw';
+        | 'factoryDraw'
+        | 'shadowveilDamage';
       availableInstanceIds: string[];
       optional?: boolean;
       minSelections?: number;
@@ -302,9 +304,10 @@ export type PendingChoice =
       sourceInstanceId: string;
       sourceName: string;
       prompt: string;
-      effect: 'excavatorDestroy';
+      effect: 'excavatorDestroy' | 'warBannerReveal' | 'warBannerDraw';
       availableInstanceIds: string[];
       optional?: boolean;
+      resumeTurnAdvance?: boolean;
     };
 
 export type GameState = {

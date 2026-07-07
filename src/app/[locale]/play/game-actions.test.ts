@@ -1025,6 +1025,62 @@ describe('deterministic player card actions', () => {
     expect(result.state.zones.supply[0]?.ready).toBe(false);
   });
 
+  it('flips a later-turn face-down territory while holding counter priority', () => {
+    const territory = makeInstance({
+      instanceId: 'territory',
+      faceDown: true,
+      faceDownEnteredTurn: 1,
+      card: createTestCard({ id: 'territory', name: 'Territory', type: 'Territory', cost: 1 }),
+    });
+    const supply = makeInstance({ instanceId: 'supply', ready: true });
+    const attacker = makeInstance({ instanceId: 'attacker', ready: true });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+    });
+    const baseState = makePlayerTurn({ turn: 2 });
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        battlefieldLeft: [territory],
+        staging: [attacker],
+        battlefieldCenter: [defender],
+        supply: [supply],
+      },
+    };
+    const declared = declareBattlefieldAttack(state, 'player', attacker.instanceId, 'battlefieldCenter');
+
+    if ('error' in declared) {
+      throw new Error(declared.error);
+    }
+
+    const counterState = {
+      ...declared.state,
+      pendingCombat: declared.state.pendingCombat
+        ? {
+            ...declared.state.pendingCombat,
+            priorityOwner: 'player' as const,
+          }
+        : null,
+    };
+    const result = applyPlayerCardAction(counterState, {
+      instanceId: territory.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'battlefieldLeft',
+      options: { faceDown: false },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.pendingCombat).toEqual(counterState.pendingCombat);
+    expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: territory.instanceId,
+      faceDown: false,
+    });
+    expect(result.state.zones.supply[0]?.ready).toBe(false);
+  });
+
   it('rejects arbitrary zone movement and actions during pending combat', () => {
     const handCard = makeInstance({ instanceId: 'hand-card' });
     const attacker = makeInstance({ instanceId: 'attacker', ready: true });

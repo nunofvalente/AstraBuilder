@@ -29,7 +29,7 @@ import {
   resolveTerraTargetChoice,
   resolveTerraZoneChoice,
 } from './terra-card-ability-handlers';
-import { resolveNeutralTargetChoice } from './neutral-card-ability-handlers';
+import { drawTopUnitForWarBanner, resolveNeutralTargetChoice } from './neutral-card-ability-handlers';
 import { addLogEntry, createLogEntry } from './game-log';
 import type {
   ActivateCardAbilityResult,
@@ -728,6 +728,12 @@ export function getCounterTargetOptions(state: GameState, counter: GameCardInsta
     );
   }
 
+  if (counter.card.id === 'IMP163') {
+    return combatUnits.filter(
+      (unit) => isUnitCard(unit.card) && getCardController(unit) !== counterController
+    );
+  }
+
   if (counter.card.id === 'IMP088') {
     return battlefieldUnits.filter(
       (unit) =>
@@ -1156,13 +1162,25 @@ export function getCurrentUnitHealth(state: GameState, instance: GameCardInstanc
     ) &&
     state.zones[zone].some((card) => card.card.id === 'IMP124' && !card.faceDown)
   );
+  const pillboxBonus = BATTLEFIELD_ZONE_IDS.some((zone) =>
+    state.zones[zone].some((card) => card.instanceId === instance.instanceId) &&
+    state.zones[zone].some(
+      (card) =>
+        card.card.id === 'IMP161' &&
+        !card.faceDown &&
+        getCardController(card) === getCardController(instance)
+    )
+  )
+    ? 2
+    : 0;
   return Math.max(
     0,
     (hasRallyPoint ? 3 : instance.card.health) +
       attachments.reduce((total, attachment) => total + attachment.card.health, 0) +
       (instance.temporaryHealthBonus ?? 0) +
       (instance.terraLastStandHealthBonus ?? 0) +
-      selenaBonus
+      selenaBonus +
+      pillboxBonus
   );
 }
 
@@ -1526,6 +1544,36 @@ export function scoreBattlefieldVictoryPoints(state: GameState, owner: Owner): G
       nextState = placeFreightModuleIntoSupplyFromScore(nextState, freightModule, zone);
     }
 
+    const warBanners = nextState.zones[zone].filter(
+      (card) =>
+        card.card.id === 'IMP164' &&
+        card.attachedToInstanceId === instance.instanceId &&
+        getCardController(card) === owner
+    );
+    for (const warBanner of warBanners) {
+      const topCard = getOwnerZoneMap(nextState, owner).deck[0];
+      if (!topCard) {
+        continue;
+      }
+      if (owner === 'player') {
+        return {
+          ...nextState,
+          pendingChoice: {
+            kind: 'neutralTarget',
+            owner: 'player',
+            sourceInstanceId: warBanner.instanceId,
+            sourceName: warBanner.card.name,
+            prompt: 'Reveal the top card of your deck for War Banner?',
+            effect: 'warBannerReveal',
+            availableInstanceIds: [warBanner.instanceId],
+            optional: true,
+            resumeTurnAdvance: true,
+          },
+        };
+      }
+      nextState = drawTopUnitForWarBanner(nextState, owner, warBanner.card.name);
+    }
+
     const jammingTowers = nextState.zones[zone].filter(
       (card) => card.card.id === 'IMP093' && !card.faceDown && getCardController(card) !== owner
     );
@@ -1633,7 +1681,11 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
   }
 
   if (pendingChoice.kind === 'neutralTarget') {
-    return resolveNeutralTargetChoice(state, pendingChoice, selectedInstanceIds);
+    const resolved = resolveNeutralTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (!('error' in resolved) && pendingChoice.resumeTurnAdvance && !resolved.pendingChoice) {
+      return finishAdvanceToNextTurnAfterScoring(resolved);
+    }
+    return resolved;
   }
 
   if (pendingChoice.kind === 'caelumTarget') {
@@ -2562,10 +2614,6 @@ export function declareBattlefieldAttack(
 
   const defender = state.zones[targetZone].find((instance) => isUnitCard(instance.card) && getCardController(instance) !== owner) ?? null;
 
-  if (!defender) {
-    return { error: 'Counter priority only opens when attacking an opposing unit.' };
-  }
-
   const defendingOwner: Owner = owner === 'player' ? 'opponent' : 'player';
   const pendingCombat: PendingCombat = {
     attackerOwner: owner,
@@ -2585,8 +2633,12 @@ export function declareBattlefieldAttack(
       prefix: 'Declared attack ',
       cardName: attacker.card.name,
       suffix: flankingOriginZone
-        ? ` from ${getZoneLogLabel(flankingOriginZone)} into ${getZoneLogLabel(targetZone)}, targeting ${defender.card.name}. Counter priority opened.`
-        : ` into ${getZoneLogLabel(targetZone)}, targeting ${defender.card.name}. Counter priority opened.`,
+        ? defender
+          ? ` from ${getZoneLogLabel(flankingOriginZone)} into ${getZoneLogLabel(targetZone)}, targeting ${defender.card.name}. Counter priority opened.`
+          : ` from ${getZoneLogLabel(flankingOriginZone)} into ${getZoneLogLabel(targetZone)}. Counter priority opened.`
+        : defender
+          ? ` into ${getZoneLogLabel(targetZone)}, targeting ${defender.card.name}. Counter priority opened.`
+          : ` into ${getZoneLogLabel(targetZone)}. Counter priority opened.`,
     }),
   };
 
@@ -2594,8 +2646,21 @@ export function declareBattlefieldAttack(
     source: attacker,
     controller: owner,
     zone: targetZone,
-    targets: [{ type: 'card', instanceId: defender.instanceId }],
+    targets: defender ? [{ type: 'card', instanceId: defender.instanceId }] : [],
   });
+  if (!defender) {
+    if (flankingOriginZone) {
+      nextState = restoreFlankingAttackerToOriginForDisplay(nextState, owner, attacker.instanceId, flankingOriginZone);
+    }
+
+    return {
+      state: nextState,
+      pendingCombat,
+      attacker,
+      defender: null,
+    };
+  }
+
   nextState = triggerCardAbilities(nextState, 'onDefend', {
     source: defender,
     controller: getCardController(defender),
@@ -2721,7 +2786,7 @@ export function getCounterPlayError(state: GameState, owner: Owner, instanceId: 
   }
 
   if (
-    ['IMP026', 'IMP027', 'IMP045', 'IMP057', 'IMP058', 'IMP121', 'IMP150', 'IMP151'].includes(counter.card.id) &&
+    ['IMP026', 'IMP027', 'IMP045', 'IMP057', 'IMP058', 'IMP121', 'IMP150', 'IMP151', 'IMP163'].includes(counter.card.id) &&
     getCounterTargetOptions(state, counter).length === 0
   ) {
     return `${counter.card.name} has no valid target.`;

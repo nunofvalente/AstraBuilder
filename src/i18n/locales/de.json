@@ -60,12 +60,14 @@
     "menuExport": "Exportieren",
     "menuShare": "Bild teilen",
     "menuSave": "Deck speichern",
+    "clearDeck": "Leeren",
     "importHeading": "Deck importieren",
     "importInstructions": "Fuege das exportierte JSON unten ein oder lade eine Datei hoch, um ein Deck zu importieren.",
     "importInstructionsText": "Fuege pro Zeile eine Karte im Format \"<Anzahl> <Kartenname>\" ein oder lade eine Textdatei hoch, um ein Deck zu importieren.",
     "importPlaceholder": "[\n  {\n    \"name\": \"Kartenname\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
     "importUploadLabel": "JSON-Datei hochladen",
+    "importUploadTextLabel": "TXT-Datei hochladen",
     "importButton": "Deck importieren",
     "importCancel": "Abbrechen",
     "importErrorInvalid": "Die JSON-Daten konnten nicht verarbeitet werden. Bitte Format pruefen und erneut versuchen.",
@@ -107,7 +109,9 @@
       "updateSuccessMessage": "Deck erfolgreich aktualisiert.",
       "dismissNotice": "Schliessen",
       "publicLabel": "Dieses Deck oeffentlich machen",
-      "publicHelp": "Oeffentliche Decks koennen in beliebten oder trendigen Listen erscheinen. Unmarkiert lassen, um es privat zu halten."
+      "publicHelp": "Oeffentliche Decks koennen in beliebten oder trendigen Listen erscheinen. Unmarkiert lassen, um es privat zu halten.",
+      "publicStatus": "Oeffentlich",
+      "privateStatus": "Privat"
     }
   },
   "myDecks": {

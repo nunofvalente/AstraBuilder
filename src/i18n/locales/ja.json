@@ -33,12 +33,14 @@
     "menuExport": "エクスポート",
     "menuShare": "画像を共有",
     "menuSave": "デッキを保存",
+    "clearDeck": "クリア",
     "importHeading": "デッキをインポート",
     "importInstructions": "エクスポートした JSON を貼り付けるか、ファイルをアップロードしてください。",
     "importInstructionsText": "「<枚数> <カード名>」の形式で1行に1枚入力するか、テキストファイルをアップロードしてください。",
     "importPlaceholder": "[\n  {\n    \"name\": \"Card Name\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
     "importUploadLabel": "JSON ファイルをアップロード",
+    "importUploadTextLabel": "TXT ファイルをアップロード",
     "importButton": "デッキをインポート",
     "importCancel": "キャンセル",
     "importErrorInvalid": "JSON を解析できませんでした。形式を確認して再試行してください。",
@@ -80,7 +82,9 @@
       "updateSuccessMessage": "デッキを更新しました。",
       "dismissNotice": "閉じる",
       "publicLabel": "このデッキを公開する",
-      "publicHelp": "公開デッキは人気またはトレンド一覧に表示される場合があります。非公開にするにはチェックを外してください。"
+      "publicHelp": "公開デッキは人気またはトレンド一覧に表示される場合があります。非公開にするにはチェックを外してください。",
+      "publicStatus": "公開",
+      "privateStatus": "非公開"
     }
   },
   "myDecks": {

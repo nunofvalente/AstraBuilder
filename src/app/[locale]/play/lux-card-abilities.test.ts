@@ -76,6 +76,26 @@ describe('Lux card abilities', () => {
       const id = `IMP${String(number).padStart(3, '0')}`;
       expect(getRegisteredCardAbilities(id), id).not.toBeNull();
     }
+    expect(getRegisteredCardAbilities('IMP161')).not.toBeNull();
+  });
+
+  it('gives friendly units occupying Fortified Pillbox zone +2 health', () => {
+    const pillbox = makeUnit('IMP161', 'player', {
+      card: createTestCard({ id: 'IMP161', name: 'Fortified Pillbox', type: 'Territory', affinity: 'Lux' }),
+    });
+    const friendly = makeUnit('friendly', 'player', {
+      card: createTestCard({ id: 'friendly', name: 'Friendly', type: 'Unit', health: 3 }),
+    });
+    const enemy = makeUnit('enemy', 'opponent', {
+      card: createTestCard({ id: 'enemy', name: 'Enemy', type: 'Unit', health: 3 }),
+    });
+    const state = {
+      ...makeState(),
+      zones: { ...makeState().zones, battlefieldLeft: [pillbox, friendly, enemy] },
+    };
+
+    expect(getCurrentUnitHealth(state, friendly)).toBe(5);
+    expect(getCurrentUnitHealth(state, enemy)).toBe(3);
   });
 
   it('creates Drone tokens for Armored Carrier and Frontline Officer', () => {

@@ -398,8 +398,11 @@ function flipTerritory(
     return rejected(state, 'Only your face-down territories can be flipped manually.');
   }
 
-  if (state.phase !== 'main' || state.activePlayer !== owner) {
-    return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only flip a territory face up during ${owner === 'player' ? 'your' : 'its'} main turn.`);
+  const canFlipDuringMain = state.phase === 'main' && state.activePlayer === owner;
+  const canFlipAsCounter = state.pendingCombat?.priorityOwner === owner;
+
+  if (!canFlipDuringMain && !canFlipAsCounter) {
+    return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only flip a territory face up during ${owner === 'player' ? 'your' : 'its'} main turn or while holding counter priority.`);
   }
 
   if (card.faceDownEnteredTurn === state.turn) {
@@ -754,14 +757,6 @@ export function applyCardAction(
     return rejected(state, 'The game is over.');
   }
 
-  if (state.pendingCombat) {
-    return rejected(state, 'Resolve the pending combat before taking another action.');
-  }
-
-  if (state.pendingChoice) {
-    return rejected(state, 'Resolve the pending ability choice before taking another action.');
-  }
-
   const ownerZones = getOwnerZoneMap(state, owner);
   const card = ownerZones[fromZone].find((instance) => instance.instanceId === instanceId) ?? null;
 
@@ -771,6 +766,20 @@ export function applyCardAction(
 
   if (getCardController(card) !== owner) {
     return rejected(state, `${owner === 'player' ? 'You can' : 'Bot can'} only move ${owner === 'player' ? 'your' : 'its'} own cards.`);
+  }
+
+  const isTerritoryFlip =
+    fromZone === toZone &&
+    BATTLEFIELD_ZONES.has(fromZone) &&
+    isTerritoryCard(card.card) &&
+    options.faceDown === false;
+
+  if (state.pendingCombat && !isTerritoryFlip) {
+    return rejected(state, 'Resolve the pending combat before taking another action.');
+  }
+
+  if (state.pendingChoice) {
+    return rejected(state, 'Resolve the pending ability choice before taking another action.');
   }
 
   if (fromZone === 'hand' && toZone === 'supply') {

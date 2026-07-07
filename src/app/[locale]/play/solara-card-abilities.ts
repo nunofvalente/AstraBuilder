@@ -13,6 +13,7 @@ export type SolaraAbilityHandlers = {
   fearlessWhelp: AbilityHandler;
   firedancer: AbilityHandler;
   lavaFlow: AbilityHandler;
+  landbreaker: AbilityHandler;
   lingyi: AbilityHandler;
   markOfDeath: AbilityHandler;
   ransack: AbilityHandler;
@@ -73,5 +74,12 @@ export function createSolaraCardAbilityRegistry(
     IMP124: { cardId: 'IMP124', abilities: [staticRule('IMP124-base-stats', 'Units in this zone have 3 base attack and health.')] },
     IMP125: { cardId: 'IMP125', abilities: [staticRule('IMP125-dig', 'Whenever a friendly unit scores this zone, put a dig counter here. At three counters, gain 2 victory points and sacrifice this territory.')] },
     IMP126: { cardId: 'IMP126', abilities: [staticRule('IMP126-end-retreat', 'At the end of your turn, you may pay {1} to force retreat a friendly unit with cost 2 or less from this zone.')] },
+    IMP162: {
+      cardId: 'IMP162',
+      abilities: [
+        staticRule('IMP162-flanking', 'Flanking.'),
+        rule('IMP162-destroy-territory-buff', 'onAttack', 'optional', 'On Attack: You may destroy a territory in the same combat zone as this unit. If you do, this gets +2/+2 until end of turn.', handlers.landbreaker),
+      ],
+    },
   };
 }
