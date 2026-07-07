@@ -149,7 +149,7 @@ export default async function HomePage({ params }: LocalePageProps) {
   ];
 
   return (
-    <main className="home-page flex w-full flex-col items-center gap-12 pb-12 text-[color:var(--text-primary)]">
+    <main className="home-page flex w-full flex-col items-center gap-16 pb-12 text-[color:var(--text-primary)] md:gap-20">
       <section
         className="banner-section home-hero relative left-1/2 mt-[-1px] flex w-screen max-w-none -translate-x-1/2 items-center overflow-hidden px-6 py-16 md:min-h-[34rem] md:py-24"
         style={bannerStyle}
@@ -237,33 +237,8 @@ export default async function HomePage({ params }: LocalePageProps) {
         </div>
       </section>
 
-      <section className="home-showcase mx-auto grid w-full max-w-6xl gap-8 px-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="home-showcase-sticky">
-          <div className="home-showcase-stage">
-            <Image
-              src="/images/home/cards/valeria-dragoon-knight.png"
-              alt=""
-              width={600}
-              height={840}
-              className="home-showcase-card home-showcase-card-left"
-            />
-            <Image
-              src="/images/home/cards/nerezza-umbrasco-scion.png"
-              alt=""
-              width={750}
-              height={1050}
-              className="home-showcase-card home-showcase-card-center"
-            />
-            <Image
-              src="/images/home/cards/akeno-noble-samurai.png"
-              alt=""
-              width={600}
-              height={840}
-              className="home-showcase-card home-showcase-card-right"
-            />
-          </div>
-        </div>
-        <div className="flex flex-col gap-4 md:py-8">
+      <section className="home-showcase mx-auto w-full max-w-6xl px-4">
+        <div className="home-showcase-grid">
           {showcaseLinks.map((item) => (
             <Link
               key={item.href}
