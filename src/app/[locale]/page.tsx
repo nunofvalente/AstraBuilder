@@ -149,7 +149,7 @@ export default async function HomePage({ params }: LocalePageProps) {
   ];
 
   return (
-    <main className="home-page flex w-full flex-col items-center gap-12 pb-12 text-[color:var(--text-primary)]">
+    <main className="home-page flex w-full flex-col items-center gap-16 pb-12 text-[color:var(--text-primary)] md:gap-20">
       <section
         className="banner-section home-hero relative left-1/2 mt-[-1px] flex w-screen max-w-none -translate-x-1/2 items-center overflow-hidden px-6 py-16 md:min-h-[34rem] md:py-24"
         style={bannerStyle}
@@ -199,33 +199,46 @@ export default async function HomePage({ params }: LocalePageProps) {
         <div className="home-hero-bottom-fade" aria-hidden="true" />
       </section>
 
-      <section className="home-showcase mx-auto grid w-full max-w-6xl gap-8 px-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="home-showcase-sticky">
-          <div className="home-showcase-stage">
+      <section className="home-battlefield-banner mx-auto w-full max-w-6xl px-4">
+        <div className="home-battlefield-banner-panel">
+          <div className="home-battlefield-banner-copy">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[color:var(--accent)]">
+              {dictionary.topBar.play}
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
+              {home.battlefieldBanner.title}
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-white/76 sm:text-base">
+              {home.battlefieldBanner.description}
+            </p>
+            <Link
+              href={`/${locale}/play`}
+              className="mt-6 inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-5 py-3 text-sm font-bold text-[color:var(--text-on-accent)] shadow-lg shadow-black/25 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#24211e]"
+            >
+              {home.battlefieldBanner.action}
+            </Link>
+          </div>
+          <div className="home-battlefield-banner-cards" aria-hidden="true">
             <Image
-              src="/images/home/cards/valeria-dragoon-knight.png"
+              src="/images/home/cards/celeste-concord-paladin.png"
               alt=""
-              width={600}
-              height={840}
-              className="home-showcase-card home-showcase-card-left"
+              width={420}
+              height={588}
+              className="home-battlefield-banner-card home-battlefield-banner-card-left"
             />
             <Image
-              src="/images/home/cards/nerezza-umbrasco-scion.png"
+              src="/images/home/cards/gaia-lord-of-nature.png"
               alt=""
-              width={750}
-              height={1050}
-              className="home-showcase-card home-showcase-card-center"
-            />
-            <Image
-              src="/images/home/cards/akeno-noble-samurai.png"
-              alt=""
-              width={600}
-              height={840}
-              className="home-showcase-card home-showcase-card-right"
+              width={420}
+              height={588}
+              className="home-battlefield-banner-card home-battlefield-banner-card-right"
             />
           </div>
         </div>
-        <div className="flex flex-col gap-4 md:py-8">
+      </section>
+
+      <section className="home-showcase mx-auto w-full max-w-6xl px-4">
+        <div className="home-showcase-grid">
           {showcaseLinks.map((item) => (
             <Link
               key={item.href}

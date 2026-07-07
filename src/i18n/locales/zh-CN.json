@@ -7,7 +7,8 @@
       "trending": { "title": "热门牌组", "placeholder": "查看社区正在关注的《Echoes of Astra》牌组。" }
     },
     "actions": { "browse": "浏览所有牌组", "create": "创建牌组" },
-    "showcaseActions": { "build": "构筑你的牌组", "decks": "探索社区牌组", "catalog": "浏览卡牌目录" }
+    "showcaseActions": { "build": "构筑你的牌组", "decks": "探索社区牌组", "catalog": "浏览卡牌目录" },
+    "battlefieldBanner": { "title": "加入战场", "description": "带上你保存的牌组进入练习对局，与机器人对手测试你的打法。", "action": "前往战场" }
   },
   "affinityPage": { "resultsHeading": "使用 {pairing} 的牌组", "empty": "目前没有符合此属性组合的牌组。", "backLink": "返回牌组列表" },
   "builder": {
@@ -254,7 +255,7 @@
     "profile": "个人资料",
     "myDecks": "我的牌组",
     "builder": "构筑器",
-    "play": "对战",
+    "play": "战场",
     "decks": "牌组",
     "collection": "卡牌目录",
     "settings": "设置",

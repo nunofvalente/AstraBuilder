@@ -26,6 +26,11 @@
       "build": "Build your deck",
       "decks": "Explore community decks",
       "catalog": "Browse card catalog"
+    },
+    "battlefieldBanner": {
+      "title": "Join the battlefield",
+      "description": "Take your saved deck into a practice match and test your lines against a bot opponent.",
+      "action": "Go to Battlefield"
     }
   },
   "affinityPage": {
@@ -358,7 +363,7 @@
     "profile": "Profile",
     "myDecks": "My Decks",
     "builder": "Builder",
-    "play": "Play",
+    "play": "Battlefield",
     "decks": "Decks",
     "collection": "Catalog",
     "settings": "Settings",
