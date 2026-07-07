@@ -26,6 +26,11 @@
       "build": "Deck erstellen",
       "decks": "Community-Decks ansehen",
       "catalog": "Katalog durchsuchen"
+    },
+    "battlefieldBanner": {
+      "title": "Betritt das Schlachtfeld",
+      "description": "Fuehre dein gespeichertes Deck in ein Trainingsspiel und teste deine Zuege gegen einen Bot.",
+      "action": "Zum Schlachtfeld"
     }
   },
   "affinityPage": {

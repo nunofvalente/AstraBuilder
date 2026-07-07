@@ -26,6 +26,11 @@
       "build": "Bina dek anda",
       "decks": "Teroka dek komuniti",
       "catalog": "Layari katalog kad"
+    },
+    "battlefieldBanner": {
+      "title": "Sertai medan perang",
+      "description": "Bawa dek tersimpan anda ke perlawanan latihan dan uji strategi menentang bot.",
+      "action": "Pergi ke Medan Perang"
     }
   },
   "affinityPage": {

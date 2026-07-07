@@ -30,6 +30,11 @@ type HomeDictionary = {
       decks: string;
       catalog: string;
     };
+    battlefieldBanner: {
+      title: string;
+      description: string;
+      action: string;
+    };
   };
 };
 

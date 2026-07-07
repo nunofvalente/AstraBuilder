@@ -26,6 +26,11 @@
       "build": "Creer votre deck",
       "decks": "Explorer les decks",
       "catalog": "Parcourir le catalogue"
+    },
+    "battlefieldBanner": {
+      "title": "Rejoindre le champ de bataille",
+      "description": "Emmenez un deck enregistre dans une partie d'entrainement et testez vos lignes contre un bot.",
+      "action": "Aller au champ de bataille"
     }
   },
   "affinityPage": {

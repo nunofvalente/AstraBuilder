@@ -7,7 +7,8 @@
       "trending": { "title": "トレンドデッキ", "placeholder": "コミュニティで注目されている Echoes of Astra のデッキを確認しましょう。" }
     },
     "actions": { "browse": "すべてのデッキを見る", "create": "デッキを作成" },
-    "showcaseActions": { "build": "デッキを構築", "decks": "コミュニティデッキを見る", "catalog": "カードカタログを見る" }
+    "showcaseActions": { "build": "デッキを構築", "decks": "コミュニティデッキを見る", "catalog": "カードカタログを見る" },
+    "battlefieldBanner": { "title": "戦場へ参加", "description": "保存済みデッキを練習マッチに持ち込み、ボット相手に動きを試しましょう。", "action": "戦場へ移動" }
   },
   "affinityPage": { "resultsHeading": "{pairing}を使用するデッキ", "empty": "このアフィニティの組み合わせに一致するデッキはまだありません。", "backLink": "デッキ一覧に戻る" },
   "builder": {
