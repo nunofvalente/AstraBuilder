@@ -220,14 +220,14 @@ export default async function HomePage({ params }: LocalePageProps) {
           </div>
           <div className="home-battlefield-banner-cards" aria-hidden="true">
             <Image
-              src="/images/home/cards/celeste-concord-paladin.png"
+              src="/images/home/cards/lingyi-the-gilded-prophet.png"
               alt=""
               width={420}
               height={588}
               className="home-battlefield-banner-card home-battlefield-banner-card-left"
             />
             <Image
-              src="/images/home/cards/gaia-lord-of-nature.png"
+              src="/images/home/cards/vero-captain-of-the-guard.png"
               alt=""
               width={420}
               height={588}
