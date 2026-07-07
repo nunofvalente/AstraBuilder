@@ -51,6 +51,114 @@ const MANUAL_CARD_ROWS = [
   },
 ];
 
+const EXTRA_BALANCE_CARD_ROWS = [
+  {
+    id: 'IMP161',
+    name: 'Fortified Pillbox',
+    affinity: 'Lux',
+    artist: 'EliasArt',
+    rarity: 'Promo',
+    number: 161,
+    type: 'Territory',
+    subtype: null,
+    cost: 3,
+    attack: 0,
+    health: 0,
+    influence: null,
+    rules_text: 'Friendly units occupying this zone get +0/+2.',
+    description: null,
+    image_url: '/images/cards/imperion-extras/IMP161_FortifiedPillbox.png',
+    raw_payload: {
+      source: 'manual-balance-extra',
+      printedId: 'IMP 161',
+    },
+  },
+  {
+    id: 'IMP162',
+    name: 'Landbreaker',
+    affinity: 'Solara',
+    artist: 'Hachii',
+    rarity: 'Promo',
+    number: 162,
+    type: 'Unit',
+    subtype: 'Beast',
+    cost: 7,
+    attack: 5,
+    health: 6,
+    influence: 2,
+    rules_text: 'Flanking (This unit can attack from a combat zone once per turn)\n\nOn Attack: You may destroy a territory in the same combat zone as this unit. If you do, this gets +2/+2 until end of turn.',
+    description: null,
+    image_url: '/images/cards/imperion-extras/IMP162_Landbreaker.png',
+    raw_payload: {
+      source: 'manual-balance-extra',
+      printedId: 'IMP 162',
+    },
+  },
+  {
+    id: 'IMP163',
+    name: 'Shadowveil Hunter',
+    affinity: 'Terra',
+    artist: 'SuL',
+    rarity: 'Promo',
+    number: 163,
+    type: 'Unit',
+    subtype: 'Sylvan',
+    cost: 2,
+    attack: 1,
+    health: 3,
+    influence: 1,
+    rules_text: 'Swift (You can play this as a counter.)\n\nOn Enter: Deal 1 damage to target enemy unit in a combat zone.',
+    description: null,
+    image_url: '/images/cards/imperion-extras/IMP163_ShadowveilHunter.png',
+    raw_payload: {
+      source: 'manual-balance-extra',
+      printedId: 'IMP 163',
+    },
+  },
+  {
+    id: 'IMP164',
+    name: 'War Banner',
+    affinity: 'Neutral',
+    artist: 'EliasArt',
+    rarity: 'Promo',
+    number: 164,
+    type: 'Item',
+    subtype: 'Equipment',
+    cost: 4,
+    attack: 1,
+    health: 1,
+    influence: 1,
+    rules_text: 'When equipped unit scores, you may reveal the top card of your deck. If that card is a unit, you may draw it.',
+    description: null,
+    image_url: '/images/cards/imperion-extras/IMP164_WarBanner.png',
+    raw_payload: {
+      source: 'manual-balance-extra',
+      printedId: 'IMP 164',
+    },
+  },
+  {
+    id: 'IMP165',
+    name: 'Minefield',
+    affinity: 'Neutral',
+    artist: 'Parhelion Studio',
+    rarity: 'Promo',
+    number: 165,
+    type: 'Territory',
+    subtype: null,
+    cost: 2,
+    attack: 0,
+    health: 0,
+    influence: null,
+    rules_text: 'On Flip: Deal 3 damage to all units in this zone.\nSacrifice this territory.',
+    description: null,
+    image_url: '/images/cards/imperion-extras/IMP165_Minefield.png',
+    raw_payload: {
+      source: 'manual-balance-extra',
+      printedId: 'IMP 165',
+    },
+  },
+];
+
 function trimTrailingSlashes(value) {
   return value.replace(/\/+$/, '');
 }
@@ -164,9 +272,15 @@ async function main() {
     source_updated_at: syncedAt,
     updated_at: syncedAt,
   }));
+  const extraBalanceRows = EXTRA_BALANCE_CARD_ROWS.map((row) => ({
+    ...row,
+    source_updated_at: syncedAt,
+    updated_at: syncedAt,
+  }));
   const rows = [
     ...astraCards.map(mapAstraCardToSupabaseRow),
     ...manualRows,
+    ...extraBalanceRows,
   ].filter((row) => row.id);
 
   for (let index = 0; index < rows.length; index += BATCH_SIZE) {

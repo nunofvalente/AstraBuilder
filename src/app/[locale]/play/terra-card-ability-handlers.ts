@@ -282,6 +282,23 @@ const sporeBloom: AbilityHandler = ({ state, event }) =>
     updateInPlay(current, target.instanceId, (card) => ({ ...card, ready: false, skipNextReady: true }))
   );
 
+const shadowveilHunter: AbilityHandler = ({ state, event }) =>
+  chooseTarget(
+    state,
+    event,
+    'shadowveilDamage',
+    [
+      ...BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]),
+      ...(state.pendingCombat
+        ? [getCardInstanceById(state, state.pendingCombat.attackerInstanceId)].filter((card): card is GameCardInstance => Boolean(card))
+        : []),
+    ].filter(
+      (unit) => isUnitCard(unit.card) && getCardController(unit) !== event.controller
+    ),
+    'Choose an enemy combat unit to deal 1 damage to.',
+    (current, target) => dealDamageToUnit(current, target.instanceId, 1)
+  );
+
 const canopyAmbush: AbilityHandler = ({ state, event }) => {
   let next = state;
   const pendingAttacker = state.pendingCombat
@@ -425,6 +442,9 @@ export function resolveTerraTargetChoice(state: GameState, pending: TerraChoice,
       break;
     case 'sporeExhaust':
       next = updateInPlay(next, cards[0]!.instanceId, (card) => ({ ...card, ready: false, skipNextReady: true }));
+      break;
+    case 'shadowveilDamage':
+      next = dealDamageToUnit(next, cards[0]!.instanceId, 1);
       break;
     case 'lastStand':
       next = readyUnitInPlay(updateInPlay(next, cards[0]!.instanceId, (card) => ({ ...card, terraLastStandAttackBonus: 2, terraLastStandHealthBonus: 1, terraLastStandExpiresAtStartOfOwner: 'player' })), cards[0]!.instanceId);
@@ -572,6 +592,7 @@ export function createTerraAbilityHandlers() {
     predatoryStrike,
     primordialHowl,
     ravenScore,
+    shadowveilHunter,
     sporeBloom,
     sunderingWyrm,
     swiftAcrobatics,

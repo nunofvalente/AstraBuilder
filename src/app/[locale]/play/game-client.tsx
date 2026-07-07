@@ -24,6 +24,7 @@ import {
 } from './game-board-ui';
 import {
   BATTLEFIELD_ZONES,
+  BATTLEFIELD_ZONE_IDS,
   activateCardAbility,
   addLogEntry,
   advanceToNextTurn,
@@ -42,6 +43,7 @@ import {
   getStagingUnitCards,
   getUnitsInPlay,
   isItemCard,
+  isTerritoryCard,
   isUnitCard,
   passCounterPriority,
   playCounterCard,
@@ -62,6 +64,7 @@ import {
   CARD_BACK_IMAGE_SRC,
   MATCH_SESSION_STORAGE_KEY,
   ZONE_LABELS,
+  getCardActionCopy,
   getDefaultPendingChoiceSelectionIds,
   getPendingChoiceTargetCards,
   isPrivateOpponentSupplyChoiceTarget,
@@ -1369,6 +1372,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     }
     const pendingCombat = gameState.pendingCombat;
     const pendingChoice = gameState.pendingChoice;
+    const cardActionCopy = getCardActionCopy(locale);
+    const readySupplyCount = getReadySupplyCount(gameState, 'player');
     const playablePlayerCounters =
       pendingCombat?.priorityOwner === 'player'
         ? gameState.zones.hand.filter((instance) => !getCounterPlayError(gameState, 'player', instance.instanceId))
@@ -1376,7 +1381,24 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     const canTakePlayerActions = !gameState.winner && (gameState.phase === 'setup' || gameState.activePlayer === 'player');
     const canUseBoardActions = canTakePlayerActions && !pendingCombat && !pendingChoice;
     const canPlayFromHand = gameState.phase === 'main' && gameState.activePlayer === 'player' && !pendingCombat && !pendingChoice;
-    const readySupplyCount = getReadySupplyCount(gameState, 'player');
+    const playableCounterTerritories =
+      pendingCombat?.priorityOwner === 'player'
+        ? BATTLEFIELD_ZONE_IDS.flatMap((zoneId) =>
+            gameState.zones[zoneId]
+              .filter(
+                (instance) =>
+                  instance.owner === 'player' &&
+                  instance.faceDown &&
+                  isTerritoryCard(instance.card) &&
+                  instance.faceDownEnteredTurn !== gameState.turn
+              )
+              .map((instance) => ({
+                instance,
+                zoneId,
+                disabled: readySupplyCount < getModifiedPlayCost(gameState, 'player', instance.card),
+              }))
+          )
+        : [];
     const playerStagingUnits = getStagingUnitCards(gameState.zones.staging, 'player');
     const friendlyUnitsInPlay = getFriendlyUnitsInPlay(gameState, 'player');
     const currentCombatStatsByInstanceId = Object.fromEntries(
@@ -1540,7 +1562,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                       <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{controlsCopy.noCounters}</p>
                     )}
                   </div>
-                  {pendingCombat.priorityOwner === 'player' && playablePlayerCounters.length > 0 ? (
+                  {pendingCombat.priorityOwner === 'player' && (playablePlayerCounters.length > 0 || playableCounterTerritories.length > 0) ? (
                     <div className="mt-4 border-t border-[color:var(--border)] pt-3">
                       <p className="text-xs font-semibold text-[color:var(--text-secondary)]">{controlsCopy.availableCounters}</p>
                       <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto">
@@ -1565,6 +1587,33 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           >
                             <span className="truncate text-sm font-semibold">{counter.card.name}</span>
                             <span className="shrink-0 text-xs text-[color:var(--text-secondary)]">{controlsCopy.cost} {getModifiedPlayCost(gameState, 'player', counter.card)}</span>
+                          </button>
+                        ))}
+                        {playableCounterTerritories.map(({ instance, zoneId, disabled }) => (
+                          <button
+                            key={instance.instanceId}
+                            type="button"
+                            onClick={() => moveCard(instance.instanceId, zoneId, zoneId, { faceDown: false })}
+                            disabled={disabled}
+                            onMouseEnter={() => setHoveredCounterPreviewCards([{ ...instance, faceDown: false }])}
+                            onFocus={() => setHoveredCounterPreviewCards([{ ...instance, faceDown: false }])}
+                            onMouseLeave={() => {
+                              setHoveredCounterPreviewCards((current) =>
+                                current?.[0]?.instanceId === instance.instanceId ? null : current
+                              );
+                            }}
+                            onBlur={() => {
+                              setHoveredCounterPreviewCards((current) =>
+                                current?.[0]?.instanceId === instance.instanceId ? null : current
+                              );
+                            }}
+                            className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold">{cardActionCopy.flipFaceUp}: {instance.card.name}</span>
+                              <span className="block text-[0.65rem] text-[color:var(--text-secondary)]">{ZONE_LABELS[zoneId]}</span>
+                            </span>
+                            <span className="shrink-0 text-xs text-[color:var(--text-secondary)]">{controlsCopy.cost} {getModifiedPlayCost(gameState, 'player', instance.card)}</span>
                           </button>
                         ))}
                       </div>

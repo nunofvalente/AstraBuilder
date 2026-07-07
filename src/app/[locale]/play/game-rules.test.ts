@@ -593,7 +593,7 @@ describe('game rules', () => {
     expect(afterStage.opponentZones.staging[0]?.instanceId).toBe(botUnit.instanceId);
   });
 
-  it('lets the bot attack from staging to capture an empty battlefield', () => {
+  it('lets the bot declare an attack from staging into an empty battlefield', () => {
     const state = buildInitialGameState(makeDeck(12), makeDeck(12));
     const botUnit = makeInstance({
       instanceId: 'opponent-ready-unit',
@@ -619,14 +619,20 @@ describe('game rules', () => {
 
     const afterAttack = applyBotTurnStep(botTurn, 'attackBattlefield');
 
-    expect(afterAttack.opponentZones.staging).toEqual([]);
-    expect(afterAttack.zones.battlefieldLeft[0]).toMatchObject({
-      instanceId: botUnit.instanceId,
-      owner: 'opponent',
-      ready: true,
+    expect(afterAttack.opponentZones.staging[0]?.instanceId).toBe(botUnit.instanceId);
+    expect(afterAttack.zones.battlefieldLeft).toEqual([]);
+    expect(afterAttack.pendingCombat).toMatchObject({
+      attackerOwner: 'opponent',
+      attackerInstanceId: botUnit.instanceId,
+      targetZone: 'battlefieldLeft',
+      defenderInstanceId: null,
+      priorityOwner: 'player',
     });
-    expect(afterAttack.pendingCombat).toBeNull();
-    expect(afterAttack.log.some((entry) => entry.suffix.includes('counter priority'))).toBe(false);
+    expect(afterAttack.log[0]).toMatchObject({
+      prefix: 'Declared attack ',
+      cardName: 'Bot Ready Unit',
+      suffix: ' into Battlefield 1. Counter priority opened.',
+    });
     expect(afterAttack.opponentVictoryPoints).toBe(0);
   });
 
@@ -1203,11 +1209,23 @@ describe('game rules', () => {
     expect(playerPassed.state.opponentVictoryPoints).toBe(2);
   });
 
-  it('does not open counter priority when attacking an empty battlefield', () => {
+  it('opens counter priority when attacking an empty battlefield', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
       card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 2 }),
+    });
+    const shadowveilHunter = makeInstance({
+      instanceId: 'shadowveil-hunter',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP163',
+        name: 'Shadowveil Hunter',
+        type: 'Unit',
+        cost: 0,
+        rulesText: 'Swift. On Enter: Deal 1 damage to target enemy unit in a combat zone.',
+      }),
     });
     const state = buildInitialGameState(makeDeck(12), makeDeck(12));
     const activeState = {
@@ -1218,16 +1236,48 @@ describe('game rules', () => {
         ...state.zones,
         staging: [attacker],
       },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [shadowveilHunter],
+      },
     };
 
     const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
-    const resolved = resolveBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
 
-    expect('error' in declared ? declared.error : null).toBe('Counter priority only opens when attacking an opposing unit.');
-    expect('error' in resolved ? resolved.error : null).toBeNull();
-    if ('error' in resolved) {
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
       return;
     }
+
+    expect(declared.state.pendingCombat).toMatchObject({
+      attackerOwner: 'player',
+      attackerInstanceId: attacker.instanceId,
+      targetZone: 'battlefieldLeft',
+      defenderInstanceId: null,
+      priorityOwner: 'opponent',
+    });
+    expect(declared.state.log[0]).toMatchObject({
+      prefix: 'Declared attack ',
+      cardName: 'Attacker',
+      suffix: ' into Battlefield 1. Counter priority opened.',
+    });
+    expect(getCounterTargetOptions(declared.state, shadowveilHunter).map((target) => target.instanceId)).toEqual([
+      attacker.instanceId,
+    ]);
+
+    const opponentPassed = passCounterPriority(declared.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed || !playerPassed.resolvedCombat) {
+      return;
+    }
+
+    const resolved = playerPassed.resolvedCombat;
+    expect('error' in resolved ? resolved.error : null).toBeNull();
 
     expect(resolved.captured).toBe(true);
     expect(resolved.state.pendingCombat).toBeNull();

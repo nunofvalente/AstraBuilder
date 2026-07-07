@@ -400,6 +400,37 @@ const lavaFlow: AbilityHandler = ({ state, event }) => {
   });
 };
 
+function destroyTerritoryAndBuffLandbreaker(
+  state: GameState,
+  source: GameCardInstance,
+  target: GameCardInstance
+): GameState {
+  const destroyed = destroyPermanent(state, target);
+  return updateCard(destroyed, source.instanceId, (card) => ({
+    ...card,
+    temporaryAttackBonus: (card.temporaryAttackBonus ?? 0) + 2,
+    temporaryHealthBonus: (card.temporaryHealthBonus ?? 0) + 2,
+    temporaryStatsExpireAfterTurn: state.turn,
+  }));
+}
+
+const landbreaker: AbilityHandler = ({ state, event }) => {
+  if (!event.zone || !BATTLEFIELD_ZONE_IDS.includes(event.zone as (typeof BATTLEFIELD_ZONE_IDS)[number])) {
+    return { state, resolved: false };
+  }
+  const zone = event.zone as (typeof BATTLEFIELD_ZONE_IDS)[number];
+  const targets = state.zones[zone].filter((card) => isTerritoryCard(card.card));
+  return chooseOrBot(
+    state,
+    event,
+    'landbreakerDestroy',
+    targets,
+    'Choose a territory in this combat zone to destroy.',
+    (current, target) => destroyTerritoryAndBuffLandbreaker(current, event.source, target),
+    true
+  );
+};
+
 const uprising: AbilityHandler = ({ state, event }) => {
   const targets = getFriendlyUnitsInPlay(state, event.controller);
   return chooseOrBot(state, event, 'uprisingBuff', targets, 'Choose a friendly unit to get +2/+0 this turn.', (current, target) => {
@@ -481,6 +512,11 @@ export function resolveSolaraTargetChoice(
       next = destroyPermanent(next, selected[0]!);
       const units = [...next.zones.staging, ...next.opponentZones.staging].filter((card) => isUnitCard(card.card));
       for (const unit of units) next = damageUnit(next, unit, 2);
+      break;
+    }
+    case 'landbreakerDestroy': {
+      const source = getCardInstanceById(next, pending.sourceInstanceId);
+      if (source) next = destroyTerritoryAndBuffLandbreaker(next, source, selected[0]!);
       break;
     }
     case 'uprisingBuff': {
@@ -598,6 +634,7 @@ export function createSolaraAbilityHandlers() {
     fearlessWhelp,
     firedancer,
     lavaFlow,
+    landbreaker,
     lingyi,
     markOfDeath,
     ransack,

@@ -13,6 +13,7 @@ export type TerraAbilityHandlers = {
   primordialHowl: AbilityHandler;
   ravenScore: AbilityHandler;
   sporeBloom: AbilityHandler;
+  shadowveilHunter: AbilityHandler;
   sunderingWyrm: AbilityHandler;
   swiftAcrobatics: AbilityHandler;
   sylvanRallier: AbilityHandler;
@@ -66,5 +67,12 @@ export function createTerraCardAbilityRegistry(
     IMP156: { cardId: 'IMP156', abilities: [staticRule('IMP156-end-exhaust', 'At the end of each turn, exhaust any enemy unit controlling this combat zone.')] },
     IMP157: { cardId: 'IMP157', abilities: [staticRule('IMP157-impede', 'Enemy attackers in this zone get -2/-0.'), staticRule('IMP157-upkeep', 'At the end of your turn, pay {2} or sacrifice this territory.')] },
     IMP158: { cardId: 'IMP158', abilities: [staticRule('IMP158-leave-draw', 'When a friendly unit leaves this zone without dying, you may pay {1} to draw a card. Once per turn.')] },
+    IMP163: {
+      cardId: 'IMP163',
+      abilities: [
+        staticRule('IMP163-swift', 'Swift.'),
+        rule('IMP163-enter-damage', 'onEnter', 'automatic', 'On Enter: Deal 1 damage to target enemy unit in a combat zone.', handlers.shadowveilHunter),
+      ],
+    },
   };
 }

@@ -362,6 +362,10 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
     });
   }
 
+  function handleClearDeck() {
+    setDeck({});
+  }
+
   function handleZoom(
     card: Card | null,
     variant: 'default' | 'compact' = 'default',
@@ -724,9 +728,11 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
               menuExport: builder.menuExport,
               menuShare: builder.menuShare,
               menuSave: builder.menuSave,
+              clearDeck: builder.clearDeck,
             }}
             onAdd={handleAddCard}
             onRemove={handleRemoveCard}
+            onClearDeck={handleClearDeck}
             onZoom={handleZoom}
             onMenuSelect={handleMenuSelect}
             isCostCurveVisible={isCostCurveVisible}
@@ -816,6 +822,7 @@ export function DeckBuilder({ dictionary, initialCards, initialError, locale }: 
           placeholderTTS: builder.importPlaceholder,
           placeholderText: builder.importPlaceholderText,
           uploadLabel: builder.importUploadLabel,
+          uploadTextLabel: builder.importUploadTextLabel,
           importButton: builder.importButton,
           cancelButton: builder.importCancel,
           errorInvalid: builder.importErrorInvalid,

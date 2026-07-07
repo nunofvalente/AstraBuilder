@@ -63,6 +63,96 @@ describe('Terra card abilities', () => {
       const id = `IMP${number}`;
       expect(getRegisteredCardAbilities(id), id).not.toBeNull();
     }
+    expect(getRegisteredCardAbilities('IMP163')).not.toBeNull();
+  });
+
+  it('targets an enemy combat unit for Shadowveil Hunter and deals 1 damage on enter', () => {
+    const hunter = card('IMP163', 'player', {
+      card: createTestCard({
+        id: 'IMP163',
+        name: 'Shadowveil Hunter',
+        type: 'Unit',
+        rulesText: 'Swift. On Enter: Deal 1 damage to target enemy unit in a combat zone.',
+      }),
+    });
+    const enemy = card('enemy', 'opponent', {
+      card: createTestCard({ id: 'enemy', name: 'Enemy', type: 'Unit', health: 3 }),
+    });
+    const ally = card('ally', 'player');
+    const current = {
+      ...state(),
+      pendingCombat: {
+        attackerInstanceId: ally.instanceId,
+        attackerOwner: 'player' as const,
+        defenderInstanceId: enemy.instanceId,
+        targetZone: 'battlefieldLeft' as const,
+        priorityOwner: 'player' as const,
+        lastPassedOwner: null,
+        counterStack: [],
+      },
+      zones: { ...state().zones, hand: [hunter], battlefieldLeft: [enemy], staging: [ally] },
+    };
+    expect(getCounterTargetOptions(current, hunter).map((target) => target.instanceId)).toEqual([enemy.instanceId]);
+
+    const pending = triggerCardAbilities(current, 'onEnter', {
+      source: hunter,
+      controller: 'player',
+      zone: 'staging',
+    });
+    expect(pending.pendingChoice).toMatchObject({
+      kind: 'terraTarget',
+      effect: 'shadowveilDamage',
+      availableInstanceIds: [enemy.instanceId],
+    });
+
+    const resolved = resolvePendingChoice(pending, [enemy.instanceId]);
+    expect('error' in resolved ? null : resolved.zones.battlefieldLeft[0]?.damage).toBe(1);
+  });
+
+  it('deals Shadowveil Hunter counter damage to an attacker entering an empty battlefield', () => {
+    const attacker = card('attacker', 'opponent', {
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 3 }),
+    });
+    const hunter = card('IMP163', 'player', {
+      card: createTestCard({
+        id: 'IMP163',
+        name: 'Shadowveil Hunter',
+        type: 'Unit',
+        cost: 0,
+        rulesText: 'Swift. On Enter: Deal 1 damage to target enemy unit in a combat zone.',
+      }),
+    });
+    const base = state();
+    const declared = declareBattlefieldAttack(
+      {
+        ...base,
+        activePlayer: 'opponent',
+        zones: { ...base.zones, hand: [hunter] },
+        opponentZones: { ...base.opponentZones, staging: [attacker] },
+      },
+      'opponent',
+      attacker.instanceId,
+      'battlefieldLeft'
+    );
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) return;
+
+    const played = playCounterCard(declared.state, 'player', hunter.instanceId, {
+      targetInstanceId: attacker.instanceId,
+    });
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) return;
+
+    const botPassed = passCounterPriority(played.state, 'opponent');
+    expect('error' in botPassed ? botPassed.error : null).toBeNull();
+    if ('error' in botPassed) return;
+    const playerPassed = passCounterPriority(botPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) return;
+
+    expect(playerPassed.state.zones.battlefieldLeft.find((unit) => unit.instanceId === attacker.instanceId)?.damage).toBe(1);
+    expect(playerPassed.state.zones.staging.find((unit) => unit.instanceId === hunter.instanceId)).toBeTruthy();
   });
 
   it('applies Impede from units, Caltrops, and Escape Route and heals surviving Akeno', () => {

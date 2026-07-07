@@ -220,7 +220,7 @@ const CARD_ACTION_COPY: Record<Locale, CardActionCopy> = {
   },
 };
 
-function getCardActionCopy(locale: Locale): CardActionCopy {
+export function getCardActionCopy(locale: Locale): CardActionCopy {
   return CARD_ACTION_COPY[locale];
 }
 

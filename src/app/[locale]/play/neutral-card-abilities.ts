@@ -2,6 +2,7 @@ import type { AbilityHandler, CardAbilityDefinition } from './card-abilities';
 
 type NeutralHandlers = {
   excavator: AbilityHandler;
+  minefield: AbilityHandler;
   supplyCarrier: AbilityHandler;
 };
 
@@ -27,6 +28,16 @@ export function createNeutralCardAbilityRegistry(handlers: NeutralHandlers): Rec
       cardId: 'IMP160',
       abilities: [
         rule('IMP160-temporary-supply', 'activated', 'activated', '{Exhaust}: Add 1 supply until end of turn.', handlers.supplyCarrier),
+      ],
+    },
+    IMP164: {
+      cardId: 'IMP164',
+      abilities: [],
+    },
+    IMP165: {
+      cardId: 'IMP165',
+      abilities: [
+        rule('IMP165-minefield-damage', 'onFlip', 'automatic', 'On Flip: Deal 3 damage to all units in this zone. Sacrifice this territory.', handlers.minefield),
       ],
     },
   };
