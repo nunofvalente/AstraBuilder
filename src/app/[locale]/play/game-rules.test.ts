@@ -620,18 +620,18 @@ describe('game rules', () => {
     const afterAttack = applyBotTurnStep(botTurn, 'attackBattlefield');
 
     expect(afterAttack.opponentZones.staging[0]?.instanceId).toBe(botUnit.instanceId);
-    expect(afterAttack.zones.battlefieldLeft).toEqual([]);
+    expect(afterAttack.zones.battlefieldCenter).toEqual([]);
     expect(afterAttack.pendingCombat).toMatchObject({
       attackerOwner: 'opponent',
       attackerInstanceId: botUnit.instanceId,
-      targetZone: 'battlefieldLeft',
+      targetZone: 'battlefieldCenter',
       defenderInstanceId: null,
       priorityOwner: 'player',
     });
     expect(afterAttack.log[0]).toMatchObject({
       prefix: 'Declared attack ',
       cardName: 'Bot Ready Unit',
-      suffix: ' into Battlefield 1. Counter priority opened.',
+      suffix: ' into Battlefield 2. Counter priority opened.',
     });
     expect(afterAttack.opponentVictoryPoints).toBe(0);
   });
@@ -2014,7 +2014,7 @@ describe('game rules', () => {
     });
   });
 
-  it('lets the bot play its first affordable counter', () => {
+  it('does not make the bot spend an unimplemented blank counter', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
@@ -2026,15 +2026,10 @@ describe('game rules', () => {
       ready: true,
       card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit' }),
     });
-    const expensiveCounter = makeInstance({
-      instanceId: 'expensive-counter',
+    const blankCounter = makeInstance({
+      instanceId: 'blank-counter',
       owner: 'opponent',
-      card: createTestCard({ name: 'Expensive Counter', type: 'Tactic', subtype: 'Counter', cost: 2 }),
-    });
-    const affordableCounter = makeInstance({
-      instanceId: 'affordable-counter',
-      owner: 'opponent',
-      card: createTestCard({ name: 'Affordable Counter', type: 'Tactic', subtype: 'Counter', cost: 1 }),
+      card: createTestCard({ name: 'Blank Counter', type: 'Tactic', subtype: 'Counter', cost: 1 }),
     });
     const state = buildInitialGameState(makeDeck(12), makeDeck(12));
     const activeState = {
@@ -2048,7 +2043,62 @@ describe('game rules', () => {
       },
       opponentZones: {
         ...state.opponentZones,
-        hand: [expensiveCounter, affordableCounter],
+        hand: [blankCounter],
+        supply: [makeInstance({ instanceId: 'opponent-supply', owner: 'opponent', ready: true })],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    if ('error' in declared) {
+      throw new Error(declared.error);
+    }
+
+    const counterState = playFirstBotCounter(declared.state);
+
+    expect(counterState).toBeNull();
+  });
+
+  it('lets the bot use a removal counter on the attacking unit when it changes combat', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 4, health: 4, cost: 3 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 1, cost: 1 }),
+    });
+    const blankCounter = makeInstance({
+      instanceId: 'blank-counter',
+      owner: 'opponent',
+      card: createTestCard({ name: 'Blank Counter', type: 'Tactic', subtype: 'Counter', cost: 0 }),
+    });
+    const killingBlow = makeInstance({
+      instanceId: 'killing-blow',
+      owner: 'opponent',
+      card: createTestCard({
+        id: 'IMP026',
+        name: 'Killing Blow',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 1,
+        rulesText: 'Destroy target unit in a combat zone.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [blankCounter, killingBlow],
         supply: [makeInstance({ instanceId: 'opponent-supply', owner: 'opponent', ready: true })],
       },
     };
@@ -2060,8 +2110,60 @@ describe('game rules', () => {
     const counterState = playFirstBotCounter(declared.state);
 
     expect(counterState?.pendingCombat?.counterStack.map((counter) => counter.instanceId)).toEqual([
-      affordableCounter.instanceId,
+      killingBlow.instanceId,
     ]);
+    expect(counterState?.pendingCombat?.counterStack[0]?.selectedAbilityTargetInstanceIds).toEqual([attacker.instanceId]);
+    expect(counterState?.pendingCombat?.priorityOwner).toBe('player');
+  });
+
+  it('lets the bot use a prevention counter to save its defending unit', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3, cost: 2 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'defender', name: 'Defender', type: 'Unit', attack: 1, health: 2, cost: 2 }),
+    });
+    const medic = makeInstance({
+      instanceId: 'medic',
+      owner: 'opponent',
+      card: createTestCard({
+        id: 'IMP045',
+        name: 'Nekora Medic',
+        type: 'Unit',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'Swift. On Enter: Prevent combat damage.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      zones: {
+        ...state.zones,
+        staging: [attacker],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        hand: [medic],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'player', attacker.instanceId, 'battlefieldLeft');
+    if ('error' in declared) {
+      throw new Error(declared.error);
+    }
+
+    const counterState = playFirstBotCounter(declared.state);
+
+    expect(counterState?.pendingCombat?.counterStack.map((counter) => counter.instanceId)).toEqual([medic.instanceId]);
+    expect(counterState?.pendingCombat?.counterStack[0]?.selectedAbilityTargetInstanceIds).toEqual([defender.instanceId]);
     expect(counterState?.pendingCombat?.priorityOwner).toBe('player');
   });
 

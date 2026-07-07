@@ -45,6 +45,7 @@ export type MoveCardOptions = {
   sacrificeUnitInstanceId?: string;
   discardCardInstanceId?: string;
   reanimateTargetInstanceId?: string;
+  abilityTargetInstanceId?: string;
   setupFirstPlayer?: Owner;
 };
 
@@ -709,7 +710,12 @@ function moveCard(
           source: movedCard,
           controller: owner,
           zone: toZone,
-          targets: options.reanimateTargetInstanceId ? [{ type: 'card', instanceId: options.reanimateTargetInstanceId }] : undefined,
+          targets: [
+            options.reanimateTargetInstanceId,
+            options.abilityTargetInstanceId,
+          ]
+            .filter((instanceId): instanceId is string => Boolean(instanceId))
+            .map((instanceId) => ({ type: 'card' as const, instanceId })),
         })
       : movedState;
   const tacticBuffedState = isTacticPlayFromHand

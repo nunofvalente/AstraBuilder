@@ -1,11 +1,17 @@
 import {
   BATTLEFIELD_ZONE_IDS,
   BATTLEFIELD_ZONES,
+  VICTORY_POINT_TARGET,
   canManuallySupplyFromHand,
   getBattlefieldAttackError,
   getBattlefieldPlacementError,
+  getCardInstanceById,
   getCardController,
   getCounterPlayError,
+  getCounterTargetOptions,
+  getCurrentUnitAttack,
+  getCurrentUnitHealth,
+  getCurrentUnitInfluence,
   getEquipmentAttachmentError,
   getFriendlyUnitsInPlay,
   getModifiedManualPlayCost,
@@ -30,6 +36,11 @@ export type BotBattlefieldAttackChoice = {
   targetZone: ZoneId;
 };
 
+export type BotCounterChoice = {
+  counterInstanceId: string;
+  targetInstanceId?: string;
+};
+
 export type BotCommand =
   | {
       type: 'card';
@@ -41,7 +52,12 @@ export type BotCommand =
       targetZone: ZoneId;
     };
 
-const HIGH_IMPACT_TACTIC_IDS = new Set(['IMP021', 'IMP022', 'IMP026', 'IMP027']);
+const HIGH_IMPACT_TACTIC_IDS = new Set(['IMP021', 'IMP022', 'IMP026', 'IMP027', 'IMP085', 'IMP086', 'IMP088', 'IMP148']);
+const TARGETED_TACTIC_IDS = new Set(['IMP026', 'IMP027', 'IMP085', 'IMP086', 'IMP088', 'IMP148']);
+const ATTACK_SCORE_THRESHOLD = 10;
+const COUNTER_SCORE_THRESHOLD = 12;
+const WINNING_ATTACK_BONUS = 500;
+const PREVENT_WIN_BONUS = 180;
 
 function getCardPlayValue(instance: GameCardInstance): number {
   const influence = instance.card.influence ?? 0;
@@ -163,17 +179,129 @@ function chooseBotSupplyCard(state: GameState): GameCardInstance | null {
   return [...supplyCandidates].sort((left, right) => getCardPlayValue(left) - getCardPlayValue(right))[0] ?? null;
 }
 
+function getUnitBattlefieldZone(state: GameState, instanceId: string): ZoneId | null {
+  return BATTLEFIELD_ZONE_IDS.find((zone) =>
+    state.zones[zone].some((instance) => instance.instanceId === instanceId)
+  ) ?? null;
+}
+
+function isProtectedFromBotTactic(state: GameState, unit: GameCardInstance): boolean {
+  if (getCardController(unit) === 'opponent') {
+    return false;
+  }
+
+  const zone = getUnitBattlefieldZone(state, unit.instanceId);
+
+  return Boolean(
+    zone &&
+    state.zones[zone].some(
+      (instance) => instance.card.id === 'IMP032' && getCardController(instance) === getCardController(unit)
+    )
+  );
+}
+
+function getBotCombatRemovalAttacker(state: GameState, target: GameCardInstance): GameCardInstance | null {
+  const targetZone = getUnitBattlefieldZone(state, target.instanceId);
+  if (!targetZone) {
+    return null;
+  }
+
+  const remainingTargetHealth = getCurrentUnitHealth(state, target) - target.damage;
+
+  return getReadyBotAttackers(state).find((attacker) => {
+    if (getBattlefieldAttackError(state, 'opponent', attacker.instanceId, targetZone)) {
+      return false;
+    }
+
+    const attackerAttack = getCurrentUnitAttack(state, attacker, targetZone);
+    const defenderAttack = target.ready ? getCurrentUnitAttack(state, target) : 0;
+    const attackerSurvives = getCurrentUnitHealth(state, attacker) - attacker.damage - defenderAttack > 0;
+
+    return attackerAttack >= remainingTargetHealth && attackerSurvives;
+  }) ?? null;
+}
+
+function getTacticTargetBaseScore(state: GameState, target: GameCardInstance): number {
+  const influence = Math.max(1, getUnitScoreValue(state, target));
+  const playerScoreBefore = estimateOwnerBattlefieldScore(state, 'player');
+  const targetZone = getUnitBattlefieldZone(state, target.instanceId);
+  const playerScoreAfter = targetZone
+    ? estimateOwnerBattlefieldScore(state, 'player', { zone: targetZone, unit: null })
+    : playerScoreBefore;
+  const preventsPlayerWin = state.playerVictoryPoints + playerScoreBefore >= VICTORY_POINT_TARGET &&
+    state.playerVictoryPoints + playerScoreAfter < VICTORY_POINT_TARGET;
+
+  return (
+    getCardPlayValue(target) +
+    influence * 9 +
+    (target.ready ? 8 : 0) +
+    (preventsPlayerWin ? PREVENT_WIN_BONUS : 0)
+  );
+}
+
+function getTacticTargetScore(state: GameState, tactic: GameCardInstance, target: GameCardInstance): number {
+  const combatRemovalPenalty = getBotCombatRemovalAttacker(state, target) ? 32 : 0;
+  const remainingHealth = getCurrentUnitHealth(state, target) - target.damage;
+  const baseScore = getTacticTargetBaseScore(state, target);
+
+  if (tactic.card.id === 'IMP085') {
+    const killsTarget = remainingHealth <= 1;
+    return baseScore + (killsTarget ? 28 : 6) - (killsTarget ? combatRemovalPenalty : 0) - tactic.card.cost;
+  }
+
+  if (tactic.card.id === 'IMP148') {
+    return baseScore + (target.ready ? 22 : -8) - tactic.card.cost;
+  }
+
+  return baseScore - combatRemovalPenalty - tactic.card.cost;
+}
+
+function getBotTargetedTacticCandidates(state: GameState, tactic: GameCardInstance): GameCardInstance[] {
+  const candidates = BATTLEFIELD_ZONE_IDS
+    .flatMap((zone) => state.zones[zone])
+    .filter((unit) => isUnitCard(unit.card) && getCardController(unit) === 'player')
+    .filter((unit) => !isProtectedFromBotTactic(state, unit));
+
+  if (tactic.card.id === 'IMP027') {
+    return candidates.filter((unit) => unit.card.cost <= 2);
+  }
+
+  if (tactic.card.id === 'IMP088') {
+    return candidates.filter((unit) => Boolean(getUnitBattlefieldZone(state, unit.instanceId)));
+  }
+
+  if (['IMP026', 'IMP085', 'IMP086', 'IMP148'].includes(tactic.card.id)) {
+    return candidates;
+  }
+
+  return [];
+}
+
+function chooseBotTargetedTacticTarget(state: GameState, tactic: GameCardInstance): GameCardInstance | null {
+  const candidates = getBotTargetedTacticCandidates(state, tactic);
+  const scored = candidates
+    .map((target) => ({ target, score: getTacticTargetScore(state, tactic, target) }))
+    .sort((left, right) => right.score - left.score)[0] ?? null;
+
+  return scored && scored.score >= 18 ? scored.target : null;
+}
+
 function chooseBotTacticPlay(state: GameState): BotCommand | null {
   const ownUnits = getFriendlyUnitsInPlay(state, 'opponent').length;
   const playerUnits = getFriendlyUnitsInPlay(state, 'player').length;
-  const selectedTactic = sortByHighestPlayValue(
-    state.opponentZones.hand.filter(
-      (instance) =>
-        isTacticCard(instance.card) &&
-        HIGH_IMPACT_TACTIC_IDS.has(instance.card.id) &&
-        canBotPlayCardToZone(state, instance, 'graveyard') &&
-        (instance.card.id !== 'IMP022' || playerUnits > ownUnits)
-    )
+  const playableTactics = state.opponentZones.hand.filter(
+    (instance) =>
+      isTacticCard(instance.card) &&
+      HIGH_IMPACT_TACTIC_IDS.has(instance.card.id) &&
+      canBotPlayCardToZone(state, instance, 'graveyard') &&
+      (instance.card.id !== 'IMP022' || playerUnits > ownUnits)
+  );
+  const removalTactic = playableTactics
+    .map((instance) => ({ instance, target: chooseBotTargetedTacticTarget(state, instance) }))
+    .filter((entry): entry is { instance: GameCardInstance; target: GameCardInstance } => Boolean(entry.target))
+    .sort((left, right) => getTacticTargetScore(state, right.instance, right.target) - getTacticTargetScore(state, left.instance, left.target))[0] ?? null;
+  const selectedTactic = removalTactic?.instance ?? sortByHighestPlayValue(
+    playableTactics.filter((instance) => !TARGETED_TACTIC_IDS.has(instance.card.id))
   )[0] ?? null;
 
   return selectedTactic
@@ -184,6 +312,9 @@ function chooseBotTacticPlay(state: GameState): BotCommand | null {
           instanceId: selectedTactic.instanceId,
           fromZone: 'hand',
           toZone: 'graveyard',
+          options: removalTactic?.instance.instanceId === selectedTactic.instanceId
+            ? { abilityTargetInstanceId: removalTactic.target.instanceId }
+            : {},
         },
       }
     : null;
@@ -198,11 +329,7 @@ function chooseBotDemonicAdvanceUnitPlay(state: GameState): BotCommand | null {
     state.opponentZones.hand.filter((instance) => isUnitCard(instance.card))
   )[0] ?? null;
   const targetZone = selectedUnit
-    ? BATTLEFIELD_ZONE_IDS.find(
-        (zone) =>
-          !state.zones[zone].some((instance) => isUnitCard(instance.card)) &&
-          canBotPlayCardToZone(state, selectedUnit, zone)
-      )
+    ? getBestEmptyBattlefieldZoneForUnit(state, selectedUnit)
     : null;
 
   return selectedUnit && targetZone
@@ -291,34 +418,78 @@ function chooseBotTerritoryPlay(state: GameState): BotCommand | null {
     : null;
 }
 
-function getAttackChoiceScore(state: GameState, attacker: GameCardInstance, targetZone: ZoneId): number {
-  const defender = state.zones[targetZone].find((instance) => getCardController(instance) === 'player' && isUnitCard(instance.card)) ?? null;
+function getUnitScoreValue(state: GameState, instance: GameCardInstance): number {
+  const attachedCards = [
+    ...state.zones.staging,
+    ...state.opponentZones.staging,
+    ...BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]),
+  ]
+    .filter((equipment) => equipment.attachedToInstanceId === instance.instanceId);
+  const cardsDrawnThisTurn = getCardController(instance) === 'player'
+    ? state.playerCardsDrawnThisTurn
+    : state.opponentCardsDrawnThisTurn;
 
-  if (!defender) {
-    const territoryValue = state.zones[targetZone].some((instance) => isTerritoryCard(instance.card)) ? 3 : 0;
-
-    return 20 + territoryValue + (attacker.card.influence ?? 0);
-  }
-
-  const attackerRemainingHealth = attacker.card.health - attacker.damage - Math.max(0, defender.card.attack);
-  const defenderRemainingHealth = defender.card.health - defender.damage - Math.max(0, attacker.card.attack);
-  const killsDefender = defenderRemainingHealth <= 0;
-  const attackerSurvives = attackerRemainingHealth > 0;
-
-  return (
-    (killsDefender ? 40 : 0) +
-    (attackerSurvives ? 15 : -15) +
-    getCardPlayValue(defender) -
-    (attackerSurvives ? 0 : Math.floor(getCardPlayValue(attacker) / 2))
-  );
+  return getCurrentUnitInfluence(instance, attachedCards, cardsDrawnThisTurn);
 }
 
-export function getBotBattlefieldAttackChoice(state: GameState): BotBattlefieldAttackChoice | null {
-  if (state.winner || state.pendingCombat || state.phase !== 'main' || state.activePlayer !== 'opponent') {
-    return null;
-  }
+function getZoneControlScore(state: GameState, zone: ZoneId, attacker: GameCardInstance): number {
+  const influence = Math.max(1, getUnitScoreValue(state, attacker));
+  const unblockedTerritoryCount = state.zones[zone].filter((instance) => isTerritoryCard(instance.card) && !instance.faceDown).length;
+  const centerBonus = zone === 'battlefieldCenter' ? 2 : 0;
 
-  const readyAttackers = [
+  return 18 + influence * 8 + unblockedTerritoryCount * 2 + centerBonus;
+}
+
+function getBestEmptyBattlefieldZoneForUnit(state: GameState, unit: GameCardInstance): ZoneId | null {
+  return BATTLEFIELD_ZONE_IDS
+    .filter((zone) => !state.zones[zone].some((instance) => isUnitCard(instance.card)))
+    .filter((zone) => canBotPlayCardToZone(state, unit, zone))
+    .map((zone) => ({ zone, score: getZoneControlScore(state, zone, unit) }))
+    .sort((left, right) => right.score - left.score)[0]?.zone ?? null;
+}
+
+function getZoneUnitControlledBy(state: GameState, zone: ZoneId, owner: 'player' | 'opponent'): GameCardInstance | null {
+  return state.zones[zone].find((instance) => getCardController(instance) === owner && isUnitCard(instance.card)) ?? null;
+}
+
+function estimateOwnerBattlefieldScore(
+  state: GameState,
+  owner: 'player' | 'opponent',
+  override?: { zone: ZoneId; unit: GameCardInstance | null }
+): number {
+  return BATTLEFIELD_ZONE_IDS.reduce((total, zone) => {
+    const scoringUnit = override?.zone === zone
+      ? override.unit
+      : getZoneUnitControlledBy(state, zone, owner);
+
+    return total + (scoringUnit ? getUnitScoreValue(state, scoringUnit) : 0);
+  }, 0);
+}
+
+function getVictoryPressureBonus(
+  state: GameState,
+  targetZone: ZoneId,
+  botScoringUnitAfterAttack: GameCardInstance | null,
+  playerScoringUnitAfterAttack: GameCardInstance | null
+): number {
+  const botScoreAfterAttack = estimateOwnerBattlefieldScore(state, 'opponent', {
+    zone: targetZone,
+    unit: botScoringUnitAfterAttack,
+  });
+  const playerScoreBeforeAttack = estimateOwnerBattlefieldScore(state, 'player');
+  const playerScoreAfterAttack = estimateOwnerBattlefieldScore(state, 'player', {
+    zone: targetZone,
+    unit: playerScoringUnitAfterAttack,
+  });
+  const winsThisTurn = state.opponentVictoryPoints + botScoreAfterAttack >= VICTORY_POINT_TARGET;
+  const preventsPlayerWin = state.playerVictoryPoints + playerScoreBeforeAttack >= VICTORY_POINT_TARGET &&
+    state.playerVictoryPoints + playerScoreAfterAttack < VICTORY_POINT_TARGET;
+
+  return (winsThisTurn ? WINNING_ATTACK_BONUS : 0) + (preventsPlayerWin ? PREVENT_WIN_BONUS : 0);
+}
+
+function getReadyBotAttackers(state: GameState): GameCardInstance[] {
+  return [
     ...state.opponentZones.staging,
     ...BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone]).filter(
       (instance) =>
@@ -328,6 +499,273 @@ export function getBotBattlefieldAttackChoice(state: GameState): BotBattlefieldA
         instance.flankingAttackUsedTurn !== state.turn
     ),
   ].filter((instance) => instance.ready && isUnitCard(instance.card));
+}
+
+function getFollowUpAttackSetupBonus(
+  state: GameState,
+  setupAttacker: GameCardInstance,
+  defender: GameCardInstance,
+  targetZone: ZoneId,
+  defenderDamageTaken: number
+): number {
+  if (!defender.ready || defenderDamageTaken <= 0) {
+    return 0;
+  }
+
+  const damagedDefender = {
+    ...defender,
+    ready: false,
+    damage: defender.damage + defenderDamageTaken,
+  };
+  const defenderHealth = getCurrentUnitHealth(state, defender);
+  if (damagedDefender.damage >= defenderHealth) {
+    return 0;
+  }
+
+  const followUpAttacker = getReadyBotAttackers(state)
+    .filter((instance) => instance.instanceId !== setupAttacker.instanceId)
+    .filter((instance) => !getBattlefieldAttackError(state, 'opponent', instance.instanceId, targetZone))
+    .find((instance) =>
+      damagedDefender.damage + getCurrentUnitAttack(state, instance, targetZone) >= defenderHealth
+    );
+
+  if (!followUpAttacker) {
+    return 0;
+  }
+
+  const defenderScoreValue = Math.max(1, getUnitScoreValue(state, defender));
+
+  return 42 + defenderScoreValue * 5 + Math.floor(getCardPlayValue(defender) / 3);
+}
+
+function willReadyOnDefend(state: GameState, defender: GameCardInstance, targetZone: ZoneId): boolean {
+  if (defender.card.id === 'IMP039' || defender.card.id === 'IMP015' || defender.card.id === 'IMP114') {
+    return true;
+  }
+
+  if (
+    state.zones[targetZone].some(
+      (instance) =>
+        instance.card.id === 'IMP094' &&
+        !instance.faceDown &&
+        getCardController(instance) === getCardController(defender)
+    )
+  ) {
+    return true;
+  }
+
+  const hasAncestralCrown = state.zones[targetZone].some(
+    (instance) =>
+      instance.card.id === 'IMP155' &&
+      !instance.faceDown &&
+      getCardController(instance) === getCardController(defender)
+  );
+  const defenderSubtype = defender.card.subtype.toLowerCase();
+
+  return hasAncestralCrown && ['sylvan', 'kitsune', 'beast'].some((subtype) => defenderSubtype.includes(subtype));
+}
+
+function getDefenderAttackAfterDefendTriggers(state: GameState, defender: GameCardInstance, targetZone: ZoneId): number {
+  const readied = willReadyOnDefend(state, defender, targetZone) ? { ...defender, ready: true } : defender;
+  const bladewolfBonus = defender.card.id === 'IMP039' ? 2 : 0;
+  const hasAncestralCrown = state.zones[targetZone].some(
+    (instance) =>
+      instance.card.id === 'IMP155' &&
+      !instance.faceDown &&
+      getCardController(instance) === getCardController(defender)
+  );
+  const defenderSubtype = defender.card.subtype.toLowerCase();
+  const crownBonus = hasAncestralCrown && ['sylvan', 'kitsune', 'beast'].some((subtype) => defenderSubtype.includes(subtype)) ? 2 : 0;
+
+  return readied.ready ? getCurrentUnitAttack(state, readied) + bladewolfBonus + crownBonus : 0;
+}
+
+function getAttackChoiceScore(state: GameState, attacker: GameCardInstance, targetZone: ZoneId): number {
+  const defender = state.zones[targetZone].find((instance) => getCardController(instance) === 'player' && isUnitCard(instance.card)) ?? null;
+
+  if (!defender) {
+    return getZoneControlScore(state, targetZone, attacker) + getVictoryPressureBonus(state, targetZone, attacker, null);
+  }
+
+  const attackerAttack = getCurrentUnitAttack(state, attacker, targetZone);
+  const defenderAttack = getDefenderAttackAfterDefendTriggers(state, defender, targetZone);
+  const attackerRemainingHealth = getCurrentUnitHealth(state, attacker) - attacker.damage - defenderAttack;
+  const defenderRemainingHealth = getCurrentUnitHealth(state, defender) - defender.damage - attackerAttack;
+  const killsDefender = defenderRemainingHealth <= 0;
+  const attackerSurvives = attackerRemainingHealth > 0;
+  const tradesUp = getCardPlayValue(defender) >= getCardPlayValue(attacker);
+  const defenderScoreValue = Math.max(1, getUnitScoreValue(state, defender));
+  const attackerScoreValue = Math.max(1, getUnitScoreValue(state, attacker));
+  const botScoringUnitAfterAttack = killsDefender && attackerSurvives ? attacker : null;
+  const playerScoringUnitAfterAttack = killsDefender ? null : defender;
+
+  return (
+    (killsDefender ? 34 + defenderScoreValue * 5 : -10) +
+    (attackerSurvives ? 22 + attackerScoreValue * 4 : tradesUp ? -4 : -28) +
+    Math.floor(getCardPlayValue(defender) / 2) -
+    (attackerSurvives ? 0 : Math.floor(getCardPlayValue(attacker) / 2)) +
+    getFollowUpAttackSetupBonus(state, attacker, defender, targetZone, attackerAttack) +
+    getVictoryPressureBonus(state, targetZone, botScoringUnitAfterAttack, playerScoringUnitAfterAttack)
+  );
+}
+
+type CombatProjection = {
+  attacker: GameCardInstance | null;
+  defender: GameCardInstance | null;
+  preventDefenderDamage?: boolean;
+};
+
+function getCombatProjectionScore(state: GameState, projection: CombatProjection): number {
+  const pendingCombat = state.pendingCombat;
+  if (!pendingCombat) {
+    return 0;
+  }
+
+  const { attacker, defender } = projection;
+  const attackerController = attacker ? getCardController(attacker) : pendingCombat.attackerOwner;
+
+  if (!attacker) {
+    return pendingCombat.attackerOwner === 'player' ? 70 : -70;
+  }
+
+  if (!defender) {
+    const zoneScore = getZoneControlScore(state, pendingCombat.targetZone, attacker);
+    return attackerController === 'opponent' ? zoneScore : -zoneScore;
+  }
+
+  const attackerAttack = attacker.ready ? getCurrentUnitAttack(state, attacker, pendingCombat.targetZone) : 0;
+  const defenderAttack = defender.ready ? getCurrentUnitAttack(state, defender) : 0;
+  const attackerHealth = getCurrentUnitHealth(state, attacker);
+  const defenderHealth = getCurrentUnitHealth(state, defender);
+  const defenderDamageTaken = projection.preventDefenderDamage ? 0 : attackerAttack;
+  const attackerDamageTaken = defenderAttack;
+  const attackerDestroyed = attacker.damage + attackerDamageTaken >= attackerHealth;
+  const defenderDestroyed = defender.damage + defenderDamageTaken >= defenderHealth;
+  let score = 0;
+
+  if (attackerController === 'opponent') {
+    score += attackerDestroyed ? -getCardPlayValue(attacker) : 12 + Math.max(1, getUnitScoreValue(state, attacker)) * 5;
+  } else {
+    score += attackerDestroyed ? getCardPlayValue(attacker) : -12 - Math.max(1, getUnitScoreValue(state, attacker)) * 5;
+  }
+
+  const defenderController = getCardController(defender);
+  if (defenderController === 'opponent') {
+    score += defenderDestroyed ? -getCardPlayValue(defender) : 12 + Math.max(1, getUnitScoreValue(state, defender)) * 5;
+  } else {
+    score += defenderDestroyed ? getCardPlayValue(defender) : -12 - Math.max(1, getUnitScoreValue(state, defender)) * 5;
+  }
+
+  if (!attackerDestroyed && defenderDestroyed) {
+    score += attackerController === 'opponent' ? 20 : -20;
+  }
+
+  return score;
+}
+
+function getCounterCombatProjection(
+  state: GameState,
+  counter: GameCardInstance,
+  target: GameCardInstance | null,
+  baseAttacker: GameCardInstance | null,
+  baseDefender: GameCardInstance | null
+): CombatProjection | null {
+  const owner = getCardController(counter);
+  const isFriendly = target ? getCardController(target) === owner : false;
+
+  if (counter.card.id === 'IMP026' || counter.card.id === 'IMP027') {
+    if (!target || isFriendly) return null;
+    return {
+      attacker: baseAttacker?.instanceId === target.instanceId ? null : baseAttacker,
+      defender: baseDefender?.instanceId === target.instanceId ? null : baseDefender,
+    };
+  }
+
+  if (counter.card.id === 'IMP045') {
+    if (!target || target.instanceId !== baseDefender?.instanceId || !isFriendly) return null;
+    return { attacker: baseAttacker, defender: baseDefender, preventDefenderDamage: true };
+  }
+
+  if (counter.card.id === 'IMP057' || counter.card.id === 'IMP151') {
+    if (!target || !isFriendly) return null;
+    return {
+      attacker: baseAttacker?.instanceId === target.instanceId ? null : baseAttacker,
+      defender: baseDefender?.instanceId === target.instanceId ? null : baseDefender,
+    };
+  }
+
+  if (counter.card.id === 'IMP058') {
+    if (!target || !isFriendly) return null;
+    const readied = { ...target, ready: true };
+    return {
+      attacker: baseAttacker?.instanceId === target.instanceId ? readied : baseAttacker,
+      defender: baseDefender?.instanceId === target.instanceId ? readied : baseDefender,
+    };
+  }
+
+  if (counter.card.id === 'IMP121') {
+    if (!target || !isFriendly) return null;
+    const enraged = {
+      ...target,
+      ready: true,
+      temporaryAttackBonus: (target.temporaryAttackBonus ?? 0) + 1,
+    };
+    return {
+      attacker: baseAttacker?.instanceId === target.instanceId ? enraged : baseAttacker,
+      defender: baseDefender?.instanceId === target.instanceId ? enraged : baseDefender,
+    };
+  }
+
+  if (counter.card.id === 'IMP150') {
+    if (!target || !isFriendly) return null;
+    const protectedUnit = {
+      ...target,
+      ready: true,
+      terraLastStandAttackBonus: (target.terraLastStandAttackBonus ?? 0) + 2,
+      terraLastStandHealthBonus: (target.terraLastStandHealthBonus ?? 0) + 1,
+    };
+    return {
+      attacker: baseAttacker?.instanceId === target.instanceId ? protectedUnit : baseAttacker,
+      defender: baseDefender?.instanceId === target.instanceId ? protectedUnit : baseDefender,
+    };
+  }
+
+  if (counter.card.id === 'IMP163') {
+    if (!target || isFriendly || !isUnitCard(target.card)) return null;
+    const damaged = { ...target, damage: target.damage + 1 };
+    const destroyed = damaged.damage >= getCurrentUnitHealth(state, target);
+    return {
+      attacker: baseAttacker?.instanceId === target.instanceId ? (destroyed ? null : damaged) : baseAttacker,
+      defender: baseDefender?.instanceId === target.instanceId ? (destroyed ? null : damaged) : baseDefender,
+    };
+  }
+
+  return null;
+}
+
+function getCounterChoiceScore(
+  state: GameState,
+  counter: GameCardInstance,
+  target: GameCardInstance | null,
+  baseScore: number,
+  baseAttacker: GameCardInstance | null,
+  baseDefender: GameCardInstance | null
+): number {
+  const projection = getCounterCombatProjection(state, counter, target, baseAttacker, baseDefender);
+
+  if (!projection) {
+    return 0;
+  }
+
+  return getCombatProjectionScore(state, projection) - baseScore - Math.max(0, counter.card.cost);
+}
+
+export function getBotBattlefieldAttackChoice(state: GameState): BotBattlefieldAttackChoice | null {
+  if (state.winner || state.pendingCombat || state.phase !== 'main' || state.activePlayer !== 'opponent') {
+    return null;
+  }
+
+  const readyAttackers = getReadyBotAttackers(state);
   const targetZones = [
     ...BATTLEFIELD_ZONE_IDS.filter((zone) =>
       state.zones[zone].some((instance) => getCardController(instance) === 'player' && isUnitCard(instance.card))
@@ -347,17 +785,41 @@ export function getBotBattlefieldAttackChoice(state: GameState): BotBattlefieldA
   );
   const choice = choices.sort((left, right) => right.score - left.score)[0] ?? null;
 
-  return choice ? { attackerInstanceId: choice.attackerInstanceId, targetZone: choice.targetZone } : null;
+  return choice && choice.score >= ATTACK_SCORE_THRESHOLD
+    ? { attackerInstanceId: choice.attackerInstanceId, targetZone: choice.targetZone }
+    : null;
 }
 
-export function chooseBotCounter(state: GameState): string | null {
+export function chooseBotCounter(state: GameState): BotCounterChoice | null {
   if (state.pendingCombat?.priorityOwner !== 'opponent') {
     return null;
   }
 
-  return state.opponentZones.hand.find(
-    (instance) => isCounterCard(instance.card) && !getCounterPlayError(state, 'opponent', instance.instanceId)
-  )?.instanceId ?? null;
+  const baseAttacker = getCardInstanceById(state, state.pendingCombat.attackerInstanceId);
+  const baseDefender = state.pendingCombat.defenderInstanceId
+    ? getCardInstanceById(state, state.pendingCombat.defenderInstanceId)
+    : null;
+  const baseScore = getCombatProjectionScore(state, { attacker: baseAttacker, defender: baseDefender });
+  const choices = state.opponentZones.hand
+    .filter((instance) => isCounterCard(instance.card) && !getCounterPlayError(state, 'opponent', instance.instanceId))
+    .flatMap((counter) => {
+      const targets = getCounterTargetOptions(state, counter);
+      const targetOptions = targets.length > 0 ? targets.map((target) => target) : [null];
+
+      return targetOptions.map((target) => ({
+        counterInstanceId: counter.instanceId,
+        targetInstanceId: target?.instanceId,
+        score: getCounterChoiceScore(state, counter, target, baseScore, baseAttacker, baseDefender),
+      }));
+    });
+  const choice = choices.sort((left, right) => right.score - left.score)[0] ?? null;
+
+  return choice && choice.score >= COUNTER_SCORE_THRESHOLD
+    ? {
+        counterInstanceId: choice.counterInstanceId,
+        ...(choice.targetInstanceId ? { targetInstanceId: choice.targetInstanceId } : null),
+      }
+    : null;
 }
 
 export function chooseBotTurnCommand(state: GameState, step: BotTurnStep): BotCommand | null {
