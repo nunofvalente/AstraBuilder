@@ -2613,13 +2613,27 @@ export function declareBattlefieldAttack(
   }
 
   const defender = state.zones[targetZone].find((instance) => isUnitCard(instance.card) && getCardController(instance) !== owner) ?? null;
+  if (!defender) {
+    const resolved = resolveBattlefieldAttack(state, owner, attackerInstanceId, targetZone);
+    if ('error' in resolved) {
+      return resolved;
+    }
+
+    return {
+      state: resolved.state,
+      pendingCombat: null,
+      attacker: resolved.attacker,
+      defender: null,
+      resolvedCombat: resolved,
+    };
+  }
 
   const defendingOwner: Owner = owner === 'player' ? 'opponent' : 'player';
   const pendingCombat: PendingCombat = {
     attackerOwner: owner,
     attackerInstanceId,
     targetZone,
-    defenderInstanceId: defender?.instanceId ?? null,
+    defenderInstanceId: defender.instanceId,
     ...(flankingOriginZone ? { flankingOriginZone } : {}),
     priorityOwner: defendingOwner,
     lastPassedOwner: null,
@@ -2646,20 +2660,8 @@ export function declareBattlefieldAttack(
     source: attacker,
     controller: owner,
     zone: targetZone,
-    targets: defender ? [{ type: 'card', instanceId: defender.instanceId }] : [],
+    targets: [{ type: 'card', instanceId: defender.instanceId }],
   });
-  if (!defender) {
-    if (flankingOriginZone) {
-      nextState = restoreFlankingAttackerToOriginForDisplay(nextState, owner, attacker.instanceId, flankingOriginZone);
-    }
-
-    return {
-      state: nextState,
-      pendingCombat,
-      attacker,
-      defender: null,
-    };
-  }
 
   nextState = triggerCardAbilities(nextState, 'onDefend', {
     source: defender,
@@ -2947,7 +2949,10 @@ export function passCounterPriority(state: GameState, owner: Owner): CounterPrio
     return { error: owner === 'player' ? 'Waiting for the bot to pass counter priority.' : 'Waiting for you to pass counter priority.' };
   }
 
-  if (pendingCombat.lastPassedOwner && pendingCombat.lastPassedOwner !== owner) {
+  if (
+    pendingCombat.counterStack.length === 0 ||
+    (pendingCombat.lastPassedOwner && pendingCombat.lastPassedOwner !== owner)
+  ) {
     const resolvedCounters = [...pendingCombat.counterStack].reverse();
     let resolvingState: GameState = {
       ...state,

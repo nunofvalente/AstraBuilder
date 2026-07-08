@@ -433,19 +433,8 @@ describe('bot policy', () => {
     };
 
     const firstAttack = applyBotTurnStep(state, 'attackBattlefield');
-    const playerPassed = passCounterPriority(firstAttack, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) {
-      return;
-    }
-
-    const botPassed = passCounterPriority(playerPassed.state, 'opponent');
-    expect('error' in botPassed ? botPassed.error : null).toBeNull();
-    if ('error' in botPassed) {
-      return;
-    }
-
-    expect(getBotBattlefieldAttackChoice(botPassed.state)).toEqual({
+    expect(firstAttack.pendingCombat).toBeNull();
+    expect(getBotBattlefieldAttackChoice(firstAttack)).toEqual({
       attackerInstanceId: secondAttacker.instanceId,
       targetZone: 'battlefieldLeft',
     });
@@ -497,16 +486,10 @@ describe('bot policy', () => {
       return;
     }
 
-    const botPassed = passCounterPriority(playerPassed.state, 'opponent');
-    expect('error' in botPassed ? botPassed.error : null).toBeNull();
-    if ('error' in botPassed) {
-      return;
-    }
-
-    expect(botPassed.state.zones.battlefieldLeft).toEqual(
+    expect(playerPassed.state.zones.battlefieldLeft).toEqual(
       expect.arrayContaining([expect.objectContaining({ instanceId: defender.instanceId, ready: false, damage: 1 })])
     );
-    expect(getBotBattlefieldAttackChoice(botPassed.state)).toEqual({
+    expect(getBotBattlefieldAttackChoice(playerPassed.state)).toEqual({
       attackerInstanceId: followUpAttacker.instanceId,
       targetZone: 'battlefieldLeft',
     });

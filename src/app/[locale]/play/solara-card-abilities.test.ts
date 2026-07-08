@@ -363,21 +363,20 @@ describe('Solara card abilities', () => {
     if ('error' in declared) return;
 
     const botPassed = passCounterPriority(declared.state, 'opponent');
-    const playerPassed = 'error' in botPassed ? botPassed : passCounterPriority(botPassed.state, 'player');
 
-    expect('error' in playerPassed ? null : playerPassed.resolvedCombat?.captured).toBe(true);
-    expect('error' in playerPassed ? [] : playerPassed.state.zones.staging.map((card) => card.instanceId)).not.toContain(flanker.instanceId);
-    expect('error' in playerPassed ? [] : playerPassed.state.zones.battlefieldLeft.map((card) => card.instanceId)).toEqual([]);
-    expect('error' in playerPassed ? [] : playerPassed.state.zones.battlefieldCenter.map((card) => card.instanceId)).toEqual([
+    expect('error' in botPassed ? null : botPassed.resolvedCombat?.captured).toBe(true);
+    expect('error' in botPassed ? [] : botPassed.state.zones.staging.map((card) => card.instanceId)).not.toContain(flanker.instanceId);
+    expect('error' in botPassed ? [] : botPassed.state.zones.battlefieldLeft.map((card) => card.instanceId)).toEqual([]);
+    expect('error' in botPassed ? [] : botPassed.state.zones.battlefieldCenter.map((card) => card.instanceId)).toEqual([
       flanker.instanceId,
       equipment.instanceId,
     ]);
-    expect('error' in playerPassed ? undefined : playerPassed.state.zones.battlefieldCenter[0]?.flankingAttackUsedTurn).toBe(base.turn);
-    expect('error' in playerPassed ? null : playerPassed.state.zones.hand[0]).toMatchObject({
+    expect('error' in botPassed ? undefined : botPassed.state.zones.battlefieldCenter[0]?.flankingAttackUsedTurn).toBe(base.turn);
+    expect('error' in botPassed ? null : botPassed.state.zones.hand[0]).toMatchObject({
       instanceId: top.instanceId,
       solaraRevealedFromDeckUntilTurn: base.turn,
     });
-    expect('error' in playerPassed ? [] : playerPassed.state.log).toEqual(
+    expect('error' in botPassed ? [] : botPassed.state.log).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           prefix: 'Flanked ',
@@ -486,11 +485,10 @@ describe('Solara card abilities', () => {
     expect('error' in declared ? null : declared.state.pendingCombat).toBeTruthy();
 
     const botPassed = 'error' in declared ? declared : passCounterPriority(declared.state, 'opponent');
-    const playerPassed = 'error' in botPassed ? botPassed : passCounterPriority(botPassed.state, 'player');
 
-    expect('error' in playerPassed ? null : playerPassed.resolvedCombat?.defenderDestroyed).toBe(true);
-    expect('error' in playerPassed ? null : playerPassed.state.playerVictoryPoints).toBe(2);
-    expect('error' in playerPassed ? [] : playerPassed.state.log).toEqual(
+    expect('error' in botPassed ? null : botPassed.resolvedCombat?.defenderDestroyed).toBe(true);
+    expect('error' in botPassed ? null : botPassed.state.playerVictoryPoints).toBe(2);
+    expect('error' in botPassed ? [] : botPassed.state.log).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ suffix: 'Reckless Warrior gained 2 victory points from Glory.' }),
       ])
