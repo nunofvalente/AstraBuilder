@@ -109,7 +109,7 @@ describe('Terra card abilities', () => {
     expect('error' in resolved ? null : resolved.zones.battlefieldLeft[0]?.damage).toBe(1);
   });
 
-  it('deals Shadowveil Hunter counter damage to an attacker entering an empty battlefield', () => {
+  it('does not let Shadowveil Hunter counter an attacker entering an empty battlefield', () => {
     const attacker = card('attacker', 'opponent', {
       ready: true,
       card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 3 }),
@@ -138,21 +138,16 @@ describe('Terra card abilities', () => {
     expect('error' in declared ? declared.error : null).toBeNull();
     if ('error' in declared) return;
 
+    expect(declared.pendingCombat).toBeNull();
+    expect(declared.resolvedCombat?.captured).toBe(true);
     const played = playCounterCard(declared.state, 'player', hunter.instanceId, {
       targetInstanceId: attacker.instanceId,
     });
-    expect('error' in played ? played.error : null).toBeNull();
-    if ('error' in played) return;
-
-    const botPassed = passCounterPriority(played.state, 'opponent');
-    expect('error' in botPassed ? botPassed.error : null).toBeNull();
-    if ('error' in botPassed) return;
-    const playerPassed = passCounterPriority(botPassed.state, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) return;
-
-    expect(playerPassed.state.zones.battlefieldLeft.find((unit) => unit.instanceId === attacker.instanceId)?.damage).toBe(1);
-    expect(playerPassed.state.zones.staging.find((unit) => unit.instanceId === hunter.instanceId)).toBeTruthy();
+    expect(played).toEqual({
+      error: 'Counter cards can only be played during a counter window.',
+    });
+    expect(declared.state.zones.battlefieldLeft.find((unit) => unit.instanceId === attacker.instanceId)?.damage).toBe(0);
+    expect(declared.state.zones.hand.find((unit) => unit.instanceId === hunter.instanceId)).toBeTruthy();
   });
 
   it('applies Impede from units, Caltrops, and Escape Route and heals surviving Akeno', () => {

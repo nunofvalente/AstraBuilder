@@ -363,12 +363,21 @@ export type BattlefieldAttackResult = {
   scoredVictoryPoints: number;
 };
 
-export type DeclareBattlefieldAttackResult = {
-  state: GameState;
-  pendingCombat: PendingCombat;
-  attacker: GameCardInstance;
-  defender: GameCardInstance | null;
-};
+export type DeclareBattlefieldAttackResult =
+  | {
+      state: GameState;
+      pendingCombat: PendingCombat;
+      attacker: GameCardInstance;
+      defender: GameCardInstance;
+      resolvedCombat?: null;
+    }
+  | {
+      state: GameState;
+      pendingCombat: null;
+      attacker: GameCardInstance;
+      defender: null;
+      resolvedCombat: BattlefieldAttackResult;
+    };
 
 export type CounterPriorityPassResult = {
   state: GameState;
