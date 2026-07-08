@@ -12,6 +12,7 @@ import { getAffinityBaseColor, getAffinityIconPath, normalizeAffinity } from '@/
 import { isConstructedDeckSize } from '@/lib/decks/rules';
 import type { Card } from '../create/deck-builder/types';
 import { getBotBattlefieldAttackChoice } from './bot-policy';
+import { buildDemoDecks } from './demo-decks';
 import { applyPlayerCardAction } from './game-actions';
 import { BOT_TURN_STEPS, applyBotTurnStep, playFirstBotCounter } from './game-bot';
 import {
@@ -225,6 +226,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     () => getDeckBannerBackground(selectedBotDeckBannerAffinities),
     [selectedBotDeckBannerAffinities]
   );
+  const demoDecks = useMemo(() => buildDemoDecks(cardMap), [cardMap]);
   const isMatchRoute = initialMode === 'match';
   const lobbyHref = `/${locale}/play`;
   const matchHref = `/${locale}/match`;
@@ -478,21 +480,23 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       setStatus('loading');
       setErrorMessage(initialError);
 
-      const { data: userResult, error: userError } = await supabase.auth.getUser();
+      const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
       if (!isMounted) {
         return;
       }
 
-      if (userError || !userResult?.user) {
-        setStatus('auth');
-        setDecks([]);
+      if (sessionError || !sessionResult.session?.user) {
+        setDecks(demoDecks);
+        setSelectedDeckId((previous) => previous || demoDecks[0]?.id || '');
+        setSelectedBotDeckId((previous) => previous || demoDecks[1]?.id || demoDecks[0]?.id || '');
+        setStatus('ready');
         return;
       }
 
       const { data, error } = await supabase
         .from('decks')
         .select('id,title,created_at,deck_cards(quantity,card_id)')
-        .eq('user_id', userResult.user.id)
+        .eq('user_id', sessionResult.session.user.id)
         .order('created_at', { ascending: false });
 
       if (!isMounted) {
@@ -510,9 +514,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       const mappedDecks = mapDeckRows((data ?? []) as DeckRow[], cardMap).filter((deck) =>
         isConstructedDeckSize(deck.cardCount)
       );
-      setDecks(mappedDecks);
-      setSelectedDeckId((previous) => previous || mappedDecks[0]?.id || '');
-      setSelectedBotDeckId((previous) => previous || mappedDecks[1]?.id || mappedDecks[0]?.id || '');
+      const availableDecks = mappedDecks.length > 0 ? [...mappedDecks, ...demoDecks] : demoDecks;
+      setDecks(availableDecks);
+      setSelectedDeckId((previous) => previous || availableDecks[0]?.id || '');
+      setSelectedBotDeckId((previous) => previous || availableDecks[1]?.id || availableDecks[0]?.id || '');
       setStatus('ready');
     }
 
@@ -521,7 +526,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     return () => {
       isMounted = false;
     };
-  }, [cardMap, initialError]);
+  }, [cardMap, demoDecks, initialError]);
 
   useEffect(() => {
     if (!isMatchRoute || status !== 'ready' || gameState) {
