@@ -1738,6 +1738,84 @@ describe('game rules', () => {
     expect(playerPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
   });
 
+  it('lets Void Warp put the attacking unit on top of its owner deck before combat damage resolves', () => {
+    const attacker = makeInstance({
+      instanceId: 'enemy-attacker',
+      owner: 'opponent',
+      ready: true,
+      card: createTestCard({ id: 'enemy-attacker', name: 'Enemy Attacker', type: 'Unit', attack: 5, health: 5 }),
+    });
+    const defender = makeInstance({
+      instanceId: 'player-defender',
+      ready: true,
+      card: createTestCard({ id: 'player-defender', name: 'Player Defender', type: 'Unit', attack: 1, health: 5 }),
+    });
+    const voidWarp = makeInstance({
+      instanceId: 'void-warp',
+      card: createTestCard({
+        id: 'IMP088',
+        name: 'Void Warp',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: "Put target unit in a combat zone on top of its owner's deck.",
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      zones: {
+        ...state.zones,
+        hand: [voidWarp],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...state.opponentZones,
+        staging: [attacker],
+      },
+    };
+    const declared = declareBattlefieldAttack(activeState, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect('error' in declared ? declared.error : null).toBeNull();
+    if ('error' in declared) {
+      return;
+    }
+
+    expect(getCounterTargetOptions(declared.state, voidWarp).map((target) => target.instanceId)).toContain(attacker.instanceId);
+
+    const played = playCounterCard(declared.state, 'player', voidWarp.instanceId, {
+      targetInstanceId: attacker.instanceId,
+    });
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) {
+      return;
+    }
+
+    const opponentPassed = passCounterPriority(played.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) {
+      return;
+    }
+    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.state.pendingCombat).toBeNull();
+    expect(playerPassed.state.opponentZones.deck[0]?.instanceId).toBe(attacker.instanceId);
+    expect(playerPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
+    expect(playerPassed.state.log.some((entry) =>
+      entry.suffix === 'Enemy Attacker was removed before combat damage, so combat ends without damage.'
+    )).toBe(true);
+    expect(playerPassed.resolvedCombat).toMatchObject({
+      attackerDestroyed: true,
+      defenderDestroyed: false,
+      captured: false,
+    });
+  });
+
   it('lets Killing Blow destroy the attacking unit before combat damage resolves', () => {
     const attacker = makeInstance({
       instanceId: 'enemy-attacker',

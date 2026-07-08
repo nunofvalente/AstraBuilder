@@ -735,7 +735,7 @@ export function getCounterTargetOptions(state: GameState, counter: GameCardInsta
   }
 
   if (counter.card.id === 'IMP088') {
-    return battlefieldUnits.filter(
+    return legalCombatTargets.filter(
       (unit) =>
         !(
           unit.protectedFromEnemyTacticsUntilTurn === state.turn &&
@@ -2788,7 +2788,7 @@ export function getCounterPlayError(state: GameState, owner: Owner, instanceId: 
   }
 
   if (
-    ['IMP026', 'IMP027', 'IMP045', 'IMP057', 'IMP058', 'IMP121', 'IMP150', 'IMP151', 'IMP163'].includes(counter.card.id) &&
+    ['IMP026', 'IMP027', 'IMP045', 'IMP057', 'IMP058', 'IMP088', 'IMP121', 'IMP150', 'IMP151', 'IMP163'].includes(counter.card.id) &&
     getCounterTargetOptions(state, counter).length === 0
   ) {
     return `${counter.card.name} has no valid target.`;

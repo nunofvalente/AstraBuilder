@@ -476,11 +476,20 @@ const forcedConfession = resolveSingleTarget(
   (state, event, target) => drawCards(damageUnit(state, target, 1), event.controller, 1, event.source.card.name)
 );
 
+function voidWarpTargets(state: GameState, event: AbilityEvent): GameCardInstance[] {
+  const battlefieldUnits = BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone])
+    .filter((card) => isUnitCard(card.card));
+  const attacker = state.pendingCombat
+    ? getUnitsInPlay(state).find((unit) => unit.instanceId === state.pendingCombat?.attackerInstanceId) ?? null
+    : null;
+  const combatUnits = attacker ? [...battlefieldUnits, attacker] : battlefieldUnits;
+  return combatUnits.filter((card) => canEnemyTacticTarget(state, event, card));
+}
+
 const voidWarp = resolveSingleTarget(
   'voidWarp',
   "Choose a unit in a combat zone to put on top of its owner's deck.",
-  (state, event) => BATTLEFIELD_ZONE_IDS.flatMap((zone) => state.zones[zone])
-    .filter((card) => isUnitCard(card.card) && canEnemyTacticTarget(state, event, card)),
+  voidWarpTargets,
   (state, _event, target) => putUnitOnTopOfDeck(state, target)
 );
 
