@@ -8,8 +8,6 @@ import { isSimulatorEnabled } from '@/lib/features';
 import { getStaticCards } from '../create/deck-builder/data';
 import { GameClient } from '../play/game-client';
 
-export const dynamic = 'force-dynamic';
-
 type LocaleParams = {
   locale: string;
 };
