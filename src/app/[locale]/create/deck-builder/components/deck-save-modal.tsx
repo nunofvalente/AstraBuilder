@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { AlertCircle, Check, Globe2, Lock, Save, X } from 'lucide-react';
 
 export type SaveDeckMode = 'new' | 'overwrite';
 
@@ -33,6 +34,8 @@ type DeckSaveModalProps = {
     dismissNotice: string;
     publicLabel: string;
     publicHelp: string;
+    publicStatus: string;
+    privateStatus: string;
   };
   totalCards: number;
   totalCardsLabel: string;
@@ -98,138 +101,164 @@ export function DeckSaveModal({
 
   const primaryButtonLabel = isSaving ? labels.saving : allowOverwrite ? labels.update : labels.submit;
   const secondaryButtonLabel = isSaving ? labels.saving : labels.saveAsNew;
+  const isSubmitDisabled = isSaving || requiresAuth;
+  const visibilityLabel = isPublic ? labels.publicStatus : labels.privateStatus;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-lg rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-2xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{labels.heading}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-4">
+      <div className="grid max-h-[calc(100vh-2rem)] w-full max-w-xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl shadow-black/50">
+        <div className="flex items-center justify-between gap-4 border-b border-[color:var(--border)] bg-[color:var(--surface-muted)]/30 px-4 py-4 sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-[color:var(--accent)]/35 bg-[color:var(--accent)]/12 text-[color:var(--accent)]">
+              <Save className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold text-[color:var(--text-primary)]">{labels.heading}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-secondary)]">
+                <span className="inline-flex items-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-1">
+                  {totalCardsLabel}: {totalCards}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-1">
+                  {isPublic ? <Globe2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {visibilityLabel}
+                </span>
+              </div>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-black/70 p-2 text-white transition hover:bg-black/80 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-[color:var(--border)] bg-black/30 text-[color:var(--text-primary)] transition hover:bg-black/45 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
             aria-label={labels.cancel}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="h-4 w-4"
-            >
-              <path d="M6 6l12 12M6 18L18 6" />
-            </svg>
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[color:var(--text-primary)]" htmlFor="deck-save-title">
-              {labels.titleLabel}
-            </label>
-            <input
-              id="deck-save-title"
-              type="text"
-              value={title}
-              onChange={(event) => setTitle(event.target.value.slice(0, 45))}
-              placeholder={labels.titlePlaceholder}
-              maxLength={45}
-              className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/50 px-3 py-2 text-sm text-[color:var(--text-primary)] focus:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-              disabled={isSaving}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[color:var(--text-primary)]" htmlFor="deck-save-description">
-              {labels.descriptionLabel}
-            </label>
-            <textarea
-              id="deck-save-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value.slice(0, 100))}
-              placeholder={labels.descriptionPlaceholder}
-              rows={4}
-              maxLength={100}
-              className="mt-1 w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/50 px-3 py-2 text-sm text-[color:var(--text-primary)] focus:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-              disabled={isSaving}
-            />
-          </div>
-
-          <div className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 px-3 py-2 text-sm text-[color:var(--text-secondary)]">
-            <span>
-              {totalCardsLabel}: {totalCards}
-            </span>
-          </div>
-
-          <label className="flex items-start gap-3 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 px-3 py-3 text-sm text-[color:var(--text-primary)]">
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={(event) => setIsPublic(event.target.checked)}
-              className="mt-1 h-4 w-4 flex-shrink-0 rounded border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-              disabled={isSaving}
-            />
-            <span>
-              <span className="block font-medium">{labels.publicLabel}</span>
-              <span className="mt-1 block text-[color:var(--text-secondary)]">{labels.publicHelp}</span>
-            </span>
-          </label>
-
-          {errorMessage ? (
-            <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
-              {errorMessage}
-            </p>
-          ) : null}
-
-          {requiresAuth ? (
-            <div className="flex flex-col gap-2 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40 px-3 py-3 text-sm text-[color:var(--text-secondary)]">
-              <span>{labels.signInPrompt}</span>
-              <Link
-                href={signInHref}
-                className="inline-flex w-fit items-center justify-center rounded-md bg-[color:var(--accent)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-              >
-                {labels.signInButton}
-              </Link>
+        <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto">
+          <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-medium text-[color:var(--text-primary)]" htmlFor="deck-save-title">
+                  {labels.titleLabel}
+                </label>
+                <span className="text-xs tabular-nums text-[color:var(--text-secondary)]">{title.length}/45</span>
+              </div>
+              <input
+                id="deck-save-title"
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value.slice(0, 45))}
+                placeholder={labels.titlePlaceholder}
+                maxLength={45}
+                className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/45 px-3 py-2.5 text-sm text-[color:var(--text-primary)] shadow-inner outline-none transition placeholder:text-[color:var(--text-secondary)]/70 focus:border-[color:var(--accent)] focus:bg-[color:var(--surface)] focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                disabled={isSaving}
+              />
             </div>
-          ) : null}
 
-          <div className="flex items-center justify-end gap-3">
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-medium text-[color:var(--text-primary)]" htmlFor="deck-save-description">
+                  {labels.descriptionLabel}
+                </label>
+                <span className="text-xs tabular-nums text-[color:var(--text-secondary)]">{description.length}/100</span>
+              </div>
+              <textarea
+                id="deck-save-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value.slice(0, 100))}
+                placeholder={labels.descriptionPlaceholder}
+                rows={4}
+                maxLength={100}
+                className="min-h-28 w-full resize-none rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)]/45 px-3 py-2.5 text-sm text-[color:var(--text-primary)] shadow-inner outline-none transition placeholder:text-[color:var(--text-secondary)]/70 focus:border-[color:var(--accent)] focus:bg-[color:var(--surface)] focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                disabled={isSaving}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsPublic((value) => !value)}
+              className={`flex w-full items-center justify-between gap-4 rounded-md border px-3 py-3 text-left transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                isPublic
+                  ? 'border-[color:var(--accent)]/45 bg-[color:var(--accent)]/10'
+                  : 'border-[color:var(--border)] bg-[color:var(--surface-muted)]/35 hover:bg-[color:var(--surface-muted)]/55'
+              }`}
+              disabled={isSaving}
+              aria-pressed={isPublic}
+            >
+              <span className="flex min-w-0 items-start gap-3">
+                <span className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border ${
+                  isPublic
+                    ? 'border-[color:var(--accent)]/50 bg-[color:var(--accent)]/15 text-[color:var(--accent)]'
+                    : 'border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-secondary)]'
+                }`}>
+                  {isPublic ? <Globe2 className="h-4 w-4" aria-hidden="true" /> : <Lock className="h-4 w-4" aria-hidden="true" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-[color:var(--text-primary)]">{visibilityLabel}</span>
+                  <span className="mt-1 block text-sm text-[color:var(--text-secondary)]">{labels.publicHelp}</span>
+                </span>
+              </span>
+              <span className={`flex h-6 w-11 flex-shrink-0 items-center rounded-full border p-0.5 transition ${
+                isPublic
+                  ? 'justify-end border-[color:var(--accent)] bg-[color:var(--accent)]'
+                  : 'justify-start border-[color:var(--border)] bg-[color:var(--surface)]'
+              }`}>
+                <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-[color:var(--accent)] shadow-sm">
+                  {isPublic ? <Check className="h-3 w-3" aria-hidden="true" /> : null}
+                </span>
+              </span>
+            </button>
+
+            {errorMessage ? (
+              <p className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-sm text-red-100">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                <span>{errorMessage}</span>
+              </p>
+            ) : null}
+
+            {requiresAuth ? (
+              <div className="flex flex-col gap-3 rounded-md border border-[color:var(--accent)]/35 bg-[color:var(--accent)]/10 px-3 py-3 text-sm text-[color:var(--text-secondary)]">
+                <span>{labels.signInPrompt}</span>
+                <Link
+                  href={signInHref}
+                  className="inline-flex w-fit items-center justify-center gap-2 rounded-md bg-[color:var(--accent)] px-3 py-2 text-xs font-semibold uppercase text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                  {labels.signInButton}
+                </Link>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 border-t border-[color:var(--border)] bg-[color:var(--surface-muted)]/25 px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-5">
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+              className="inline-flex items-center justify-center rounded-md border border-[color:var(--border)] px-4 py-2.5 text-sm font-medium text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
               disabled={isSaving}
             >
               {labels.cancel}
             </button>
             {allowOverwrite ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleSaveAsNew}
-                  className="inline-flex items-center justify-center rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:opacity-70"
-                  disabled={isSaving}
-                >
-                  {secondaryButtonLabel}
-                </button>
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:opacity-70"
-                  disabled={isSaving}
-                >
-                  {primaryButtonLabel}
-                </button>
-              </>
-            ) : (
               <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-md bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:opacity-70"
-                disabled={isSaving}
+                type="button"
+                onClick={handleSaveAsNew}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-[color:var(--border)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isSubmitDisabled}
               >
-                {primaryButtonLabel}
+                <Save className="h-4 w-4" aria-hidden="true" />
+                {secondaryButtonLabel}
               </button>
-            )}
+            ) : null}
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-[color:var(--accent)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text-on-accent)] transition hover:bg-[color:var(--accent)]/90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSubmitDisabled}
+            >
+              <Save className="h-4 w-4" aria-hidden="true" />
+              {primaryButtonLabel}
+            </button>
           </div>
         </form>
       </div>

@@ -30,6 +30,11 @@ type HomeDictionary = {
       decks: string;
       catalog: string;
     };
+    battlefieldBanner: {
+      title: string;
+      description: string;
+      action: string;
+    };
   };
 };
 
@@ -61,12 +66,14 @@ type BuilderDictionary = {
     menuExport: string;
     menuShare: string;
     menuSave: string;
+    clearDeck: string;
     importHeading: string;
     importInstructions: string;
     importInstructionsText: string;
     importPlaceholder: string;
     importPlaceholderText: string;
     importUploadLabel: string;
+    importUploadTextLabel: string;
     importButton: string;
     importCancel: string;
     importErrorInvalid: string;
@@ -113,6 +120,8 @@ type BuilderDictionary = {
       dismissNotice: string;
       publicLabel: string;
       publicHelp: string;
+      publicStatus: string;
+      privateStatus: string;
     };
   };
 };
@@ -394,6 +403,7 @@ type TopBarDictionary = {
     profile: string;
     myDecks: string;
     builder: string;
+    play: string;
     decks: string;
     collection: string;
     settings: string;
@@ -425,6 +435,8 @@ const dictionaries: Record<Locale, ImportDictionary> = {
   fr: () => import("./locales/fr.json"),
   de: () => import("./locales/de.json"),
   ms: () => import("./locales/ms.json"),
+  "zh-CN": () => import("./locales/zh-CN.json"),
+  ja: () => import("./locales/ja.json"),
 };
 
 export type Dictionary = HomeDictionary &

@@ -1,9 +1,8 @@
 import cardsData from "@/data/cards.json";
 import devCardsData from "@/data/cards-dev.json";
+import { getSupabaseCardRows } from "@/lib/supabase/cards";
 import { normaliseCard } from "./utils";
 import type { Card } from "./types";
-import { fetchAstraCardCatalog } from "@/lib/astra/astra-card-catalog";
-import { mapAstraCardsToCardRows } from "@/lib/astra/astra-card-mapper";
 
 type CardsFile = {
   generatedAt: string;
@@ -20,28 +19,22 @@ export async function getStaticCards(): Promise<{ cards: Card[]; error: string |
   }
 
   const fallbackCards = typedCardsData.cards;
+  const useSupabaseCards = process.env.NEXT_PUBLIC_USE_SUPABASE_CARDS === "true";
 
-  try {
-    const astraCards = await fetchAstraCardCatalog();
-    if (astraCards.length === 0) {
-      return {
-        cards: fallbackCards,
-        error: "No card data returned from the Astra API. Showing cached cards.",
-      };
-    }
+  if (!useSupabaseCards) {
+    return { cards: fallbackCards, error: null };
+  }
 
-    const cardRows = mapAstraCardsToCardRows(astraCards);
-    const cards = cardRows.map((row, index) => normaliseCard(row, index));
-
-    return {
-      cards,
-      error: null,
-    };
-  } catch (unknownError) {
-    const message = unknownError instanceof Error ? unknownError.message : "Unknown error";
+  const { rows, error } = await getSupabaseCardRows();
+  if (rows.length === 0) {
     return {
       cards: fallbackCards,
-      error: `Unable to load live Astra card data: ${message}`,
+      error: error ?? "No card data returned from Supabase. Showing cached cards.",
     };
   }
+
+  return {
+    cards: rows.map((row, index) => normaliseCard(row, index)),
+    error,
+  };
 }

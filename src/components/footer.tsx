@@ -28,7 +28,25 @@ export function Footer() {
           >
             Disclaimer
           </button>
-          <span className="text-xs text-white/70">AstraBuilder</span>
+          <div className="flex items-center gap-4">
+            <Link
+              href="https://discord.gg/MU3vP2yXX"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Join the AstraBuilder Discord"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/75 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]/60"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 127.14 96.36"
+                className="h-5 w-5"
+                fill="currentColor"
+              >
+                <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15ZM42.45 65.69c-6.27 0-11.43-5.73-11.43-12.78s5.06-12.79 11.43-12.79 11.54 5.78 11.43 12.79-5.06 12.78-11.43 12.78Zm42.24 0c-6.27 0-11.43-5.73-11.43-12.78s5.06-12.79 11.43-12.79 11.54 5.78 11.43 12.79-5.06 12.78-11.43 12.78Z" />
+              </svg>
+            </Link>
+            <span className="text-xs text-white/70">AstraBuilder</span>
+          </div>
         </div>
       </footer>
 

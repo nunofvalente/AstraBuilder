@@ -26,6 +26,11 @@
       "build": "Bina dek anda",
       "decks": "Teroka dek komuniti",
       "catalog": "Layari katalog kad"
+    },
+    "battlefieldBanner": {
+      "title": "Sertai medan perang",
+      "description": "Bawa dek tersimpan anda ke perlawanan latihan dan uji strategi menentang bot.",
+      "action": "Pergi ke Medan Perang"
     }
   },
   "affinityPage": {
@@ -55,12 +60,14 @@
     "menuExport": "Eksport",
     "menuShare": "Kongsi imej",
     "menuSave": "Simpan dek",
+    "clearDeck": "Kosongkan",
     "importHeading": "Import dek",
     "importInstructions": "Tampal JSON eksport di bawah atau muat naik fail untuk mengimport dek.",
     "importInstructionsText": "Tampal satu kad setiap baris dalam format \"<bilangan> <nama kad>\" atau muat naik fail teks untuk mengimport dek.",
     "importPlaceholder": "[\n  {\n    \"name\": \"Nama Kad\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
     "importUploadLabel": "Muat naik fail JSON",
+    "importUploadTextLabel": "Muat naik fail TXT",
     "importButton": "Import dek",
     "importCancel": "Batal",
     "importErrorInvalid": "JSON yang diberi tidak dapat diproses. Sila semak format dan cuba lagi.",
@@ -102,7 +109,9 @@
       "updateSuccessMessage": "Dek berjaya dikemas kini.",
       "dismissNotice": "Tutup",
       "publicLabel": "Jadikan dek ini awam",
-      "publicHelp": "Dek awam mungkin muncul dalam senarai Popular atau Trending. Biarkan tidak ditanda untuk kekalkan sebagai peribadi."
+      "publicHelp": "Dek awam mungkin muncul dalam senarai Popular atau Trending. Biarkan tidak ditanda untuk kekalkan sebagai peribadi.",
+      "publicStatus": "Awam",
+      "privateStatus": "Peribadi"
     }
   },
   "myDecks": {
@@ -362,6 +371,7 @@
     "profile": "Profil",
     "myDecks": "Dek Saya",
     "builder": "Pembina",
+    "play": "Medan Perang",
     "decks": "Dek",
     "collection": "Katalog",
     "settings": "Tetapan",

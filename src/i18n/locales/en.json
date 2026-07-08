@@ -26,6 +26,11 @@
       "build": "Build your deck",
       "decks": "Explore community decks",
       "catalog": "Browse card catalog"
+    },
+    "battlefieldBanner": {
+      "title": "Join the battlefield",
+      "description": "Take your saved deck into a practice match and test your lines against a bot opponent.",
+      "action": "Go to Battlefield"
     }
   },
   "affinityPage": {
@@ -55,12 +60,14 @@
     "menuExport": "Export",
     "menuShare": "Share image",
     "menuSave": "Save deck",
+    "clearDeck": "Clear",
     "importHeading": "Import deck",
     "importInstructions": "Paste the exported JSON below or upload a file to import a deck.",
     "importInstructionsText": "Paste one card per line in the format \"<count> <card name>\" or upload a text file to import a deck.",
     "importPlaceholder": "[\n  {\n    \"name\": \"Card Name\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
     "importUploadLabel": "Upload JSON file",
+    "importUploadTextLabel": "Upload TXT file",
     "importButton": "Import deck",
     "importCancel": "Cancel",
     "importErrorInvalid": "The provided JSON could not be parsed. Please check the format and try again.",
@@ -102,7 +109,9 @@
       "updateSuccessMessage": "Deck updated successfully.",
       "dismissNotice": "Dismiss",
       "publicLabel": "Make this deck public",
-      "publicHelp": "Public decks may appear in Popular or Trending lists. Leave unchecked to keep it private."
+      "publicHelp": "Public decks may appear in Popular or Trending lists. Leave unchecked to keep it private.",
+      "publicStatus": "Public",
+      "privateStatus": "Private"
     }
   },
   "myDecks": {
@@ -358,6 +367,7 @@
     "profile": "Profile",
     "myDecks": "My Decks",
     "builder": "Builder",
+    "play": "Battlefield",
     "decks": "Decks",
     "collection": "Catalog",
     "settings": "Settings",

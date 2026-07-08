@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-10T21:42:09.770Z",
+  "generatedAt": "2026-07-07T10:11:53.752Z",
   "cards": [
     {
       "id": "IMP087",
@@ -762,6 +762,25 @@
       "detailLabel": "Drifter's Necklace Item (Equipment) Cost 3 Affinity Caelum Rarity Common"
     },
     {
+      "id": "IMPT001",
+      "name": "Drone",
+      "type": "Unit",
+      "affinity": "Neutral",
+      "number": null,
+      "cost": 0,
+      "attack": 1,
+      "health": 1,
+      "subtype": "Drone Token",
+      "rarity": "Token",
+      "artist": "Parhelion Studio",
+      "influence": 0,
+      "rulesText": "",
+      "description": "\"The future of warfare is here. Deadly, nimble, and at an affordable price!\" - Falrich, Merchant of War",
+      "imageSrc": "/images/tokens/drone-token.png",
+      "searchContent": "drone unit drone token neutral token parhelion studio  \"the future of warfare is here. deadly, nimble, and at an affordable price!\" - falrich, merchant of war 0 0 1 1",
+      "detailLabel": "Drone Unit (Drone Token) Cost 0 Affinity Neutral Rarity Token"
+    },
+    {
       "id": "IMP006",
       "name": "Ebonblight Invoker",
       "type": "Unit",
@@ -933,6 +952,25 @@
       "detailLabel": "Excavator Unit (Vehicle) Cost 4 Affinity Neutral Rarity Uncommon"
     },
     {
+      "id": "IMP000",
+      "name": "Experiment",
+      "type": "Unit",
+      "affinity": "Neutral",
+      "number": 0,
+      "cost": 0,
+      "attack": 2,
+      "health": 2,
+      "subtype": "Experiment Token",
+      "rarity": "Token",
+      "artist": "Parhelion Studio",
+      "influence": 0,
+      "rulesText": "",
+      "description": "\"Not my most impressive work, but this should suffice.\" - Vermillion",
+      "imageSrc": "/images/tokens/experiment-token.png",
+      "searchContent": "experiment unit experiment token neutral token parhelion studio  \"not my most impressive work, but this should suffice.\" - vermillion 0 0 0 2 2",
+      "detailLabel": "Experiment Unit (Experiment Token) Cost 0 Affinity Neutral Rarity Token"
+    },
+    {
       "id": "IMP028",
       "name": "Experimental Augment",
       "type": "Item",
@@ -1064,6 +1102,25 @@
       "imageSrc": "https://assets.echoesofastra.com/cards/IMP085_ForcedConfession_web.png",
       "searchContent": "forced confession tactic  caelum uncommon ge-b deal 1 damage to target enemy unit. draw a card. \"stealing from me has consequences. are you ready to talk yet?\" - falrich 85  2  ",
       "detailLabel": "Forced Confession Tactic Cost 2 Affinity Caelum Rarity Uncommon"
+    },
+    {
+      "id": "IMP161",
+      "name": "Fortified Pillbox",
+      "type": "Territory",
+      "affinity": "Lux",
+      "number": 161,
+      "cost": 3,
+      "attack": 0,
+      "health": 0,
+      "subtype": "",
+      "rarity": "Promo",
+      "artist": "EliasArt",
+      "influence": null,
+      "rulesText": "Friendly units occupying this zone get +0/+2.",
+      "description": "",
+      "imageSrc": "/images/cards/imperion-extras/IMP161_FortifiedPillbox.png",
+      "searchContent": "fortified pillbox territory  lux promo eliasart friendly units occupying this zone get +0/+2.  161  3  ",
+      "detailLabel": "Fortified Pillbox Territory Cost 3 Affinity Lux Rarity Promo"
     },
     {
       "id": "IMP061",
@@ -1465,6 +1522,25 @@
       "detailLabel": "Kobold Runt Unit (Dragonkin) Cost 1 Affinity Solara Rarity Common"
     },
     {
+      "id": "IMP162",
+      "name": "Landbreaker",
+      "type": "Unit",
+      "affinity": "Solara",
+      "number": 162,
+      "cost": 7,
+      "attack": 5,
+      "health": 6,
+      "subtype": "Beast",
+      "rarity": "Promo",
+      "artist": "Hachii",
+      "influence": 2,
+      "rulesText": "Flanking (This unit can attack from a combat zone once per turn)\n\nOn Attack: You may destroy a territory in the same combat zone as this unit. If you do, this gets +2/+2 until end of turn.",
+      "description": "",
+      "imageSrc": "/images/cards/imperion-extras/IMP162_Landbreaker.png",
+      "searchContent": "landbreaker unit beast solara promo hachii flanking (this unit can attack from a combat zone once per turn)\n\non attack: you may destroy a territory in the same combat zone as this unit. if you do, this gets +2/+2 until end of turn.  162 2 7 5 6",
+      "detailLabel": "Landbreaker Unit (Beast) Cost 7 Affinity Solara Rarity Promo"
+    },
+    {
       "id": "IMP150",
       "name": "Last Stand",
       "type": "Tactic",
@@ -1672,6 +1748,25 @@
       "imageSrc": "https://assets.echoesofastra.com/cards/IMP072_MasterStrategist_web.png",
       "searchContent": "master strategist unit vampire caelum common subu on enter: you may draw a card. if you do, discard a card. \"your every move has led you exactly where i want you.\" 72 1 2 2 2",
       "detailLabel": "Master Strategist Unit (Vampire) Cost 2 Affinity Caelum Rarity Common"
+    },
+    {
+      "id": "IMP165",
+      "name": "Minefield",
+      "type": "Territory",
+      "affinity": "Neutral",
+      "number": 165,
+      "cost": 2,
+      "attack": 0,
+      "health": 0,
+      "subtype": "",
+      "rarity": "Promo",
+      "artist": "Parhelion Studio",
+      "influence": null,
+      "rulesText": "On Flip: Deal 3 damage to all units in this zone.\nSacrifice this territory.",
+      "description": "",
+      "imageSrc": "/images/cards/imperion-extras/IMP165_Minefield.png",
+      "searchContent": "minefield territory  neutral promo parhelion studio on flip: deal 3 damage to all units in this zone.\nsacrifice this territory.  165  2  ",
+      "detailLabel": "Minefield Territory Cost 2 Affinity Neutral Rarity Promo"
     },
     {
       "id": "IMP154",
@@ -2261,6 +2356,25 @@
       "imageSrc": "https://assets.echoesofastra.com/cards/IMP048_Seraphiel,HeraldofLight_web.png",
       "searchContent": "seraphiel, herald of light renowned unit angel primal lux legendary okazu on score: return a unit card from your graveyard to your staging area. (units enter exhausted.)\n\non death: place this card on the bottom of your deck. calamity emerges again. but this time, with a guiding light. 48 2 7 5 5",
       "detailLabel": "Seraphiel, Herald of Light Renowned Unit (Angel Primal) Cost 7 Affinity Lux Rarity Legendary"
+    },
+    {
+      "id": "IMP163",
+      "name": "Shadowveil Hunter",
+      "type": "Unit",
+      "affinity": "Terra",
+      "number": 163,
+      "cost": 2,
+      "attack": 1,
+      "health": 3,
+      "subtype": "Sylvan",
+      "rarity": "Promo",
+      "artist": "SuL",
+      "influence": 1,
+      "rulesText": "Swift (You can play this as a counter.)\n\nOn Enter: Deal 1 damage to target enemy unit in a combat zone.",
+      "description": "",
+      "imageSrc": "/images/cards/imperion-extras/IMP163_ShadowveilHunter.png",
+      "searchContent": "shadowveil hunter unit sylvan terra promo sul swift (you can play this as a counter.)\n\non enter: deal 1 damage to target enemy unit in a combat zone.  163 1 2 1 3",
+      "detailLabel": "Shadowveil Hunter Unit (Sylvan) Cost 2 Affinity Terra Rarity Promo"
     },
     {
       "id": "IMP075",
@@ -2907,6 +3021,25 @@
       "imageSrc": "https://assets.echoesofastra.com/cards/IMP080_WanderingSkyMerchant_web.png",
       "searchContent": "wandering sky merchant unit leporin caelum rare eight studio each player draws an extra card during their draw phase. \"the backbone of a good deal is equity!\" 80 1 3 1 2",
       "detailLabel": "Wandering Sky Merchant Unit (Leporin) Cost 3 Affinity Caelum Rarity Rare"
+    },
+    {
+      "id": "IMP164",
+      "name": "War Banner",
+      "type": "Item",
+      "affinity": "Neutral",
+      "number": 164,
+      "cost": 4,
+      "attack": 1,
+      "health": 1,
+      "subtype": "Equipment",
+      "rarity": "Promo",
+      "artist": "EliasArt",
+      "influence": 1,
+      "rulesText": "When equipped unit scores, you may reveal the top card of your deck. If that card is a unit, you may draw it.",
+      "description": "",
+      "imageSrc": "/images/cards/imperion-extras/IMP164_WarBanner.png",
+      "searchContent": "war banner item equipment neutral promo eliasart when equipped unit scores, you may reveal the top card of your deck. if that card is a unit, you may draw it.  164 1 4 1 1",
+      "detailLabel": "War Banner Item (Equipment) Cost 4 Affinity Neutral Rarity Promo"
     },
     {
       "id": "IMP142",

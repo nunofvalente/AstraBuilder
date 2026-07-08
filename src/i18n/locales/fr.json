@@ -26,6 +26,11 @@
       "build": "Creer votre deck",
       "decks": "Explorer les decks",
       "catalog": "Parcourir le catalogue"
+    },
+    "battlefieldBanner": {
+      "title": "Rejoindre le champ de bataille",
+      "description": "Emmenez un deck enregistre dans une partie d'entrainement et testez vos lignes contre un bot.",
+      "action": "Aller au champ de bataille"
     }
   },
   "affinityPage": {
@@ -55,12 +60,14 @@
     "menuExport": "Exporter",
     "menuShare": "Partager l'image",
     "menuSave": "Enregistrer le deck",
+    "clearDeck": "Effacer",
     "importHeading": "Importer le deck",
     "importInstructions": "Collez le JSON exporte ci-dessous ou televersez un fichier pour importer un deck.",
     "importInstructionsText": "Collez une carte par ligne au format \"<nombre> <nom de carte>\" ou televersez un fichier texte pour importer un deck.",
     "importPlaceholder": "[\n  {\n    \"name\": \"Nom de carte\",\n    \"count\": 2\n  }\n]",
     "importPlaceholderText": "3 Argentum Tank\n2 Ashfang Pillager\n1 Dreadscythe Myrmidon",
     "importUploadLabel": "Telecharger un fichier JSON",
+    "importUploadTextLabel": "Telecharger un fichier TXT",
     "importButton": "Importer le deck",
     "importCancel": "Annuler",
     "importErrorInvalid": "Le JSON fourni n'a pas pu etre analyse. Verifiez le format et reessayez.",
@@ -102,7 +109,9 @@
       "updateSuccessMessage": "Deck mis a jour avec succes.",
       "dismissNotice": "Fermer",
       "publicLabel": "Rendre ce deck public",
-      "publicHelp": "Les decks publics peuvent apparaitre dans les listes Populaire ou Tendance. Laissez decoche pour le garder prive."
+      "publicHelp": "Les decks publics peuvent apparaitre dans les listes Populaire ou Tendance. Laissez decoche pour le garder prive.",
+      "publicStatus": "Public",
+      "privateStatus": "Prive"
     }
   },
   "myDecks": {
@@ -358,6 +367,7 @@
     "profile": "Profil",
     "myDecks": "Mes decks",
     "builder": "Constructeur",
+    "play": "Champ de bataille",
     "decks": "Decks",
     "collection": "Catalogue",
     "settings": "Parametres",
