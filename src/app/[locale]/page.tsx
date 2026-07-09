@@ -85,17 +85,17 @@ export default async function HomePage({ params }: LocalePageProps) {
 
   const heroCards = [
     {
-      src: '/images/home/cards/celeste-concord-paladin.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP041_Celeste,ConcordPaladin.png',
       alt: 'Celeste, Concord Paladin card',
       className: 'home-hero-card home-hero-card-primary',
     },
     {
-      src: '/images/home/cards/calico-blood-witch.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP003_Calico,theBloodWitch.png',
       alt: 'Calico, the Blood Witch card',
       className: 'home-hero-card home-hero-card-secondary',
     },
     {
-      src: '/images/home/cards/varenthus-skyscourge.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP111_Varenthus,theSkyscourge.png',
       alt: 'Varenthus, the Skyscourge card',
       className: 'home-hero-card home-hero-card-tertiary',
     },
@@ -125,27 +125,27 @@ export default async function HomePage({ params }: LocalePageProps) {
   ];
   const sectionRibbonCards = [
     {
-      src: '/images/home/cards/gaia-lord-of-nature.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP130_Gaia,LordofNature.png',
       objectPosition: '47% 23%',
     },
     {
-      src: '/images/home/cards/renata-skyborne-orphan.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP073_Renata,SkyborneOrphan.png',
       objectPosition: '50% 19%',
     },
     {
-      src: '/images/home/cards/ruins-looter.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP109_RuinsLooter.png',
       objectPosition: '48% 22%',
     },
     {
-      src: '/images/home/cards/seraphiel-herald-of-light.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP048_Seraphiel,HeraldofLight.png',
       objectPosition: '49% 24%',
     },
     {
-      src: '/images/home/cards/jormun-feldragon-of-wyrmscar.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP009_Jormun,FeldragonofWyrmscar.png',
       objectPosition: '50% 24%',
     },
     {
-      src: '/images/home/cards/yako-illusionist.png',
+      src: 'https://assets.echoesofastra.com/cards/IMP144_YakoIllusionist.png',
       objectPosition: '50% 19%',
     },
   ];
@@ -228,14 +228,14 @@ export default async function HomePage({ params }: LocalePageProps) {
               </div>
               <div className="home-battlefield-banner-cards" aria-hidden="true">
                 <Image
-                  src="/images/home/cards/lingyi-the-gilded-prophet.png"
+                  src="https://assets.echoesofastra.com/cards/IMP105_Lingyi,theGildedProphet.png"
                   alt=""
                   width={420}
                   height={588}
                   className="home-battlefield-banner-card home-battlefield-banner-card-left"
                 />
                 <Image
-                  src="/images/home/cards/vero-captain-of-the-guard.png"
+                  src="https://assets.echoesofastra.com/cards/IMP051_Vero,CaptainoftheGuard.png"
                   alt=""
                   width={420}
                   height={588}
@@ -268,21 +268,21 @@ export default async function HomePage({ params }: LocalePageProps) {
           <div className="home-showcase-sticky">
             <div className="home-showcase-stage">
               <Image
-                src="/images/home/cards/valeria-dragoon-knight.png"
+                src="https://assets.echoesofastra.com/cards/IMP078_Valeria,DragoonKnight.png"
                 alt=""
                 width={600}
                 height={840}
                 className="home-showcase-card home-showcase-card-left"
               />
               <Image
-                src="/images/home/cards/nerezza-umbrasco-scion.png"
+                src="https://assets.echoesofastra.com/cards/IMP011_Nerezza,UmbrascoScion.png"
                 alt=""
                 width={750}
                 height={1050}
                 className="home-showcase-card home-showcase-card-center"
               />
               <Image
-                src="/images/home/cards/akeno-noble-samurai.png"
+                src="https://assets.echoesofastra.com/cards/IMP127_Akeno,NobleSamurai.png"
                 alt=""
                 width={600}
                 height={840}
