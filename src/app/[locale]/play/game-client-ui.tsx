@@ -177,7 +177,7 @@ export function CompactZoneStack({
     <>
       <div
         className={`relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
-          compact ? 'h-[min(4.35rem,100%)]' : 'h-20'
+          compact ? 'h-16' : 'h-20'
         }`}
         title={label}
       >
@@ -211,7 +211,9 @@ export function CompactZoneStack({
       <button
         type="button"
         onClick={onClick}
-        className="grid min-h-0 w-full grid-rows-[1fr_auto] place-items-center px-2 py-1.5 transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+        className={`grid min-h-0 w-full place-items-center transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+          compact ? 'grid-rows-[auto_auto] px-1 py-1' : 'grid-rows-[1fr_auto] px-2 py-1.5'
+        }`}
       >
         {stackContent}
       </button>
@@ -219,7 +221,9 @@ export function CompactZoneStack({
   }
 
   return (
-    <div className="grid min-h-0 w-full grid-rows-[1fr_auto] place-items-center px-2 py-1.5">
+    <div className={`grid min-h-0 w-full place-items-center ${
+      compact ? 'grid-rows-[auto_auto] px-1 py-1' : 'grid-rows-[1fr_auto] px-2 py-1.5'
+    }`}>
       {stackContent}
     </div>
   );
@@ -238,7 +242,7 @@ export function OpponentHandStrip({ cards, locale = 'en' }: { cards: GameCardIns
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
-            const rotation = Math.max(-12, Math.min(12, offsetFromCenter * 3.2));
+            const rotation = Math.max(-10, Math.min(10, offsetFromCenter * 2.8));
             const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
             const handCardStyle = {
               '--opponent-hand-card-y': `${-36 - verticalOffset}px`,
@@ -254,7 +258,7 @@ export function OpponentHandStrip({ cards, locale = 'en' }: { cards: GameCardIns
                 style={{ zIndex: index + 1 }}
               >
                 <div
-                  className="relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
+                  className="relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] transform-gpu overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
                   style={handCardStyle}
                 >
                   <Image
