@@ -2177,7 +2177,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
   return (
     <main className="play-simulator-workspace flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 text-[color:var(--text-primary)] lg:px-6">
-      {content}
+      <section className="flex min-h-[60vh] flex-1 items-center justify-center lg:landscape:hidden">
+        <p className="max-w-md text-center text-base font-semibold text-[color:var(--text-secondary)]">
+          {lobbyCopy.simulatorUnavailable}
+        </p>
+      </section>
+      <div className="hidden min-h-0 flex-1 flex-col lg:landscape:flex">
+        {content}
+      </div>
     </main>
   );
 }
