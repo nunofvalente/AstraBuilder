@@ -1530,7 +1530,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               </ol>
             </aside>
           </div>
-          <div className="relative grid min-h-[42rem] grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
+          <div className="relative grid min-h-[42rem] grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
             {pendingCombat && !pendingCounterTargetSource ? (
               <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/45 px-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">
@@ -1650,7 +1650,6 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               deckCards={gameState.opponentZones.deck}
               temporarySupplyCount={gameState.opponentTemporarySupply}
               currentCombatStatsByInstanceId={currentCombatStatsByInstanceId}
-              compact
               mirror
               cardsDrawnThisTurnByOwner={{
                 player: gameState.playerCardsDrawnThisTurn,
