@@ -151,10 +151,67 @@ describe('Nox card abilities', () => {
     const discarded = triggerCardAbilities(active, 'onDeath', { source: zealot, controller: 'player', zone: 'graveyard' });
     expect(discarded.opponentZones.hand).toEqual([]);
 
+    const playerCard = makeCard('player-card', 'Player Card', '', 'Unit');
+    const opponentZealot = makeCard('IMP017', 'Valrathian Zealot', 'On Death: Target opponent discards a card.', 'Unit');
+    opponentZealot.owner = 'opponent';
+    const playerDiscardPending = triggerCardAbilities({
+      ...state,
+      zones: { ...state.zones, hand: [playerCard] },
+    }, 'onDeath', { source: opponentZealot, controller: 'opponent', zone: 'graveyard' });
+    expect(playerDiscardPending.pendingChoice).toMatchObject({
+      kind: 'forcedDiscard',
+      availableCardInstanceIds: [playerCard.instanceId],
+      sourceName: 'Valrathian Zealot',
+    });
+    const playerDiscarded = resolvePendingChoice(playerDiscardPending, [playerCard.instanceId]);
+    expect('error' in playerDiscarded ? null : playerDiscarded.zones.graveyard[0]?.instanceId).toBe(playerCard.instanceId);
+
     const pending = triggerCardAbilities(discarded, 'onDeath', { source: retainer, controller: 'player', zone: 'graveyard' });
     expect(pending.pendingChoice).toMatchObject({ kind: 'noxTarget', effect: 'retainerBuff' });
     const resolved = resolvePendingChoice(pending, [ally.instanceId]);
     expect('error' in resolved ? null : resolved.zones.staging[0]?.temporaryInfluenceBonus).toBe(1);
+  });
+
+  it('opens a discard choice when the player destroys an opponent Valrathian Zealot in combat', () => {
+    const attacker = makeUnit('attacker', 'player', {
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 5, influence: 1 }),
+    });
+    const zealot = makeUnit('IMP017', 'opponent', {
+      card: createTestCard({
+        id: 'IMP017',
+        name: 'Valrathian Zealot',
+        type: 'Unit Demon',
+        attack: 0,
+        health: 2,
+        rulesText: 'On Death: Target opponent discards a card.',
+      }),
+    });
+    const discard = makeCard('discard', 'Discard Me', '', 'Tactic');
+    const state = makeState();
+
+    const result = resolveBattlefieldAttack({
+      ...state,
+      zones: {
+        ...state.zones,
+        hand: [discard],
+        staging: [attacker],
+        battlefieldLeft: [zealot],
+      },
+    }, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in result ? result.error : null).toBeNull();
+    if ('error' in result) {
+      return;
+    }
+
+    expect(result.state.pendingChoice).toMatchObject({
+      kind: 'forcedDiscard',
+      availableCardInstanceIds: [discard.instanceId],
+      sourceName: 'Valrathian Zealot',
+    });
+
+    const resolved = resolvePendingChoice(result.state, [discard.instanceId]);
+    expect('error' in resolved ? null : resolved.zones.graveyard[0]?.instanceId).toBe(discard.instanceId);
   });
 
   it('uses cards drawn this turn as Vermillion base influence', () => {

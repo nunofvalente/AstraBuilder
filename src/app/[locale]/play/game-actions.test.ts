@@ -685,14 +685,49 @@ describe('deterministic player card actions', () => {
     expect(result.state.zones.supply[0]?.ready).toBe(false);
   });
 
-  it('does not let a player have two Renowned units in play', () => {
+  it('lets a player have multiple Renowned units with different names in play', () => {
     const existingRenowned = makeInstance({
       instanceId: 'existing-renowned',
-      card: createTestCard({ id: 'renowned-1', name: 'Existing Renowned', type: 'Renowned Unit', cost: 1 }),
+      card: createTestCard({ id: 'renowned-1', name: 'Calico, the Blood Witch', type: 'Renowned Unit', cost: 1 }),
     });
     const secondRenowned = makeInstance({
       instanceId: 'second-renowned',
-      card: createTestCard({ id: 'renowned-2', name: 'Second Renowned', type: 'Renowned Unit', cost: 1 }),
+      card: createTestCard({ id: 'renowned-2', name: 'Lucille', type: 'Renowned Unit', cost: 1 }),
+    });
+    const supply = makeInstance({ instanceId: 'supply', ready: true });
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [secondRenowned],
+        staging: [existingRenowned],
+        supply: [supply],
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: secondRenowned.instanceId,
+      fromZone: 'hand',
+      toZone: 'staging',
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.hand).toEqual([]);
+    expect(result.state.zones.staging.map((instance) => instance.instanceId)).toEqual([
+      secondRenowned.instanceId,
+      existingRenowned.instanceId,
+    ]);
+  });
+
+  it('does not let a player have two Renowned units with the same name in play', () => {
+    const existingRenowned = makeInstance({
+      instanceId: 'existing-renowned',
+      card: createTestCard({ id: 'renowned-1', name: 'Lucille', type: 'Renowned Unit', cost: 1 }),
+    });
+    const secondRenowned = makeInstance({
+      instanceId: 'second-renowned',
+      card: createTestCard({ id: 'renowned-2', name: 'Lucille', type: 'Renowned Unit', cost: 1 }),
     });
     const supply = makeInstance({ instanceId: 'supply', ready: true });
     const baseState = makePlayerTurn();
@@ -713,7 +748,7 @@ describe('deterministic player card actions', () => {
     });
 
     expect(result.applied).toBe(false);
-    expect(result.error).toBe('You can only have one Renowned unit in play.');
+    expect(result.error).toBe('You can only have one Renowned unit named Lucille in play.');
     expect(result.state.zones.hand).toEqual([secondRenowned]);
     expect(result.state.zones.staging).toEqual([existingRenowned]);
   });
