@@ -7,10 +7,12 @@ import {
   getHandActions,
   getPendingChoiceTargetCards,
   isPrivateOpponentSupplyChoiceTarget,
+  shouldContinueBotTurnAfterResolvedAttack,
 } from './game-client-support';
 import {
   buildInitialGameState,
   type GameCardInstance,
+  type GameState,
   type PendingChoice,
   type SavedDeck,
 } from './game-rules';
@@ -33,6 +35,15 @@ function makeInstance(id: string): GameCardInstance {
 }
 
 describe('game client support', () => {
+  function makeBotMainState(overrides: Partial<GameState> = {}): GameState {
+    return {
+      ...buildInitialGameState(makeDeck(), makeDeck()),
+      phase: 'main',
+      activePlayer: 'opponent',
+      ...overrides,
+    };
+  }
+
   it('localizes card actions for every supported non-English locale', () => {
     const base = buildInitialGameState(makeDeck(), makeDeck());
     const unit: GameCardInstance = {
@@ -153,5 +164,34 @@ describe('game client support', () => {
     expect(getPendingChoiceTargetCards(state, pendingChoice)).toEqual([playerSupply, opponentSupply]);
     expect(isPrivateOpponentSupplyChoiceTarget(state, pendingChoice, opponentSupply)).toBe(true);
     expect(isPrivateOpponentSupplyChoiceTarget(state, pendingChoice, playerSupply)).toBe(false);
+  });
+
+  it('continues the bot turn after an instant resolved attack leaves no pending work', () => {
+    expect(shouldContinueBotTurnAfterResolvedAttack(makeBotMainState())).toBe(true);
+  });
+
+  it('does not continue the bot turn while combat, choices, or another turn are active', () => {
+    expect(shouldContinueBotTurnAfterResolvedAttack(makeBotMainState({
+      pendingCombat: {
+        attackerOwner: 'opponent',
+        attackerInstanceId: 'attacker',
+        targetZone: 'battlefieldLeft',
+        defenderInstanceId: 'defender',
+        priorityOwner: 'player',
+        lastPassedOwner: null,
+        counterStack: [],
+      },
+    }))).toBe(false);
+    expect(shouldContinueBotTurnAfterResolvedAttack(makeBotMainState({
+      pendingChoice: {
+        kind: 'noxTarget',
+        owner: 'player',
+        sourceInstanceId: 'source',
+        sourceName: 'Source',
+        effect: 'retainerBuff',
+        availableInstanceIds: ['target'],
+      },
+    }))).toBe(false);
+    expect(shouldContinueBotTurnAfterResolvedAttack(makeBotMainState({ activePlayer: 'player' }))).toBe(false);
   });
 });

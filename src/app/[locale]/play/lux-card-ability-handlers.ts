@@ -22,6 +22,7 @@ import {
   recordCardsDrawn,
   readyUnitInPlay,
   removeUnitFromPlay,
+  shouldCardCeaseInZone,
   type GameCardInstance,
   type GameState,
   type Owner,
@@ -215,12 +216,16 @@ function removeCardToHand(state: GameState, target: GameCardInstance): GameState
           [zone]: state.zones[zone].filter((card) => !removedIds.has(card.instanceId)),
         },
       };
-  nextState = setOwnerPrivateZone(
-    nextState,
-    target.owner,
-    'hand',
-    [prepareCardForZone(target, 'hand'), ...getOwnerPrivateZone(nextState, target.owner, 'hand')]
-  );
+  if (!shouldCardCeaseInZone(target, 'hand')) {
+    nextState = setOwnerPrivateZone(
+      nextState,
+      target.owner,
+      'hand',
+      shouldCardCeaseInZone(target, 'hand')
+        ? getOwnerPrivateZone(nextState, target.owner, 'hand')
+        : [prepareCardForZone(target, 'hand'), ...getOwnerPrivateZone(nextState, target.owner, 'hand')]
+    );
+  }
   for (const attachment of attachments) {
     nextState = setOwnerPrivateZone(
       nextState,
@@ -256,12 +261,14 @@ function banishCard(state: GameState, target: GameCardInstance): GameState {
           [zone]: state.zones[zone].filter((card) => !removedIds.has(card.instanceId)),
         },
       };
-  nextState = setOwnerPrivateZone(
-    nextState,
-    target.owner,
-    'banish',
-    [prepareCardForZone(target, 'banish'), ...getOwnerPrivateZone(nextState, target.owner, 'banish')]
-  );
+  if (!shouldCardCeaseInZone(target, 'banish')) {
+    nextState = setOwnerPrivateZone(
+      nextState,
+      target.owner,
+      'banish',
+      [prepareCardForZone(target, 'banish'), ...getOwnerPrivateZone(nextState, target.owner, 'banish')]
+    );
+  }
   for (const attachment of attachments) {
     nextState = setOwnerPrivateZone(
       nextState,
@@ -579,7 +586,11 @@ function resolveStormhammer({ state, event }: AbilityContext): AbilityResolution
     };
   }
   const exhausted = updateUnitInPlay(state, exhaustTargets[0]!.instanceId, (unit) => ({ ...unit, ready: false }));
-  return { state: damageUnit(exhausted, damageTargets[0]!, 4), resolved: true };
+  return {
+    state: damageUnit(exhausted, damageTargets[0]!, 4),
+    resolved: true,
+    message: `${event.source.card.name} exhausted ${exhaustTargets[0]!.card.name} to deal 4 damage to ${damageTargets[0]!.card.name}.`,
+  };
 }
 
 export function resolveLuxTargetChoice(
@@ -684,12 +695,14 @@ export function resolveLuxTargetChoice(
         'graveyard',
         graveyard.filter((card) => card.instanceId !== deadUnit.instanceId)
       );
-      nextState = setOwnerPrivateZone(
-        nextState,
-        deadUnit.owner,
-        'hand',
-        [prepareCardForZone(deadUnit, 'hand'), ...getOwnerPrivateZone(nextState, deadUnit.owner, 'hand')]
-      );
+    nextState = setOwnerPrivateZone(
+      nextState,
+      deadUnit.owner,
+      'hand',
+      shouldCardCeaseInZone(deadUnit, 'hand')
+        ? getOwnerPrivateZone(nextState, deadUnit.owner, 'hand')
+        : [prepareCardForZone(deadUnit, 'hand'), ...getOwnerPrivateZone(nextState, deadUnit.owner, 'hand')]
+    );
       nextState = banishOrSacrificeTerritory(nextState, territory, false);
       break;
     }
@@ -707,7 +720,9 @@ export function resolveLuxTargetChoice(
         zones: {
           ...nextState.zones,
           graveyard: graveyard.filter((card) => card.instanceId !== selected[0]!.instanceId),
-          hand: [prepareCardForZone(selected[0]!, 'hand'), ...nextState.zones.hand],
+          hand: shouldCardCeaseInZone(selected[0]!, 'hand')
+            ? nextState.zones.hand
+            : [prepareCardForZone(selected[0]!, 'hand'), ...nextState.zones.hand],
         },
       };
       break;
@@ -743,6 +758,14 @@ export function resolveLuxTargetChoice(
       break;
     case 'stormhammerDamage':
       nextState = damageUnit(nextState, selected[0]!, 4);
+      if (source) {
+        nextState = {
+          ...nextState,
+          log: addLogEntry(nextState, {
+            suffix: `${source.card.name} dealt 4 damage to ${selected[0]!.card.name}.`,
+          }),
+        };
+      }
       break;
     case 'suppression':
       nextState = banishCard(nextState, selected[0]!);
@@ -803,7 +826,9 @@ export function applyHallowedSanctumDeath(
     nextState,
     unit.owner,
     'hand',
-    [prepareCardForZone(unit, 'hand'), ...getOwnerPrivateZone(nextState, unit.owner, 'hand')]
+    shouldCardCeaseInZone(unit, 'hand')
+      ? getOwnerPrivateZone(nextState, unit.owner, 'hand')
+      : [prepareCardForZone(unit, 'hand'), ...getOwnerPrivateZone(nextState, unit.owner, 'hand')]
   );
   return banishOrSacrificeTerritory(nextState, sanctum, false);
 }

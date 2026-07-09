@@ -6,6 +6,7 @@ import {
   advanceToNextTurn,
   buildInitialGameState,
   declareBattlefieldAttack,
+  getBattlefieldAttackError,
   resolveBattlefieldAttack,
   type GameCardInstance,
   type GameState,
@@ -302,6 +303,44 @@ describe('deterministic player card actions', () => {
       ready: false,
     });
     expect(result.state.zones.supply[0]?.ready).toBe(false);
+  });
+
+  it('plays Lingyi from hand exhausted even though her on-enter grants Blitz to another card', () => {
+    const lingyi = makeInstance({
+      instanceId: 'lingyi',
+      card: createTestCard({
+        id: 'IMP105',
+        name: 'Lingyi, the Gilded Prophet',
+        type: 'Renowned Unit',
+        cost: 1,
+        rulesText: 'On Enter: You may reveal, then banish a unit card from your hand. It gains Blitz and "This card can be played from the banish pile once."',
+      }),
+    });
+    const supply = makeInstance({ instanceId: 'supply', ready: true });
+    const baseState = makePlayerTurn();
+    const state = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        hand: [lingyi],
+        supply: [supply],
+      },
+    };
+
+    const result = applyPlayerCardAction(state, {
+      instanceId: lingyi.instanceId,
+      fromZone: 'hand',
+      toZone: 'staging',
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.state.zones.staging[0]).toMatchObject({
+      instanceId: lingyi.instanceId,
+      ready: false,
+    });
+    expect(getBattlefieldAttackError(result.state, 'player', lingyi.instanceId, 'battlefieldLeft')).toBe(
+      'Only ready units can attack.'
+    );
   });
 
   it('plays IMP014 and creates an Experiment token on enter', () => {

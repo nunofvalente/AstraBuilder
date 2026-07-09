@@ -20,6 +20,7 @@ import {
   readyUnitInPlay,
   recordCardsDrawn,
   removeUnitFromPlay,
+  shouldCardCeaseInZone,
   type GameCardInstance,
   type GameState,
   type Owner,
@@ -552,7 +553,9 @@ export function resolveSolaraTargetChoice(
         const graveyard = ownerZone(next, target.owner, 'graveyard');
         if (!graveyard.some((card) => card.instanceId === target.instanceId)) continue;
         next = setOwnerZone(next, target.owner, 'graveyard', graveyard.filter((card) => card.instanceId !== target.instanceId));
-        next = setOwnerZone(next, target.owner, 'hand', [prepareCardForZone(target, 'hand'), ...ownerZone(next, target.owner, 'hand')]);
+        if (!shouldCardCeaseInZone(target, 'hand')) {
+          next = setOwnerZone(next, target.owner, 'hand', [prepareCardForZone(target, 'hand'), ...ownerZone(next, target.owner, 'hand')]);
+        }
       }
       break;
     case 'wyvernAttack': {

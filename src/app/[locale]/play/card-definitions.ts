@@ -24,21 +24,23 @@ export type CardDefinition = {
 };
 
 const KEYWORD_PATTERNS: Record<CardKeyword, RegExp> = {
-  blitz: /\bblitz\b/i,
-  flanking: /\bflanking\b/i,
-  flying: /\bflying\b/i,
-  fortify: /\bfortify\b/i,
-  glory: /\bglory\b/i,
-  impede: /\bimpede\b/i,
-  provoke: /\bprovoke\b/i,
-  radiance: /\bradiance\b/i,
-  swift: /\bswift\b/i,
+  blitz: /^\s*blitz\b/im,
+  flanking: /^\s*flanking\b/im,
+  flying: /^\s*flying\b/im,
+  fortify: /^\s*fortify\b/im,
+  glory: /^\s*glory\b/im,
+  impede: /^\s*impede\b/im,
+  provoke: /^\s*provoke\b/im,
+  radiance: /^\s*radiance\b/im,
+  swift: /^\s*swift\b/im,
 };
 
 export function getCardType(card: Card): CardType {
   const type = card.type.toLowerCase();
+  const subtype = card.subtype.toLowerCase();
+  const rarity = card.rarity.toLowerCase();
 
-  if (type.includes('token')) {
+  if (type.includes('token') || subtype.includes('token') || rarity === 'token') {
     return 'token';
   }
 

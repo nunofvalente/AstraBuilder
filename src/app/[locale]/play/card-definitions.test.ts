@@ -9,16 +9,31 @@ describe('card definitions', () => {
     expect(getCardType(createTestCard({ type: 'Tactic' }))).toBe('tactic');
     expect(getCardType(createTestCard({ type: 'Territory' }))).toBe('territory');
     expect(getCardType(createTestCard({ type: 'Item Equipment' }))).toBe('item');
+    expect(getCardType(createTestCard({ type: 'Unit', subtype: 'Drone Token', rarity: 'Token' }))).toBe('token');
   });
 
   it('derives keywords from rules text', () => {
-    const card = createTestCard({ rulesText: 'Blitz (This unit enters ready.) Provoke. Flanking. Swift.' });
+    const card = createTestCard({
+      rulesText: 'Blitz (This unit enters ready.)\nProvoke.\nFlanking.\nSwift.',
+    });
 
     expect(hasCardKeyword(card, 'blitz')).toBe(true);
     expect(hasCardKeyword(card, 'provoke')).toBe(true);
     expect(hasCardKeyword(card, 'flanking')).toBe(true);
     expect(hasCardKeyword(card, 'swift')).toBe(true);
     expect(hasCardKeyword(card, 'flying')).toBe(false);
+  });
+
+  it('does not treat granted keyword text as the source card having that keyword', () => {
+    const lingyi = createTestCard({
+      id: 'IMP105',
+      name: 'Lingyi, the Gilded Prophet',
+      type: 'Renowned Unit',
+      rulesText: 'On Enter: You may reveal, then banish a unit card from your hand. It gains Blitz and "This card can be played from the banish pile once."',
+    });
+
+    expect(hasCardKeyword(lingyi, 'blitz')).toBe(false);
+    expect(defineCard(lingyi).entersStagingExhausted).toBe(true);
   });
 
   it('derives default play destinations', () => {

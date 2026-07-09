@@ -25,6 +25,7 @@ import {
   readyUnitInPlay,
   recordCardsDrawn,
   removeUnitFromPlay,
+  shouldCardCeaseInZone,
   triggerCardAbilities,
   type GameCardInstance,
   type GameState,
@@ -168,10 +169,12 @@ function removeCardToHand(state: GameState, target: GameCardInstance): GameState
   let nextState = zone === 'staging'
     ? setOwnerPrivateZone(state, controller, 'staging', zoneCards.filter((card) => !removedIds.has(card.instanceId)))
     : { ...state, zones: { ...state.zones, [zone]: zoneCards.filter((card) => !removedIds.has(card.instanceId)) } };
-  nextState = setOwnerPrivateZone(nextState, target.owner, 'hand', [
-    prepareCardForZone(target, 'hand'),
-    ...getOwnerPrivateZone(nextState, target.owner, 'hand'),
-  ]);
+  if (!shouldCardCeaseInZone(target, 'hand')) {
+    nextState = setOwnerPrivateZone(nextState, target.owner, 'hand', [
+      prepareCardForZone(target, 'hand'),
+      ...getOwnerPrivateZone(nextState, target.owner, 'hand'),
+    ]);
+  }
   for (const attachment of attachments) {
     nextState = setOwnerPrivateZone(nextState, attachment.owner, 'graveyard', [
       prepareCardForZone(attachment, 'graveyard'),
@@ -279,10 +282,12 @@ function putUnitOnTopOfDeck(state: GameState, target: GameCardInstance): GameSta
   let nextState = zone === 'staging'
     ? setOwnerPrivateZone(state, controller, 'staging', zoneCards.filter((card) => !removedIds.has(card.instanceId)))
     : { ...state, zones: { ...state.zones, [zone]: zoneCards.filter((card) => !removedIds.has(card.instanceId)) } };
-  nextState = setOwnerPrivateZone(nextState, target.owner, 'deck', [
-    prepareCardForZone(target, 'deck'),
-    ...getOwnerPrivateZone(nextState, target.owner, 'deck'),
-  ]);
+  if (!shouldCardCeaseInZone(target, 'deck')) {
+    nextState = setOwnerPrivateZone(nextState, target.owner, 'deck', [
+      prepareCardForZone(target, 'deck'),
+      ...getOwnerPrivateZone(nextState, target.owner, 'deck'),
+    ]);
+  }
   for (const attachment of attachments) {
     nextState = setOwnerPrivateZone(nextState, attachment.owner, 'graveyard', [
       prepareCardForZone(attachment, 'graveyard'),
@@ -649,10 +654,12 @@ function resolveBreachTheDam({ state, event }: AbilityContext): AbilityResolutio
     const units = cards.filter((card) => isUnitCard(card.card));
     const attachedItems = cards.filter((card) => isItemCard(card.card) && card.attachedToInstanceId);
     for (const unit of units) {
-      nextState = setOwnerPrivateZone(nextState, unit.owner, 'hand', [
-        prepareCardForZone(unit, 'hand'),
-        ...getOwnerPrivateZone(nextState, unit.owner, 'hand'),
-      ]);
+      if (!shouldCardCeaseInZone(unit, 'hand')) {
+        nextState = setOwnerPrivateZone(nextState, unit.owner, 'hand', [
+          prepareCardForZone(unit, 'hand'),
+          ...getOwnerPrivateZone(nextState, unit.owner, 'hand'),
+        ]);
+      }
     }
     for (const item of attachedItems) {
       nextState = setOwnerPrivateZone(nextState, item.owner, 'graveyard', [
