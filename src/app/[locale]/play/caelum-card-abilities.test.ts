@@ -217,6 +217,22 @@ describe('Caelum card abilities', () => {
       ])
     );
 
+    const token = makeUnit('token', 'opponent', {
+      card: createTestCard({ id: 'token', name: 'Drone', type: 'Unit', subtype: 'Drone Token', rarity: 'Token', affinity: 'Neutral' }),
+    });
+    const tokenState = {
+      ...makeState(),
+      opponentZones: { ...makeState().opponentZones, staging: [token] },
+    };
+    const tokenBouncePending = triggerCardAbilities(tokenState, 'onEnter', {
+      source: leviathan,
+      controller: 'player',
+      zone: 'staging',
+    });
+    const bouncedToken = resolvePendingChoice(tokenBouncePending, [token.instanceId]);
+    expect('error' in bouncedToken ? null : bouncedToken.opponentZones.staging).toEqual([]);
+    expect('error' in bouncedToken ? null : bouncedToken.opponentZones.hand).toEqual([]);
+
     const lockdownPending = triggerCardAbilities(state, 'onEnter', {
       source: enforcer,
       controller: 'player',
@@ -556,6 +572,21 @@ describe('Caelum card abilities', () => {
     const warpedPending = triggerCardAbilities(state, 'onPlay', { source: voidWarp, controller: 'player', zone: 'graveyard' });
     const warped = resolvePendingChoice(warpedPending, [target.instanceId]);
     expect('error' in warped ? null : warped.opponentZones.deck[0]?.instanceId).toBe(target.instanceId);
+
+    const token = makeUnit('token', 'opponent', {
+      card: createTestCard({ id: 'token', name: 'Drone', type: 'Unit', subtype: 'Drone Token', rarity: 'Token', affinity: 'Neutral' }),
+    });
+    const tokenState = {
+      ...makeState(),
+      zones: {
+        ...makeState().zones,
+        battlefieldLeft: [token],
+      },
+    };
+    const tokenWarpPending = triggerCardAbilities(tokenState, 'onPlay', { source: voidWarp, controller: 'player', zone: 'graveyard' });
+    const tokenWarped = resolvePendingChoice(tokenWarpPending, [token.instanceId]);
+    expect('error' in tokenWarped ? null : tokenWarped.zones.battlefieldLeft).toEqual([]);
+    expect('error' in tokenWarped ? null : tokenWarped.opponentZones.deck.some((card) => card.instanceId === token.instanceId)).toBe(false);
 
     const destroyed = activateCardAbility(state, 'player', dreadnought.instanceId, target.instanceId);
     expect(destroyed).not.toHaveProperty('error');

@@ -177,7 +177,7 @@ export function CompactZoneStack({
     <>
       <div
         className={`relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
-          compact ? 'h-16' : 'h-20'
+          compact ? 'h-16 min-[2560px]:h-20' : 'h-20'
         }`}
         title={label}
       >
@@ -187,7 +187,7 @@ export function CompactZoneStack({
               src={faceDown ? CARD_BACK_IMAGE_SRC : topCard?.card.imageSrc || CARD_BACK_IMAGE_SRC}
               alt=""
               fill
-              sizes={compact ? '44px' : '56px'}
+              sizes={compact ? '(min-width: 2560px) 56px, 44px' : '56px'}
               className="object-cover"
             />
             <span className="absolute inset-0 flex items-center justify-center">
@@ -212,7 +212,7 @@ export function CompactZoneStack({
         type="button"
         onClick={onClick}
         className={`grid min-h-0 w-full place-items-center transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
-          compact ? 'grid-rows-[auto_auto] px-1 py-1' : 'grid-rows-[1fr_auto] px-2 py-1.5'
+          compact ? 'grid-rows-[auto_auto] px-1 py-1 min-[2560px]:grid-rows-[1fr_auto] min-[2560px]:px-2 min-[2560px]:py-1.5' : 'grid-rows-[1fr_auto] px-2 py-1.5'
         }`}
       >
         {stackContent}
@@ -222,7 +222,7 @@ export function CompactZoneStack({
 
   return (
     <div className={`grid min-h-0 w-full place-items-center ${
-      compact ? 'grid-rows-[auto_auto] px-1 py-1' : 'grid-rows-[1fr_auto] px-2 py-1.5'
+      compact ? 'grid-rows-[auto_auto] px-1 py-1 min-[2560px]:grid-rows-[1fr_auto] min-[2560px]:px-2 min-[2560px]:py-1.5' : 'grid-rows-[1fr_auto] px-2 py-1.5'
     }`}>
       {stackContent}
     </div>
