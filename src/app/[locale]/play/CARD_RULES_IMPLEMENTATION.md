@@ -19,7 +19,7 @@ Card rules are implemented from canonical card text, not stored as executable da
 
 ## Implemented Affinities
 
-- Nox cards `IMP001` through `IMP032` are registered and integrated with the simulator.
+- Nox cards `IMP001` through `IMP032` are registered and integrated with the simulator, including player-choice discard prompts for Valrathian Zealot and other forced-discard death effects.
 - Lux cards `IMP033` through `IMP063` plus balance extra `IMP161` are registered and integrated with the simulator.
 - Lux integration includes Provoke, combat stat modifiers, damage prevention, Drone creation, targeted tactics and counters, graveyard recovery, temporary supply, end-turn choices, Quarantine Zone rules, and Fortified Pillbox zone health bonuses.
 - Caelum cards `IMP064` through `IMP095` are registered.
@@ -54,6 +54,7 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Staging accepts units only.
 - Battlefield zones accept territories from hand and ready units from staging.
 - Units enter staging exhausted unless they have `Blitz`.
+- Renowned units are limited to one in play per card name for each controller.
 - Equipment must be attached to one of your units in staging when played.
 - Attached equipment is rendered tucked under its host unit instead of as a separate free-standing staging card.
 - Attachment state is stabilized after board moves; equipment without a legal same-zone unit host is sent to graveyard automatically.
