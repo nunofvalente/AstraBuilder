@@ -533,7 +533,7 @@ export function BattlefieldPanel({
 
   function renderSlot(instance: GameCardInstance | null, label: string | null, size: 'unit' | 'territory') {
     const isActive = activeInstanceId === instance?.instanceId;
-    const sizeClassName = size === 'unit' ? 'h-[min(11rem,100%)]' : 'h-[min(10.25rem,100%)]';
+    const sizeClassName = size === 'unit' ? 'h-[7.1rem]' : 'h-[6.35rem]';
     const slotClassName =
       size === 'unit'
         ? 'border-[color:var(--accent)]/45 bg-[color:var(--surface-muted)]/35'
@@ -624,12 +624,12 @@ export function BattlefieldPanel({
         <div className="flex min-h-0 items-center justify-center overflow-visible">
           <div className="relative flex h-full items-center justify-center overflow-visible">
             {unit ? (
-              <div className="absolute left-1/2 top-[5.2rem] z-0 -translate-x-1/2">
+              <div className="absolute left-1/2 top-[5.35rem] z-0 -translate-x-1/2">
                 <AttachedEquipmentCards
                   cards={getAttachedCards(cards, unit.instanceId)}
-                  cardHeight={166}
-                  offset={32}
-                  exposedHeight={116}
+                  cardHeight={72}
+                  offset={24}
+                  exposedHeight={28}
                   interactive
                   onCardMouseEnter={openEquipmentPreview}
                   onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
@@ -753,12 +753,12 @@ export function CombinedStagingSupplyPanel({
   const canActivateActiveStagingCard = canShowActivatedAbilityAction(activeStagingCard, onActivate);
   const rowsClassName = compact
     ? mirror
-      ? 'grid-rows-[minmax(5.25rem,0.42fr)_minmax(9.5rem,0.82fr)]'
-      : 'grid-rows-[minmax(9.5rem,0.82fr)_minmax(5.25rem,0.42fr)]'
+      ? 'grid-rows-[minmax(4.6rem,0.38fr)_minmax(7rem,0.66fr)]'
+      : 'grid-rows-[minmax(7rem,0.66fr)_minmax(4.6rem,0.38fr)]'
     : mirror
-      ? 'grid-rows-[minmax(5.75rem,0.44fr)_minmax(12rem,0.86fr)]'
-      : 'grid-rows-[minmax(12rem,0.86fr)_minmax(5.75rem,0.44fr)]';
-  const stagingCardClassName = compact ? 'h-[min(8rem,100%)]' : 'h-[min(10.75rem,100%)]';
+      ? 'grid-rows-[minmax(5.1rem,0.4fr)_minmax(10rem,0.86fr)]'
+      : 'grid-rows-[minmax(10rem,0.86fr)_minmax(5.1rem,0.4fr)]';
+  const stagingCardClassName = compact ? 'h-[5.6rem]' : 'h-[7.5rem]';
   const panelToneClassName = 'border-[color:var(--accent)]/24 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.10),transparent_42%),linear-gradient(180deg,rgba(54,48,42,0.78),rgba(30,28,26,0.72))]';
   const stagingToneClassName = 'border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(255,226,183,0.045),rgba(0,0,0,0.13))]';
   const visibleTemporarySupplyCount = Math.max(0, Math.floor(temporarySupplyCount));
@@ -847,15 +847,15 @@ export function CombinedStagingSupplyPanel({
                 return (
                 <div
                   key={instance.instanceId}
-                  className={`relative flex h-full flex-none items-center justify-center ${attachedItems.length > 0 ? compact ? 'pb-16' : 'pb-24' : ''} ${instance.ready ? '' : compact ? 'w-[8rem]' : 'w-[10.75rem]'}`}
+                  className={`relative flex h-full flex-none items-center justify-center ${attachedItems.length > 0 ? compact ? 'pb-10' : 'pb-9' : ''} ${instance.ready ? '' : compact ? 'w-[5.6rem]' : 'w-[7.5rem]'}`}
                 >
                   {attachedItems.length > 0 ? (
-                    <div className={`absolute left-1/2 z-0 -translate-x-1/2 ${compact ? 'top-[2.8rem]' : 'top-[3.9rem]'}`}>
+                    <div className={`absolute left-1/2 z-0 -translate-x-1/2 ${compact ? 'top-[2.1rem]' : 'top-[5.35rem]'}`}>
                       <AttachedEquipmentCards
                         cards={attachedItems}
-                        cardHeight={compact ? 112 : 146}
-                        offset={compact ? 24 : 30}
-                        exposedHeight={compact ? 28 : 40}
+                        cardHeight={compact ? 64 : 72}
+                        offset={compact ? 17 : 24}
+                        exposedHeight={compact ? 20 : 28}
                         interactive
                         onCardMouseEnter={openEquipmentPreview}
                         onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
@@ -938,21 +938,23 @@ export function CombinedStagingSupplyPanel({
             )}
           </div>
           <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
-          <div className="grid min-h-0 w-20 grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center">
-            <div className="flex min-h-0 w-20 items-center justify-center">
+          <div className="grid min-h-0 w-[4.5rem] grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center">
+            <div className="flex min-h-0 w-[4.5rem] items-center justify-center">
               <CompactZoneStack
                 label={mirror ? copy.deck : copy.banish}
                 cards={mirror ? deckCards : banishCards}
                 faceDown={mirror}
+                compact
                 onClick={mirror ? undefined : () => setIsBanishOpen(true)}
               />
             </div>
             <div className="mx-2 h-px bg-[color:var(--border)]/70" aria-hidden="true" />
-            <div className="flex min-h-0 w-20 items-center justify-center">
+            <div className="flex min-h-0 w-[4.5rem] items-center justify-center">
               <CompactZoneStack
                 label={mirror ? copy.banish : copy.deck}
                 cards={mirror ? banishCards : deckCards}
                 faceDown={!mirror}
+                compact
                 onClick={mirror ? () => setIsBanishOpen(true) : undefined}
               />
             </div>
@@ -977,11 +979,11 @@ export function CombinedStagingSupplyPanel({
                   {Array.from({ length: visibleTemporarySupplyCount }, (_, index) => (
                     <div
                       key={`temporary-supply-${index}`}
-                      className="flex h-20 w-20 flex-none items-center justify-center"
+                      className="flex h-16 w-16 flex-none items-center justify-center"
                       data-temporary-supply
                     >
                       <div
-                        className="relative flex aspect-[5/7] h-20 flex-col items-center justify-center overflow-hidden rounded-md border-2 border-amber-200/80 bg-amber-600 text-white shadow-md shadow-amber-950/30"
+                        className="relative flex aspect-[5/7] h-16 flex-col items-center justify-center overflow-hidden rounded-md border-2 border-amber-200/80 bg-amber-600 text-white shadow-md shadow-amber-950/30"
                         title="Temporary supply"
                         aria-label={`Temporary supply ${index + 1} of ${visibleTemporarySupplyCount}`}
                       >
@@ -993,13 +995,13 @@ export function CombinedStagingSupplyPanel({
                   {supplyCards.map((instance) => (
                     <div
                       key={instance.instanceId}
-                      className="flex h-20 w-20 flex-none items-center justify-center"
+                      className="flex h-16 w-16 flex-none items-center justify-center"
                       aria-hidden={canInspectSupplyCards ? undefined : 'true'}
                     >
                       {canInspectSupplyCards ? (
                         <button
                           type="button"
-                          className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+                          className={`relative aspect-[5/7] h-16 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
                           aria-label={`Inspect supply card ${instance.card.name}`}
                           onMouseEnter={() => openSupplyPreview(instance)}
                           onFocus={() => openSupplyPreview(instance)}
@@ -1009,7 +1011,7 @@ export function CombinedStagingSupplyPanel({
                           <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
                         </button>
                       ) : (
-                        <div className={`relative aspect-[5/7] h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
+                        <div className={`relative aspect-[5/7] h-16 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
                           <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
                         </div>
                       )}
@@ -1020,8 +1022,8 @@ export function CombinedStagingSupplyPanel({
               </div>
             </div>
             <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
-            <div className="flex min-h-0 w-20 items-center justify-center px-0">
-              <CompactZoneStack label={copy.graveyard} cards={graveyardCards} onClick={() => setIsGraveyardOpen(true)} />
+            <div className="flex min-h-0 w-[4.5rem] items-center justify-center px-0">
+              <CompactZoneStack label={copy.graveyard} cards={graveyardCards} compact onClick={() => setIsGraveyardOpen(true)} />
             </div>
           </div>
         </div>
@@ -1379,7 +1381,7 @@ export function HandStrip({
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
-            const rotation = Math.max(-12, Math.min(12, offsetFromCenter * 3.2));
+            const rotation = Math.max(-10, Math.min(10, offsetFromCenter * 2.8));
             const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
             const handCardStyle = {
               '--hand-card-y': `${62 + verticalOffset}px`,
@@ -1390,7 +1392,7 @@ export function HandStrip({
             return (
             <article
               key={instance.instanceId}
-              className="relative flex w-16 flex-none justify-center"
+              className="relative flex w-16 flex-none justify-center hover:z-40"
               style={{ zIndex: activeCardId === instance.instanceId ? 30 : index + 1 }}
             >
               <button
@@ -1401,7 +1403,7 @@ export function HandStrip({
                 onFocus={() => setPreviewCard(instance.card)}
                 onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
                 onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-                className="pointer-events-auto group flex w-28 translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] rounded-md focus:outline-none transition-transform duration-200 hover:translate-y-6 hover:rotate-0 focus-visible:translate-y-6 focus-visible:rotate-0"
+                className="pointer-events-auto group flex w-28 origin-bottom translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] transform-gpu rounded-md transition-transform duration-200 hover:translate-y-6 hover:rotate-0 hover:scale-110 focus:outline-none focus-visible:translate-y-6 focus-visible:rotate-0 focus-visible:scale-110"
                 style={handCardStyle}
                 aria-expanded={activeCardId === instance.instanceId}
                 aria-haspopup={disabled ? undefined : 'menu'}
