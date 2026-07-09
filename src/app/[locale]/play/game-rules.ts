@@ -599,12 +599,15 @@ export function getRenownedUnitLimitError(
     return null;
   }
 
+  const enteringName = enteringUnit.card.name.trim().toLowerCase();
   const existingRenowned = getRenownedUnitsInPlay(state, owner).find(
-    (instance) => instance.instanceId !== ignoreInstanceId
+    (instance) =>
+      instance.instanceId !== ignoreInstanceId &&
+      instance.card.name.trim().toLowerCase() === enteringName
   );
 
   return existingRenowned
-    ? `${owner === 'player' ? 'You can' : 'Bot can'} only have one Renowned unit in play.`
+    ? `${owner === 'player' ? 'You can' : 'Bot can'} only have one Renowned unit named ${enteringUnit.card.name} in play.`
     : null;
 }
 
@@ -1598,6 +1601,10 @@ export function scoreBattlefieldVictoryPoints(state: GameState, owner: Owner): G
 }
 
 function finishAdvanceToNextTurnAfterScoring(state: GameState): GameState {
+  if (state.pendingChoice) {
+    return state;
+  }
+
   const cleanedState = clearEndOfTurnDamage(state);
 
   if (cleanedState.winner) {
@@ -3427,6 +3434,9 @@ export function resolveBattlefieldAttack(
       controller: getCardController(destroyedUnit),
       zone: targetZone,
     });
+    if (nextState.pendingChoice) {
+      break;
+    }
     if (getOwnerZoneMap(nextState, destroyedUnit.owner).graveyard.some(
       (card) => card.instanceId === destroyedUnit.instanceId
     )) {
@@ -3736,7 +3746,19 @@ export function advanceToNextTurn(state: GameState): GameState {
     const botUnits = getFriendlyUnitsInPlay(scoredState, 'opponent');
     if (botUnits.length > 0) {
       const removed = removeUnitFromPlay(scoredState, botUnits[0]!.instanceId);
-      return finishAdvanceToNextTurnAfterScoring('error' in removed ? scoredState : removed.state);
+      if ('error' in removed) {
+        return finishAdvanceToNextTurnAfterScoring(scoredState);
+      }
+      if (removed.state.pendingChoice) {
+        return {
+          ...removed.state,
+          pendingChoice: {
+            ...removed.state.pendingChoice,
+            resumeTurnAdvance: true,
+          } as PendingChoice,
+        };
+      }
+      return finishAdvanceToNextTurnAfterScoring(removed.state);
     }
     const hideoutZone = BATTLEFIELD_ZONE_IDS.find((zone) =>
       scoredState.zones[zone].some((instance) => instance.instanceId === hideout.instanceId)
