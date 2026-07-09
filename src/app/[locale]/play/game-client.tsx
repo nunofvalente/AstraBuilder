@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, ChevronDown, ChevronsRight, Flag, Play, RotateCcw, Sparkles, Swords, Users } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
@@ -71,6 +71,7 @@ import {
   getPendingChoiceTargetCards,
   isPrivateOpponentSupplyChoiceTarget,
   mapDeckRows,
+  shouldContinueBotTurnAfterResolvedAttack,
   type DeckRow,
   type MoveCardOptions,
 } from './game-client-support';
@@ -174,6 +175,14 @@ function DeckAffinityIcons({ affinities }: { affinities: string[] }) {
   );
 }
 
+function isInteractiveShortcutTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(target.closest('a, button, input, select, textarea, [contenteditable="true"], [role="button"]'));
+}
+
 export function GameClient({ locale, initialCards, initialError, initialMode = 'lobby' }: GameClientProps) {
   const playCopy = getPlayBoardCopy(locale);
   const controlsCopy = getPlayControlsCopy(locale);
@@ -231,6 +240,13 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const lobbyHref = `/${locale}/play`;
   const matchHref = `/${locale}/match`;
   const signInHref = `/${locale}/sign-in?redirect=${encodeURIComponent(isMatchRoute ? matchHref : lobbyHref)}`;
+  const canPassTurn = Boolean(
+    gameState &&
+    !gameState.winner &&
+    gameState.phase !== 'setup' &&
+    gameState.activePlayer === 'player' &&
+    !gameState.pendingCombat
+  );
 
   useEffect(() => {
     if (!isPlayerDeckMenuOpen && !isBotDeckMenuOpen) {
@@ -350,6 +366,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
             if (!nextState.pendingCombat) {
               clearAttackArrow(arrowId);
+              if (shouldContinueBotTurnAfterResolvedAttack(nextState)) {
+                scheduleBotAttackOrAdvance(BOT_POST_COMBAT_REVIEW_DELAY_MS);
+              }
             }
 
             return nextState;
@@ -606,16 +625,38 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     returnToLobby();
   }
 
-  function requestPassTurn() {
-    if (!gameState || gameState.winner || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+  const requestPassTurn = useCallback(() => {
+    if (!canPassTurn) {
       return;
     }
 
     setIsPassTurnDialogOpen(true);
-  }
+  }, [canPassTurn]);
+
+  useEffect(() => {
+    if (!canPassTurn || isConcedeDialogOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.code !== 'Space' || event.repeat || isInteractiveShortcutTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (isPassTurnDialogOpen) {
+        confirmPassTurn();
+      } else {
+        requestPassTurn();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canPassTurn, isConcedeDialogOpen, isPassTurnDialogOpen, requestPassTurn]);
 
   function confirmPassTurn() {
-    if (!gameState || gameState.winner || gameState.phase === 'setup' || gameState.activePlayer !== 'player') {
+    if (!canPassTurn || !gameState) {
       setIsPassTurnDialogOpen(false);
       return;
     }
@@ -865,7 +906,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       if (result.resolvedCombat) {
         setAttackArrow(null);
         if (result.state.activePlayer === 'opponent') {
-          scheduleBotTurnAdvance();
+          scheduleBotAttackOrAdvance(BOT_POST_COMBAT_REVIEW_DELAY_MS);
         }
         return result.state;
       }
@@ -1515,7 +1556,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                   {controlsCopy.concede}
                 </button>
-                <button type="button" onClick={requestPassTurn} disabled={Boolean(gameState.winner) || gameState.phase === 'setup' || gameState.activePlayer !== 'player' || Boolean(pendingCombat)} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={requestPassTurn} disabled={!canPassTurn} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
                   <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
                   {controlsCopy.passTurn}
                 </button>
@@ -1530,7 +1571,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               </ol>
             </aside>
           </div>
-          <div className="relative grid min-h-[42rem] grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
+          <div className="relative grid min-h-[42rem] grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0 min-[2560px]:grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)]">
             {pendingCombat && !pendingCounterTargetSource ? (
               <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/45 px-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">

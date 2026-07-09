@@ -50,6 +50,7 @@ import {
   triggerCardAbilities,
   VICTORY_POINT_TARGET,
   markSuppliedThisTurn,
+  moveCardsToOwnerGraveyards,
   type GameCardInstance,
   type SavedDeck,
 } from './game-rules';
@@ -195,6 +196,29 @@ describe('game rules', () => {
       ready: true,
       faceDown: true,
     });
+  });
+
+  it('makes tokens cease instead of moving them to private zones', () => {
+    const state = buildInitialGameState(makeDeck(10), null);
+    const token = makeInstance({
+      instanceId: 'player-token',
+      card: createTestCard({ id: 'token-1', name: 'Token', type: 'Token Unit' }),
+    });
+    const banishedToken = makeInstance({
+      instanceId: 'player-banished-token',
+      card: createTestCard({ id: 'token-2', name: 'Banished Token', type: 'Token Unit' }),
+      banishOnDeath: true,
+    });
+    const unit = makeInstance({
+      instanceId: 'player-unit',
+      card: createTestCard({ id: 'unit-2', name: 'Unit', type: 'Unit' }),
+    });
+
+    const nextState = moveCardsToOwnerGraveyards(state, [token, banishedToken, unit]);
+
+    expect(nextState.zones.graveyard.map((card) => card.instanceId)).toContain(unit.instanceId);
+    expect(nextState.zones.graveyard.map((card) => card.instanceId)).not.toContain(token.instanceId);
+    expect(nextState.zones.banish.map((card) => card.instanceId)).not.toContain(banishedToken.instanceId);
   });
 
   it('keeps units ready when they enter a battlefield zone', () => {
@@ -2519,6 +2543,73 @@ describe('game rules', () => {
     expect(resolvedState.pendingChoice).toBeNull();
     expect(resolvedState.zones.staging.map((instance) => instance.instanceId)).toEqual([unitOne.instanceId]);
     expect(resolvedState.zones.graveyard[0]?.instanceId).toBe(unitTwo.instanceId);
+  });
+
+  it('scores Lucille before Vampire Retainer death influence from her On Score sacrifice', () => {
+    const lucille = makeInstance({
+      instanceId: 'lucille',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP010',
+        name: 'Lucille, Blood Baroness',
+        type: 'Renowned Unit Vampire',
+        influence: 1,
+        rulesText: 'On Enter: Create a 2/2 Experiment unit token with 0 influence.\n\nOn Score: You may sacrifice any number of units in your staging area to gain that many victory points.',
+      }),
+    });
+    const retainer = makeInstance({
+      instanceId: 'retainer',
+      ready: true,
+      card: createTestCard({
+        id: 'IMP018',
+        name: 'Vampire Retainer',
+        type: 'Unit Vampire',
+        influence: 0,
+        rulesText: 'On Death: Target friendly unit gets +1 influence until the end of your next turn.',
+      }),
+    });
+    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const activeState = {
+      ...state,
+      phase: 'main' as const,
+      activePlayer: 'player' as const,
+      firstPlayer: 'player' as const,
+      hasFirstPlayerSkippedDraw: true,
+      zones: {
+        ...state.zones,
+        battlefieldLeft: [lucille],
+        staging: [retainer],
+      },
+    };
+
+    const pendingState = advanceToNextTurn(activeState);
+    const resolvedState = resolvePendingChoice(pendingState, [retainer.instanceId]);
+
+    expect('error' in resolvedState ? resolvedState.error : null).toBeNull();
+    if ('error' in resolvedState) {
+      return;
+    }
+
+    expect(resolvedState.playerVictoryPoints).toBe(2);
+    expect(resolvedState.pendingChoice).toMatchObject({
+      kind: 'noxTarget',
+      effect: 'retainerBuff',
+    });
+
+    const buffedState = resolvePendingChoice(resolvedState, [lucille.instanceId]);
+    expect('error' in buffedState ? buffedState.error : null).toBeNull();
+    if ('error' in buffedState) {
+      return;
+    }
+
+    expect(buffedState.playerVictoryPoints).toBe(2);
+    expect(buffedState.activePlayer).toBe('opponent');
+    expect(buffedState.pendingChoice).toBeNull();
+    expect(buffedState.log.filter((entry) => entry.suffix?.includes('from battlefield control.'))).toHaveLength(1);
+    expect(buffedState.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: lucille.instanceId,
+      temporaryInfluenceBonus: 1,
+    });
   });
 
   it('resolves Nerezza by sacrificing a chosen unit and then stealing a chosen enemy combat-zone unit', () => {

@@ -18,6 +18,7 @@ import {
   prepareCardForZone,
   readyUnitInPlay,
   recordCardsDrawn,
+  shouldCardCeaseInZone,
   triggerCardAbilities,
   type GameCardInstance,
   type GameState,
@@ -452,7 +453,9 @@ export function resolveTerraTargetChoice(state: GameState, pending: TerraChoice,
     case 'katanaReturn': {
       const card = cards[0]!;
       next = setPrivateZone(next, card.owner, 'graveyard', privateZone(next, card.owner, 'graveyard').filter((item) => item.instanceId !== card.instanceId));
-      next = setPrivateZone(next, card.owner, 'deck', [prepareCardForZone(card, 'deck'), ...privateZone(next, card.owner, 'deck')]);
+      if (!shouldCardCeaseInZone(card, 'deck')) {
+        next = setPrivateZone(next, card.owner, 'deck', [prepareCardForZone(card, 'deck'), ...privateZone(next, card.owner, 'deck')]);
+      }
       break;
     }
     case 'escapeRoutePay':

@@ -440,6 +440,49 @@ describe('bot policy', () => {
     });
   });
 
+  it('runs every immediate bot attack while profitable attacks remain', () => {
+    const firstAttacker = makeInstance({
+      instanceId: 'first-attacker',
+      ready: true,
+      card: createTestCard({ id: 'first-attacker', name: 'First Attacker', type: 'Unit', attack: 2, health: 2, influence: 1 }),
+    });
+    const secondAttacker = makeInstance({
+      instanceId: 'second-attacker',
+      ready: true,
+      card: createTestCard({ id: 'second-attacker', name: 'Second Attacker', type: 'Unit', attack: 2, health: 2, influence: 1 }),
+    });
+    const baseState = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const state = {
+      ...baseState,
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      opponentZones: {
+        ...baseState.opponentZones,
+        hand: [],
+        staging: [firstAttacker, secondAttacker],
+      },
+      zones: {
+        ...baseState.zones,
+        battlefieldLeft: [],
+        battlefieldCenter: [],
+        battlefieldRight: [],
+      },
+    };
+
+    const executedState = runBotTurn(state);
+    const botBattlefieldUnits = [
+      ...executedState.zones.battlefieldLeft,
+      ...executedState.zones.battlefieldCenter,
+      ...executedState.zones.battlefieldRight,
+    ].filter((instance) => instance.owner === 'opponent');
+
+    expect(botBattlefieldUnits.map((instance) => instance.instanceId).sort()).toEqual([
+      firstAttacker.instanceId,
+      secondAttacker.instanceId,
+    ].sort());
+    expect(executedState.opponentZones.staging).toEqual([]);
+  });
+
   it('uses a setup attack to exhaust and soften a defender for a follow-up attacker', () => {
     const setupAttacker = makeInstance({
       instanceId: 'setup-attacker',

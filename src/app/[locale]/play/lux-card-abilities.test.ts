@@ -294,6 +294,89 @@ describe('Lux card abilities', () => {
     expect('error' in resuscitateResolved ? null : resuscitateResolved.zones.hand.some((card) => card.instanceId === dead.instanceId)).toBe(true);
   });
 
+  it('logs the target damaged by Stormhammer Howitzer', () => {
+    const howitzer = makeCard(
+      'IMP049',
+      'Stormhammer Howitzer',
+      'Unit Vehicle',
+      'On Enter: You may exhaust another ready staging unit to deal 4 damage to an enemy staging unit.'
+    );
+    const spotter = makeUnit('spotter', 'player', {
+      card: createTestCard({ id: 'spotter', name: 'Spotter', type: 'Unit' }),
+    });
+    const target = makeUnit('target', 'opponent', {
+      card: createTestCard({ id: 'target', name: 'Target Drone', type: 'Unit', health: 5 }),
+    });
+    const state = {
+      ...makeState(),
+      zones: {
+        ...makeState().zones,
+        staging: [howitzer, spotter],
+      },
+      opponentZones: {
+        ...makeState().opponentZones,
+        staging: [target],
+      },
+    };
+
+    const exhaustChoice = triggerCardAbilities(state, 'onEnter', {
+      source: howitzer,
+      controller: 'player',
+      zone: 'staging',
+    });
+    const damageChoice = resolvePendingChoice(exhaustChoice, [spotter.instanceId]);
+    expect('error' in damageChoice ? damageChoice.error : null).toBeNull();
+    if ('error' in damageChoice) {
+      return;
+    }
+
+    const damaged = resolvePendingChoice(damageChoice, [target.instanceId]);
+    expect('error' in damaged ? damaged.error : null).toBeNull();
+    if ('error' in damaged) {
+      return;
+    }
+
+    expect(damaged.opponentZones.staging[0]).toMatchObject({ instanceId: target.instanceId, damage: 4 });
+    expect(damaged.log[0]?.suffix).toBe('Stormhammer Howitzer dealt 4 damage to Target Drone.');
+  });
+
+  it('makes tokens cease when Lux effects would move them to hand', () => {
+    const extraction = makeCard('IMP057', 'Emergency Extraction', 'Tactic', 'Return target friendly unit or item.');
+    const resuscitate = makeCard('IMP054', 'Resuscitate', 'Tactic', 'Return a unit from your graveyard to your hand.');
+    const stagingToken = makeUnit('staging-token', 'player', {
+      card: createTestCard({ id: 'staging-token', name: 'Staging Token', type: 'Token Unit' }),
+    });
+    const graveyardToken = makeUnit('graveyard-token', 'player', {
+      card: createTestCard({ id: 'graveyard-token', name: 'Graveyard Token', type: 'Token Unit' }),
+    });
+    const state = {
+      ...makeState(),
+      zones: {
+        ...makeState().zones,
+        staging: [stagingToken],
+        graveyard: [graveyardToken],
+      },
+    };
+
+    const extractionPending = triggerCardAbilities(state, 'onPlay', {
+      source: extraction,
+      controller: 'player',
+      zone: 'graveyard',
+    });
+    const extracted = resolvePendingChoice(extractionPending, [stagingToken.instanceId]);
+    expect('error' in extracted ? null : extracted.zones.staging).toEqual([]);
+    expect('error' in extracted ? null : extracted.zones.hand.some((card) => card.instanceId === stagingToken.instanceId)).toBe(false);
+
+    const resuscitatePending = triggerCardAbilities('error' in extracted ? state : extracted, 'onPlay', {
+      source: resuscitate,
+      controller: 'player',
+      zone: 'graveyard',
+    });
+    const resuscitated = resolvePendingChoice(resuscitatePending, [graveyardToken.instanceId]);
+    expect('error' in resuscitated ? null : resuscitated.zones.graveyard.some((card) => card.instanceId === graveyardToken.instanceId)).toBe(false);
+    expect('error' in resuscitated ? null : resuscitated.zones.hand.some((card) => card.instanceId === graveyardToken.instanceId)).toBe(false);
+  });
+
   it('provides legal Lux counter targets', () => {
     const attacker = makeUnit('attacker');
     const defender = makeUnit('defender', 'opponent', { ready: false });

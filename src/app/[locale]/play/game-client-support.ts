@@ -113,6 +113,16 @@ export function isPrivateOpponentSupplyChoiceTarget(
   );
 }
 
+export function shouldContinueBotTurnAfterResolvedAttack(gameState: GameState): boolean {
+  return Boolean(
+    !gameState.winner &&
+      gameState.phase === 'main' &&
+      gameState.activePlayer === 'opponent' &&
+      !gameState.pendingCombat &&
+      !gameState.pendingChoice
+  );
+}
+
 export const ZONE_LABELS: Record<ZoneId, string> = {
   deck: 'Deck',
   hand: 'Hand',

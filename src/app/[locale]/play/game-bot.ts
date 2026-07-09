@@ -13,6 +13,7 @@ import {
 } from './game-rules';
 
 export const BOT_TURN_STEPS = ['supply', 'stageUnit', 'stageUnit', 'attackBattlefield'] as const satisfies BotTurnStep[];
+const MAX_BOT_ATTACK_STEPS = 12;
 
 export function applyBotTurnStep(state: GameState, step: BotTurnStep): GameState {
   const command = chooseBotTurnCommand(state, step);
@@ -50,7 +51,31 @@ export function runBotTurn(state: GameState): GameState {
     return state;
   }
 
-  return BOT_TURN_STEPS.reduce((nextState, step) => applyBotTurnStep(nextState, step), state);
+  let nextState = BOT_TURN_STEPS
+    .filter((step) => step !== 'attackBattlefield')
+    .reduce((currentState, step) => applyBotTurnStep(currentState, step), state);
+
+  for (let index = 0; index < MAX_BOT_ATTACK_STEPS; index += 1) {
+    if (
+      nextState.winner ||
+      nextState.pendingCombat ||
+      nextState.pendingChoice ||
+      nextState.phase !== 'main' ||
+      nextState.activePlayer !== 'opponent'
+    ) {
+      break;
+    }
+
+    const afterAttack = applyBotTurnStep(nextState, 'attackBattlefield');
+
+    if (afterAttack === nextState) {
+      break;
+    }
+
+    nextState = afterAttack;
+  }
+
+  return nextState;
 }
 
 export function resolveAutomaticBotTurn(state: GameState): GameState {

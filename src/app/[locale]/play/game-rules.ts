@@ -110,6 +110,18 @@ export function isUnitCard(card: Card): boolean {
   return type === 'unit' || type === 'token';
 }
 
+export function isTokenCard(card: Card): boolean {
+  return getCardType(card) === 'token';
+}
+
+export function canCardExistInZone(card: Card, zone: ZoneId): boolean {
+  return !isTokenCard(card) || zone === 'staging' || BATTLEFIELD_ZONES.has(zone);
+}
+
+export function shouldCardCeaseInZone(instance: GameCardInstance, zone: ZoneId): boolean {
+  return !canCardExistInZone(instance.card, zone);
+}
+
 export function isItemCard(card: Card): boolean {
   return getCardType(card) === 'item';
 }
@@ -1826,6 +1838,17 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
           controller: pendingChoice.owner,
           zone: 'graveyard',
         });
+        if (nextState.pendingChoice) {
+          return pendingChoice.resumeTurnAdvance
+            ? {
+                ...nextState,
+                pendingChoice: {
+                  ...nextState.pendingChoice,
+                  resumeTurnAdvance: true,
+                } as PendingChoice,
+              }
+            : nextState;
+        }
       }
     } else {
       nextState = {
@@ -2280,16 +2303,16 @@ export function moveCardsToOwnerGraveyards(
       state.turn <= instance.abandonLabBanishOnDeathUntilTurn
     );
   const playerDestroyed = destroyedCards
-    .filter((instance) => instance.owner === 'player' && !shouldBanishOnDeath(instance))
+    .filter((instance) => instance.owner === 'player' && !shouldBanishOnDeath(instance) && !shouldCardCeaseInZone(instance, 'graveyard'))
     .map((instance) => prepareCardForZone(instance, 'graveyard'));
   const playerBanished = destroyedCards
-    .filter((instance) => instance.owner === 'player' && shouldBanishOnDeath(instance))
+    .filter((instance) => instance.owner === 'player' && shouldBanishOnDeath(instance) && !shouldCardCeaseInZone(instance, 'banish'))
     .map((instance) => prepareCardForZone(instance, 'banish'));
   const opponentDestroyed = destroyedCards
-    .filter((instance) => instance.owner === 'opponent' && !shouldBanishOnDeath(instance))
+    .filter((instance) => instance.owner === 'opponent' && !shouldBanishOnDeath(instance) && !shouldCardCeaseInZone(instance, 'graveyard'))
     .map((instance) => prepareCardForZone(instance, 'graveyard'));
   const opponentBanished = destroyedCards
-    .filter((instance) => instance.owner === 'opponent' && shouldBanishOnDeath(instance))
+    .filter((instance) => instance.owner === 'opponent' && shouldBanishOnDeath(instance) && !shouldCardCeaseInZone(instance, 'banish'))
     .map((instance) => prepareCardForZone(instance, 'banish'));
 
   return {
@@ -3479,7 +3502,9 @@ export function resolveBattlefieldAttack(
             opponentZones: {
               ...nextState.opponentZones,
               graveyard: graveyard.filter((card) => card.instanceId !== defender.instanceId),
-              deck: [prepareCardForZone(defender, 'deck'), ...nextState.opponentZones.deck],
+              deck: shouldCardCeaseInZone(defender, 'deck')
+                ? nextState.opponentZones.deck
+                : [prepareCardForZone(defender, 'deck'), ...nextState.opponentZones.deck],
             },
           };
         }
