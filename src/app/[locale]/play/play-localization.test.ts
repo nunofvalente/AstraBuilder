@@ -31,6 +31,8 @@ describe('play localization', () => {
     )).toBe('已开始与 Testing Solara 的对局设置。机器人已放置起始补给。请从手牌中选择 1 张作为起始补给，然后选择谁先手。');
     expect(translateGameLogText('zh-CN', 'You skip the first draw.')).toBe('你跳过第一次抽卡。');
     expect(translateGameLogText('ja', 'Bot skips the first draw.')).toBe('ボットは最初のドローをスキップします。');
+    expect(translateGameLogText('zh-CN', 'Kept the opening hand.')).toBe('已保留起始手牌。');
+    expect(translateGameLogText('ja', 'Mulliganed the opening hand and drew 6 new cards.')).toBe('初手をマリガンし、新たに6枚引きました。');
   });
 
   it('localizes every control-panel button label', () => {
