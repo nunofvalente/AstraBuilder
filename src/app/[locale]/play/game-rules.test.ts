@@ -39,7 +39,6 @@ import {
   passCounterPriority,
   playCounterCard,
   resolvePendingChoice,
-  resolveOpeningHand,
   resolveBattlefieldAttack,
   rollFirstPlayer,
   runTurnStart,
@@ -377,7 +376,6 @@ describe('game rules', () => {
     expect(state.opponentVictoryPoints).toBe(0);
     expect(state.winner).toBeNull();
     expect(state.playerStartingSupplyPlaced).toBe(false);
-    expect(state.playerOpeningHandConfirmed).toBe(false);
     expect(state.opponentStartingSupplyPlaced).toBe(true);
     expect(state.playerSuppliedThisTurn).toBe(false);
     expect(state.opponentSuppliedThisTurn).toBe(false);
@@ -385,30 +383,6 @@ describe('game rules', () => {
     expect(state.zones.supply).toHaveLength(0);
     expect(state.opponentZones.hand).toHaveLength(6);
     expect(state.opponentZones.supply).toHaveLength(1);
-  });
-
-  it('mulligans the whole opening hand once before starting supply', () => {
-    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
-    const originalHandIds = state.zones.hand.map((card) => card.instanceId);
-    const allPlayerCardIds = [...state.zones.hand, ...state.zones.deck].map((card) => card.instanceId).sort();
-    const mulliganed = resolveOpeningHand(state, true);
-    const repeated = resolveOpeningHand(mulliganed, true);
-
-    expect(mulliganed.playerOpeningHandConfirmed).toBe(true);
-    expect(mulliganed.zones.hand).toHaveLength(6);
-    expect(mulliganed.zones.deck).toHaveLength(6);
-    expect([...mulliganed.zones.hand, ...mulliganed.zones.deck].map((card) => card.instanceId).sort()).toEqual(allPlayerCardIds);
-    expect(repeated).toBe(mulliganed);
-    expect(originalHandIds).toHaveLength(6);
-  });
-
-  it('can keep the opening hand and cannot change it afterward', () => {
-    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
-    const kept = resolveOpeningHand(state, false);
-
-    expect(kept.playerOpeningHandConfirmed).toBe(true);
-    expect(kept.zones.hand).toEqual(state.zones.hand);
-    expect(resolveOpeningHand(kept, true)).toBe(kept);
   });
 
   it('starts turn 1 with the selected first player', () => {
