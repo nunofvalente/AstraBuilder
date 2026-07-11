@@ -316,6 +316,10 @@ function placeSupply(
   setupFirstPlayer?: Owner
 ): CardActionResult {
   if (owner === 'player' && !state.playerStartingSupplyPlaced) {
+    if (!state.playerOpeningHandConfirmed) {
+      return rejected(state, 'Choose whether to keep or mulligan your opening hand before placing starting supply.');
+    }
+
     if (state.sessionMode === 'multiplayer' && !setupFirstPlayer) {
       return rejected(state, 'A first player is required to start a multiplayer game.');
     }
