@@ -50,6 +50,7 @@ import {
   passCounterPriority,
   playCounterCard,
   resolvePendingChoice,
+  resolveOpeningHand,
   resolveBattlefieldAttack,
   rollFirstPlayer,
   shuffleCards,
@@ -980,6 +981,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     setGameState(startedState);
   }
 
+  function chooseOpeningHand(mulligan: boolean) {
+    setGameState((previous) => previous ? resolveOpeningHand(previous, mulligan) : previous);
+  }
+
   function resetGame() {
     if (selectedDeck) {
       clearBotTurnTimers();
@@ -1484,7 +1489,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     const canFlipFaceUp = canPlayFromHand;
     const canSupplyFromHand =
       gameState.phase === 'setup'
-        ? !gameState.playerStartingSupplyPlaced
+        ? gameState.playerOpeningHandConfirmed && !gameState.playerStartingSupplyPlaced
         : canManuallySupplyFromHand(gameState, 'player');
     const pendingHandPlaySource =
       pendingHandPlayCost
@@ -2163,7 +2168,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         ) : null}
         <RequiredActionToast
           message={
-            !gameState.playerStartingSupplyPlaced
+            !gameState.playerOpeningHandConfirmed
+              ? controlsCopy.openingHand
+              : !gameState.playerStartingSupplyPlaced
               ? controlsCopy.startingSupply
               : gameState.phase === 'setup'
                 ? gameState.sessionMode === 'multiplayer'
@@ -2172,7 +2179,24 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 : null
           }
           actions={
-            gameState.sessionMode === 'practice' && gameState.phase === 'setup' && gameState.playerStartingSupplyPlaced ? (
+            gameState.phase === 'setup' && !gameState.playerOpeningHandConfirmed ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => chooseOpeningHand(false)}
+                  className="pointer-events-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  {controlsCopy.keepHand}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseOpeningHand(true)}
+                  className="pointer-events-auto rounded-md border border-[color:var(--accent)]/50 bg-[color:var(--accent)]/20 px-3 py-2 text-xs font-bold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                >
+                  {controlsCopy.mulligan}
+                </button>
+              </>
+            ) : gameState.sessionMode === 'practice' && gameState.phase === 'setup' && gameState.playerStartingSupplyPlaced ? (
               <>
                 <button
                   type="button"

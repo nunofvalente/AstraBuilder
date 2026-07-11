@@ -59,6 +59,7 @@ export {
   placeAutomaticStartingSupply,
   placeCardIntoSupply,
   placeStartingSupply,
+  resolveOpeningHand,
   shuffleCards,
 } from './game-setup';
 

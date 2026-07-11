@@ -270,12 +270,24 @@ type ExtraControlsCopy = {
   resolvesNext: string;
   setup: string;
   startingSupply: string;
+  openingHand: string;
+  keepHand: string;
+  mulligan: string;
   chooseFirst: string;
   rollingFirst: string;
   youFirst: string;
 };
 
-const EXTRA_CONTROLS_COPY: Record<Locale, ExtraControlsCopy> = {
+const OPENING_HAND_COPY: Record<Locale, Pick<ExtraControlsCopy, 'openingHand' | 'keepHand' | 'mulligan'>> = {
+  en: { openingHand: 'Keep this opening hand or mulligan all 6 cards. You can only mulligan once.', keepHand: 'Keep hand', mulligan: 'Mulligan' },
+  fr: { openingHand: 'Gardez cette main de départ ou remplacez les 6 cartes. Vous ne pouvez le faire qu’une fois.', keepHand: 'Garder la main', mulligan: 'Mulligan' },
+  de: { openingHand: 'Behalte diese Starthand oder tausche alle 6 Karten aus. Ein Mulligan ist nur einmal möglich.', keepHand: 'Hand behalten', mulligan: 'Mulligan' },
+  ms: { openingHand: 'Kekalkan tangan permulaan ini atau tukar kesemua 6 kad. Mulligan hanya boleh dibuat sekali.', keepHand: 'Kekalkan tangan', mulligan: 'Mulligan' },
+  'zh-CN': { openingHand: '保留这组起始手牌，或将全部 6 张牌调度。每局只能调度一次。', keepHand: '保留手牌', mulligan: '调度' },
+  ja: { openingHand: 'この初手をキープするか、6枚すべてを引き直します。マリガンは1回だけです。', keepHand: 'キープ', mulligan: 'マリガン' },
+};
+
+const EXTRA_CONTROLS_COPY: Record<Locale, Omit<ExtraControlsCopy, 'openingHand' | 'keepHand' | 'mulligan'>> = {
   en: { availableCounters: 'Available counters', backToLobby: 'Back to lobby', botFirst: 'Bot first', concedeDescription: 'This will leave the current room and return you to the lobby.', cost: 'Cost', lobby: 'Lobby', noCounters: 'No counters played.', passTurnDescription: 'This will end your actions for this turn and pass priority to the bot.', rematch: 'Rematch', resolvesNext: 'Resolves next', setup: 'Setup', startingSupply: 'Choose 1 card from your hand to place as starting supply.', chooseFirst: 'Choose who takes the first turn.', rollingFirst: 'Rolling to choose who takes the first turn.', youFirst: 'You first' },
   fr: { availableCounters: 'Contres disponibles', backToLobby: 'Retour au salon', botFirst: 'Bot en premier', concedeDescription: 'Vous quitterez la partie en cours et retournerez au salon.', cost: 'Coût', lobby: 'Salon', noCounters: 'Aucun contre joué.', passTurnDescription: 'Vos actions se terminent et la priorité passe au bot.', rematch: 'Rejouer', resolvesNext: 'Se résout ensuite', setup: 'Mise en place', startingSupply: 'Choisissez 1 carte de votre main comme ravitaillement de départ.', chooseFirst: 'Choisissez qui joue en premier.', rollingFirst: 'Tirage au sort du premier joueur.', youFirst: 'Vous en premier' },
   de: { availableCounters: 'Verfügbare Konter', backToLobby: 'Zurück zur Lobby', botFirst: 'Bot beginnt', concedeDescription: 'Du verlässt das aktuelle Spiel und kehrst zur Lobby zurück.', cost: 'Kosten', lobby: 'Lobby', noCounters: 'Keine Konter gespielt.', passTurnDescription: 'Deine Aktionen enden und die Priorität geht an den Bot.', rematch: 'Revanche', resolvesNext: 'Wird als Nächstes aufgelöst', setup: 'Vorbereitung', startingSupply: 'Wähle 1 Handkarte als Startversorgung.', chooseFirst: 'Wähle, wer den ersten Zug hat.', rollingFirst: 'Der erste Spieler wird ausgelost.', youFirst: 'Du beginnst' },
@@ -285,7 +297,7 @@ const EXTRA_CONTROLS_COPY: Record<Locale, ExtraControlsCopy> = {
 };
 
 export function getPlayControlsCopy(locale: Locale): PlayControlsCopy & ExtraControlsCopy {
-  return { ...CONTROLS_COPY[locale], ...EXTRA_CONTROLS_COPY[locale] };
+  return { ...CONTROLS_COPY[locale], ...EXTRA_CONTROLS_COPY[locale], ...OPENING_HAND_COPY[locale] };
 }
 
 export type PlayLobbyCopy = {
@@ -476,6 +488,26 @@ const ACTION_LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, stri
 
 export function translateGameLogText(locale: Locale, text: string): string {
   if (locale === 'en') return text;
+  if (text === 'Kept the opening hand.') {
+    return {
+      fr: 'Main de départ conservée.',
+      de: 'Starthand behalten.',
+      ms: 'Tangan permulaan dikekalkan.',
+      'zh-CN': '已保留起始手牌。',
+      ja: '初手をキープしました。',
+    }[locale];
+  }
+  const mulliganMatch = text.match(/^Mulliganed the opening hand and drew (\d+) new cards\.$/);
+  if (mulliganMatch) {
+    const count = mulliganMatch[1];
+    return {
+      fr: `Main de départ remplacée et ${count} nouvelles cartes piochées.`,
+      de: `Starthand ausgetauscht und ${count} neue Karten gezogen.`,
+      ms: `Tangan permulaan ditukar dan ${count} kad baharu ditarik.`,
+      'zh-CN': `已调度起始手牌并抽取 ${count} 张新牌。`,
+      ja: `初手をマリガンし、新たに${count}枚引きました。`,
+    }[locale];
+  }
   const setupMatch = text.match(/^Started setup against (.+)\. Bot placed starting supply\. Choose 1 card from hand as starting supply, then choose who goes first\.$/);
   if (setupMatch) {
     const deckName = setupMatch[1];
