@@ -50,7 +50,6 @@ Card rules are implemented from canonical card text, not stored as executable da
 
 ## Simulator Status
 
-- Before placing starting supply, the player must either keep the six-card opening hand or take one mulligan. A mulligan shuffles the full opening hand back into the deck and draws six replacement cards; it cannot be repeated.
 - Manual supply is limited to 1 card from hand during your own main turn.
 - Staging accepts units only.
 - Battlefield zones accept territories from hand and ready units from staging.

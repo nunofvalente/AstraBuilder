@@ -321,7 +321,6 @@ export type GameState = {
   activePlayer: Owner | null;
   firstPlayer: Owner | null;
   hasFirstPlayerSkippedDraw: boolean;
-  playerOpeningHandConfirmed: boolean;
   playerStartingSupplyPlaced: boolean;
   opponentStartingSupplyPlaced: boolean;
   playerSuppliedThisTurn: boolean;
