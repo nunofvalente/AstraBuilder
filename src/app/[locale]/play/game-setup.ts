@@ -1,4 +1,4 @@
-import { addLogEntry, createLogEntry } from './game-log';
+import { createLogEntry } from './game-log';
 import type {
   GameCardInstance,
   GameSessionMode,
@@ -65,7 +65,6 @@ export function buildInitialGameState(deck: SavedDeck, botDeck: SavedDeck | null
     activePlayer: null,
     firstPlayer: null,
     hasFirstPlayerSkippedDraw: false,
-    playerOpeningHandConfirmed: false,
     playerStartingSupplyPlaced: false,
     opponentStartingSupplyPlaced: Boolean(opponentSetup),
     playerSuppliedThisTurn: false,
@@ -98,34 +97,6 @@ export function buildInitialGameState(deck: SavedDeck, botDeck: SavedDeck | null
           : `Started practice with ${instances.length} cards. Choose 1 card from hand as starting supply.`,
       }),
     ],
-  };
-}
-
-export function resolveOpeningHand(state: GameState, mulligan: boolean): GameState {
-  if (state.phase !== 'setup' || state.playerOpeningHandConfirmed || state.playerStartingSupplyPlaced) {
-    return state;
-  }
-
-  if (!mulligan) {
-    return {
-      ...state,
-      playerOpeningHandConfirmed: true,
-      log: addLogEntry(state, { suffix: 'Kept the opening hand.' }),
-    };
-  }
-
-  const handSize = state.zones.hand.length;
-  const shuffledDeck = shuffleCards([...state.zones.deck, ...state.zones.hand]);
-
-  return {
-    ...state,
-    playerOpeningHandConfirmed: true,
-    zones: {
-      ...state.zones,
-      hand: shuffledDeck.slice(0, handSize),
-      deck: shuffledDeck.slice(handSize),
-    },
-    log: addLogEntry(state, { suffix: `Mulliganed the opening hand and drew ${handSize} new cards.` }),
   };
 }
 

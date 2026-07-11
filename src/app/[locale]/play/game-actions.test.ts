@@ -59,7 +59,6 @@ describe('deterministic player card actions', () => {
     const replacement = makeInstance({ instanceId: 'replacement' });
     const state = {
       ...buildInitialGameState(makeDeck(12), makeDeck(12), 'multiplayer'),
-      playerOpeningHandConfirmed: true,
       zones: {
         ...buildInitialGameState(makeDeck(12), makeDeck(12), 'multiplayer').zones,
         hand: [supplyCard],
@@ -86,7 +85,6 @@ describe('deterministic player card actions', () => {
     const baseState = buildInitialGameState(makeDeck(12), makeDeck(12), 'multiplayer');
     const state = {
       ...baseState,
-      playerOpeningHandConfirmed: true,
       zones: {
         ...baseState.zones,
         hand: [supplyCard],
@@ -103,21 +101,6 @@ describe('deterministic player card actions', () => {
     expect(result.error).toBe('A first player is required to start a multiplayer game.');
     expect(result.state.zones.hand).toEqual([supplyCard]);
     expect(result.state.zones.supply).toEqual([]);
-  });
-
-  it('requires the opening hand decision before starting supply', () => {
-    const state = buildInitialGameState(makeDeck(12), makeDeck(12));
-    const supplyCard = state.zones.hand[0]!;
-
-    const result = applyPlayerCardAction(state, {
-      instanceId: supplyCard.instanceId,
-      fromZone: 'hand',
-      toZone: 'supply',
-    });
-
-    expect(result.applied).toBe(false);
-    expect(result.error).toContain('keep or mulligan');
-    expect(result.state.zones).toEqual(state.zones);
   });
 
   it('supplies once per turn and draws a replacement', () => {
