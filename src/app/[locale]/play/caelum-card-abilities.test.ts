@@ -702,6 +702,78 @@ describe('Caelum card abilities', () => {
     });
   });
 
+  it('offers each Freight Module trigger before finishing score advancement', () => {
+    const scoringUnit = makeUnit('scorer', 'player');
+    const firstModule = makeUnit('IMP091', 'player', {
+      instanceId: 'freight-one',
+      attachedToInstanceId: scoringUnit.instanceId,
+      card: createTestCard({ id: 'IMP091', name: 'Freight Module', type: 'Item Equipment', influence: 1, affinity: 'Caelum' }),
+    });
+    const secondModule = makeUnit('IMP091', 'player', {
+      instanceId: 'freight-two',
+      attachedToInstanceId: scoringUnit.instanceId,
+      card: createTestCard({ id: 'IMP091', name: 'Freight Module', type: 'Item Equipment', influence: 1, affinity: 'Caelum' }),
+    });
+    const state = {
+      ...makeState(),
+      zones: {
+        ...makeState().zones,
+        battlefieldLeft: [scoringUnit, firstModule, secondModule],
+      },
+    };
+
+    const scored = scoreBattlefieldVictoryPoints(state, 'player');
+    expect(scored.pendingChoice).toMatchObject({
+      effect: 'freightModuleSupply',
+      availableInstanceIds: ['freight-one'],
+      remainingScoreItemTriggerIds: ['freight-two'],
+    });
+
+    const firstResolved = resolvePendingChoice(scored, ['freight-one']);
+    expect('error' in firstResolved ? null : firstResolved.pendingChoice).toMatchObject({
+      effect: 'freightModuleSupply',
+      availableInstanceIds: ['freight-two'],
+      remainingScoreItemTriggerIds: [],
+    });
+
+    const secondResolved = 'error' in firstResolved ? firstResolved : resolvePendingChoice(firstResolved, ['freight-two']);
+    expect('error' in secondResolved ? null : secondResolved.pendingChoice).toBeNull();
+    expect('error' in secondResolved ? [] : secondResolved.zones.supply.map((card) => card.instanceId)).toEqual(
+      expect.arrayContaining(['freight-one', 'freight-two'])
+    );
+  });
+
+  it('queues a different item on-score trigger after Freight Module', () => {
+    const scoringUnit = makeUnit('mixed-item-scorer');
+    const freightModule = makeUnit('IMP091', 'player', {
+      attachedToInstanceId: scoringUnit.instanceId,
+      card: createTestCard({ id: 'IMP091', name: 'Freight Module', type: 'Item Equipment', affinity: 'Caelum' }),
+    });
+    const warBanner = makeUnit('IMP164', 'player', {
+      attachedToInstanceId: scoringUnit.instanceId,
+      card: createTestCard({ id: 'IMP164', name: 'War Banner', type: 'Item Equipment' }),
+    });
+    const topCard = makeUnit('top-unit');
+    const base = makeState();
+    const state = {
+      ...base,
+      zones: {
+        ...base.zones,
+        deck: [topCard],
+        battlefieldLeft: [scoringUnit, freightModule, warBanner],
+      },
+    };
+
+    const scored = scoreBattlefieldVictoryPoints(state, 'player');
+    expect(scored.pendingChoice).toMatchObject({ effect: 'freightModuleSupply' });
+
+    const freightResolved = resolvePendingChoice(scored, [freightModule.instanceId]);
+    expect('error' in freightResolved ? null : freightResolved.pendingChoice).toMatchObject({
+      effect: 'warBannerReveal',
+      sourceInstanceId: warBanner.instanceId,
+    });
+  });
+
   it('returns a tactic and sacrifices Archive Ruins when your unit scores its zone', () => {
     const scoringUnit = makeUnit('archive-scorer', 'player', {
       card: createTestCard({ id: 'archive-scorer', name: 'Archive Scorer', type: 'Unit', influence: 1 }),

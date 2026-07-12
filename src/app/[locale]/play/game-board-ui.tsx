@@ -776,14 +776,14 @@ export function CombinedStagingSupplyPanel({
       ? 'grid-rows-[minmax(4.6rem,0.38fr)_minmax(7rem,0.66fr)] min-[2560px]:grid-rows-[minmax(5.25rem,0.42fr)_minmax(9.5rem,0.82fr)]'
       : 'grid-rows-[minmax(7rem,0.66fr)_minmax(4.6rem,0.38fr)] min-[2560px]:grid-rows-[minmax(9.5rem,0.82fr)_minmax(5.25rem,0.42fr)]'
     : mirror
-      ? 'grid-rows-[minmax(5.1rem,0.4fr)_minmax(10rem,0.86fr)] min-[2560px]:grid-rows-[minmax(5.25rem,0.42fr)_minmax(9.5rem,0.82fr)]'
+      ? 'grid-rows-[minmax(5.1rem,0.4fr)_minmax(10rem,0.86fr)] min-[2560px]:grid-rows-[minmax(5.75rem,0.44fr)_minmax(12rem,0.86fr)]'
       : 'grid-rows-[minmax(10rem,0.86fr)_minmax(5.1rem,0.4fr)] min-[2560px]:grid-rows-[minmax(12rem,0.86fr)_minmax(5.75rem,0.44fr)]';
-  const stagingCardClassName = compact || mirror ? 'h-[5.6rem] min-[2560px]:h-[min(8rem,100%)]' : 'h-[7.5rem] min-[2560px]:h-[min(10.75rem,100%)]';
-  const exhaustedStagingWidthClassName = compact || mirror ? 'w-[5.6rem] min-[2560px]:w-[8rem]' : 'w-[7.5rem] min-[2560px]:w-[10.75rem]';
-  const stagingAttachmentPaddingClassName = compact || mirror ? 'pb-10 min-[2560px]:pb-16' : 'pb-9 min-[2560px]:pb-24';
-  const stagingAttachmentTopClassName = compact || mirror ? 'top-[2.1rem] min-[2560px]:top-[2.8rem]' : 'top-[5.35rem] min-[2560px]:top-[3.9rem]';
+  const stagingCardClassName = compact ? 'h-[5.6rem] min-[2560px]:h-[min(8rem,100%)]' : 'h-[7.5rem] min-[2560px]:h-[min(10.75rem,100%)]';
+  const exhaustedStagingWidthClassName = compact ? 'w-[5.6rem] min-[2560px]:w-[8rem]' : 'w-[7.5rem] min-[2560px]:w-[10.75rem]';
+  const stagingAttachmentPaddingClassName = compact ? 'pb-10 min-[2560px]:pb-16' : 'pb-9 min-[2560px]:pb-24';
+  const stagingAttachmentTopClassName = compact ? 'top-[2.1rem] min-[2560px]:top-[2.8rem]' : 'top-[5.35rem] min-[2560px]:top-[3.9rem]';
   const stagingAttachmentSizes = isFourKViewport
-    ? compact || mirror
+    ? compact
       ? { cardHeight: 112, offset: 24, exposedHeight: 28 }
       : { cardHeight: 146, offset: 30, exposedHeight: 40 }
     : compact

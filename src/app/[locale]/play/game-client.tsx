@@ -106,6 +106,14 @@ type MatchSessionPayload = {
   mode?: 'practice' | 'multiplayer';
 };
 
+type GameRoom = {
+  id: string;
+  code: string;
+  status: 'waiting' | 'ready' | 'playing' | 'finished';
+  host_user_id: string;
+  guest_user_id: string | null;
+};
+
 function getDeckBannerAffinities(deck: SavedDeck | null): string[] {
   const affinityCounts = new Map<string, number>();
 
@@ -208,6 +216,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [hoveredCounterPreviewCards, setHoveredCounterPreviewCards] = useState<GameCardInstance[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [matchSetupError, setMatchSetupError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState('');
+  const [room, setRoom] = useState<GameRoom | null>(null);
+  const [roomError, setRoomError] = useState<string | null>(null);
+  const [isRoomRequestPending, setIsRoomRequestPending] = useState(false);
   const botTurnTimersRef = useRef<number[]>([]);
   const playerDeckMenuRef = useRef<HTMLDivElement | null>(null);
   const botDeckMenuRef = useRef<HTMLDivElement | null>(null);
@@ -494,6 +507,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   }, [isMatchRoute]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const invitedRoomCode = new URLSearchParams(window.location.search).get('room')?.toUpperCase() ?? '';
+    if (/^[A-Z0-9]{6}$/.test(invitedRoomCode)) {
+      setSelectedMode('lobby');
+      setRoomCode(invitedRoomCode);
+    }
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function loadDecks() {
@@ -506,12 +528,15 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       }
 
       if (sessionError || !sessionResult.session?.user) {
+        setCurrentUserId(null);
         setDecks(demoDecks);
         setSelectedDeckId((previous) => previous || demoDecks[0]?.id || '');
         setSelectedBotDeckId((previous) => previous || demoDecks[1]?.id || demoDecks[0]?.id || '');
         setStatus('ready');
         return;
       }
+
+      setCurrentUserId(sessionResult.session.user.id);
 
       const { data, error } = await supabase
         .from('decks')
@@ -547,6 +572,46 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       isMounted = false;
     };
   }, [cardMap, demoDecks, initialError]);
+
+  useEffect(() => {
+    if (!room) return;
+    const channel = supabase
+      .channel(`game-room-${room.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_rooms', filter: `id=eq.${room.id}` }, (payload) => {
+        setRoom(payload.new as GameRoom);
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [room?.id]);
+
+  async function submitRoomRequest(kind: 'create' | 'join') {
+    if (!selectedDeck || !currentUserId) return;
+    setIsRoomRequestPending(true);
+    setRoomError(null);
+    const { data: sessionResult } = await supabase.auth.getSession();
+    const token = sessionResult.session?.access_token;
+    if (!token) {
+      setRoomError(lobbyCopy.signInPrompt);
+      setIsRoomRequestPending(false);
+      return;
+    }
+    try {
+      const response = await fetch(kind === 'create' ? '/api/rooms' : '/api/rooms/join', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ deckId: selectedDeck.id, ...(kind === 'join' ? { code: roomCode } : {}) }),
+      });
+      const payload = await response.json() as { room?: GameRoom; message?: string };
+      if (!response.ok || !payload.room) throw new Error(payload.message || lobbyCopy.roomRequestFailed);
+      setRoom(payload.room);
+      setRoomCode(payload.room.code);
+      router.push(`/${locale}/match/${payload.room.code}`);
+    } catch (error) {
+      setRoomError(error instanceof Error ? error.message : lobbyCopy.roomRequestFailed);
+    } finally {
+      setIsRoomRequestPending(false);
+    }
+  }
 
   useEffect(() => {
     if (!isMatchRoute || status !== 'ready' || gameState) {
@@ -1378,6 +1443,35 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
                             {lobbyCopy.createLobbyDescription}
                           </p>
+                          {!currentUserId ? (
+                            <p className="mt-3 text-sm font-semibold text-[color:var(--text-secondary)]">
+                              {lobbyCopy.roomSignInPrompt}{' '}
+                              <Link href={signInHref} className="font-bold text-[color:var(--accent)] underline underline-offset-2">
+                                {lobbyCopy.signIn}
+                              </Link>
+                            </p>
+                          ) : null}
+                          {room ? (
+                            <div className="mt-4">
+                              <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">{lobbyCopy.roomCode}</p>
+                              <p className="mt-1 font-mono text-3xl font-black tracking-[0.25em] text-[color:var(--accent)]">{room.code}</p>
+                              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{room.status === 'waiting' ? lobbyCopy.roomWaiting : lobbyCopy.roomReady}</p>
+                            </div>
+                          ) : (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <input
+                                value={roomCode}
+                                onChange={(event) => setRoomCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                                aria-label={lobbyCopy.roomCode}
+                                placeholder={lobbyCopy.roomCodePlaceholder}
+                                className="w-36 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 font-mono font-bold uppercase tracking-widest text-[color:var(--text-primary)]"
+                              />
+                              <button type="button" disabled={!currentUserId || !selectedDeck || roomCode.length !== 6 || isRoomRequestPending} onClick={() => void submitRoomRequest('join')} className="rounded-md border border-[color:var(--border)] px-4 py-2 text-sm font-bold disabled:opacity-50">
+                                {lobbyCopy.joinRoom}
+                              </button>
+                            </div>
+                          )}
+                          {roomError ? <p role="alert" className="mt-3 text-sm text-red-400">{roomError}</p> : null}
                         </div>
                       </div>
                     </div>
@@ -1412,8 +1506,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
               <button
                 type="button"
-                onClick={startSelectedDeck}
-                disabled={!selectedDeck || !selectedBotDeck || selectedMode !== 'practice'}
+                onClick={selectedMode === 'lobby' ? () => void submitRoomRequest('create') : startSelectedDeck}
+                disabled={!selectedDeck || (selectedMode === 'practice' ? !selectedBotDeck : selectedMode === 'matchmaking' || !currentUserId || isRoomRequestPending || Boolean(room))}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--text-primary)] px-4 py-4 text-base font-bold text-[color:var(--background)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55"
               >
                 <Play className="h-4 w-4" aria-hidden="true" />
@@ -1421,7 +1515,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   ? lobbyCopy.startPractice
                   : selectedMode === 'matchmaking'
                     ? lobbyCopy.findMatch(selectedQueue === 'ranked' ? lobbyCopy.ranked : lobbyCopy.casual)
-                    : lobbyCopy.createLobby}
+                    : lobbyCopy.createRoom}
               </button>
             </div>
           </section>
