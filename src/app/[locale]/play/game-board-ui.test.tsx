@@ -378,6 +378,22 @@ describe('CombinedStagingSupplyPanel', () => {
     expect(deckLabel.compareDocumentPosition(banishLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('keeps mirrored staging cards at the same full size as player staging cards', () => {
+    const opponentUnit = { ...makeInstance(), instanceId: 'opponent-staging-unit', owner: 'opponent' as const };
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[opponentUnit]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        mirror
+      />,
+    );
+
+    expect(container.querySelector('[data-card-instance-id="opponent-staging-unit"]')).toHaveClass('h-[7.5rem]');
+  });
+
   it('opens the banish pile and plays a Lingyi-marked unit from the modal', () => {
     const onMove = vi.fn();
     const banished = {
