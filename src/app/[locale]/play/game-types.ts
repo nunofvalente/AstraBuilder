@@ -97,7 +97,7 @@ export type PendingCombat = {
   counterStack: GameCardInstance[];
 };
 
-export type PendingChoice =
+export type PendingChoice = (
   | {
       kind: 'lucilleScore';
       owner: Owner;
@@ -308,7 +308,13 @@ export type PendingChoice =
       availableInstanceIds: string[];
       optional?: boolean;
       resumeTurnAdvance?: boolean;
-    };
+    }
+) & {
+  remainingScoreItemTriggerIds?: string[];
+  scoreTriggerOwner?: Owner;
+  scoreTriggerZone?: ZoneId;
+  resumeTurnAdvance?: boolean;
+};
 
 export type GameState = {
   deckId: string;

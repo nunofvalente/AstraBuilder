@@ -747,6 +747,21 @@ export function resolveCaelumTargetChoice(
   pendingChoice: CaelumChoice,
   selectedInstanceIds: string[]
 ): GameState | { error: string } {
+  const continueFreightModuleChoices = (nextState: GameState): GameState => {
+    if (pendingChoice.effect !== 'freightModuleSupply') return nextState;
+    const [nextModuleId, ...remainingModuleIds] = pendingChoice.contextInstanceIds ?? [];
+    if (!nextModuleId || !findCardInstance(nextState, nextModuleId)) return nextState;
+    return {
+      ...nextState,
+      pendingChoice: {
+        ...pendingChoice,
+        sourceInstanceId: nextModuleId,
+        availableInstanceIds: [nextModuleId],
+        contextInstanceIds: remainingModuleIds,
+      },
+    };
+  };
+
   if (selectedInstanceIds.length === 0 && pendingChoice.optional) {
     if (pendingChoice.effect === 'airdrop') {
       const deck = state.zones.deck;
@@ -765,7 +780,7 @@ export function resolveCaelumTargetChoice(
         }),
       };
     }
-    return { ...state, pendingChoice: null };
+    return continueFreightModuleChoices({ ...state, pendingChoice: null });
   }
   if (selectedInstanceIds.length !== 1 || !pendingChoice.availableInstanceIds.includes(selectedInstanceIds[0]!)) {
     return { error: 'Choose exactly one valid card.' };
@@ -899,7 +914,7 @@ export function resolveCaelumTargetChoice(
       nextState = logAbilityOutcome(nextState, pendingChoice.sourceName, `${selected.card.name} returned from graveyard to hand, then Archive Ruins was sacrificed.`);
       break;
   }
-  return nextState;
+  return continueFreightModuleChoices(nextState);
 }
 
 export function resolveCaelumZoneChoice(

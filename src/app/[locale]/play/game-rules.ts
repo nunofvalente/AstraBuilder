@@ -1385,6 +1385,59 @@ function applyArchiveRuinsControlTrigger(
   return returnTacticWithArchiveRuins(state, owner, archiveRuins, archiveTactics[0]!);
 }
 
+function continueScoreItemTriggers(state: GameState, owner: Owner, zone: ZoneId, triggerIds: string[]): GameState {
+  let nextState = state;
+  for (let index = 0; index < triggerIds.length; index += 1) {
+    const triggerId = triggerIds[index]!;
+    const trigger = nextState.zones[zone].find((card) => card.instanceId === triggerId);
+    if (!trigger) continue;
+    const remainingIds = triggerIds.slice(index + 1);
+
+    if (trigger.card.id === 'IMP092') {
+      nextState = applyArchiveRuinsControlTrigger(nextState, owner, zone);
+    } else if (trigger.card.id === 'IMP091') {
+      nextState = owner === 'player'
+        ? {
+            ...nextState,
+            pendingChoice: {
+              kind: 'caelumTarget', owner: 'player', sourceInstanceId: trigger.instanceId,
+              sourceName: trigger.card.name, prompt: 'Move Freight Module to your supply area exhausted?',
+              effect: 'freightModuleSupply', availableInstanceIds: [trigger.instanceId], optional: true,
+            },
+          }
+        : placeFreightModuleIntoSupplyFromScore(nextState, trigger, zone);
+    } else if (trigger.card.id === 'IMP164') {
+      if (!getOwnerZoneMap(nextState, owner).deck[0]) continue;
+      nextState = owner === 'player'
+        ? {
+            ...nextState,
+            pendingChoice: {
+              kind: 'neutralTarget', owner: 'player', sourceInstanceId: trigger.instanceId,
+              sourceName: trigger.card.name, prompt: 'Reveal the top card of your deck for War Banner?',
+              effect: 'warBannerReveal', availableInstanceIds: [trigger.instanceId], optional: true,
+            },
+          }
+        : drawTopUnitForWarBanner(nextState, owner, trigger.card.name);
+    } else if (trigger.card.id === 'IMP093') {
+      nextState = forceOwnerDiscard(nextState, owner, trigger);
+    }
+
+    if (nextState.pendingChoice) {
+      return {
+        ...nextState,
+        pendingChoice: {
+          ...nextState.pendingChoice,
+          remainingScoreItemTriggerIds: remainingIds,
+          scoreTriggerOwner: owner,
+          scoreTriggerZone: zone,
+          resumeTurnAdvance: true,
+        },
+      };
+    }
+  }
+  return nextState;
+}
+
 export function scoreBattlefieldVictoryPoints(state: GameState, owner: Owner): GameState {
   if (state.winner) {
     return state;
@@ -1529,76 +1582,32 @@ export function scoreBattlefieldVictoryPoints(state: GameState, owner: Owner): G
       return nextState;
     }
 
-    nextState = applyArchiveRuinsControlTrigger(nextState, owner, zone, { resumeTurnAdvance: true });
-    if (nextState.pendingChoice) {
-      return nextState;
-    }
-
+    const archiveRuins = nextState.zones[zone].find(
+      (card) => card.card.id === 'IMP092' && !card.faceDown && getCardController(card) === owner &&
+        getOwnerZoneMap(nextState, owner).graveyard.some((graveyardCard) => isTacticCard(graveyardCard.card))
+    );
     const freightModules = nextState.zones[zone].filter(
       (card) =>
         card.card.id === 'IMP091' &&
         card.attachedToInstanceId === instance.instanceId &&
         getCardController(card) === owner
     );
-    for (const freightModule of freightModules) {
-      if (owner === 'player') {
-        return {
-          ...nextState,
-          pendingChoice: {
-            kind: 'caelumTarget',
-            owner: 'player',
-            sourceInstanceId: freightModule.instanceId,
-            sourceName: freightModule.card.name,
-            prompt: 'Move Freight Module to your supply area exhausted?',
-            effect: 'freightModuleSupply',
-            availableInstanceIds: [freightModule.instanceId],
-            optional: true,
-            resumeTurnAdvance: true,
-          },
-        };
-      }
-      nextState = placeFreightModuleIntoSupplyFromScore(nextState, freightModule, zone);
-    }
-
     const warBanners = nextState.zones[zone].filter(
       (card) =>
         card.card.id === 'IMP164' &&
         card.attachedToInstanceId === instance.instanceId &&
         getCardController(card) === owner
     );
-    for (const warBanner of warBanners) {
-      const topCard = getOwnerZoneMap(nextState, owner).deck[0];
-      if (!topCard) {
-        continue;
-      }
-      if (owner === 'player') {
-        return {
-          ...nextState,
-          pendingChoice: {
-            kind: 'neutralTarget',
-            owner: 'player',
-            sourceInstanceId: warBanner.instanceId,
-            sourceName: warBanner.card.name,
-            prompt: 'Reveal the top card of your deck for War Banner?',
-            effect: 'warBannerReveal',
-            availableInstanceIds: [warBanner.instanceId],
-            optional: true,
-            resumeTurnAdvance: true,
-          },
-        };
-      }
-      nextState = drawTopUnitForWarBanner(nextState, owner, warBanner.card.name);
-    }
-
     const jammingTowers = nextState.zones[zone].filter(
       (card) => card.card.id === 'IMP093' && !card.faceDown && getCardController(card) !== owner
     );
-    for (const jammingTower of jammingTowers) {
-      nextState = forceOwnerDiscard(nextState, owner, jammingTower, { resumeTurnAdvance: true });
-      if (nextState.pendingChoice) {
-        return nextState;
-      }
-    }
+    nextState = continueScoreItemTriggers(nextState, owner, zone, [
+      ...(archiveRuins ? [archiveRuins.instanceId] : []),
+      ...freightModules.map((card) => card.instanceId),
+      ...warBanners.map((card) => card.instanceId),
+      ...jammingTowers.map((card) => card.instanceId),
+    ]);
+    if (nextState.pendingChoice) return nextState;
   }
 
   if (nextState.winner === owner) {
@@ -1663,6 +1672,25 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   const selectedIdSet = new Set(selectedInstanceIds);
   const ownerZones = getOwnerZoneMap(state, pendingChoice.owner);
+  const continueQueuedScoreItems = (resolved: GameState): GameState => {
+    const remainingIds = pendingChoice.remainingScoreItemTriggerIds;
+    const owner = pendingChoice.scoreTriggerOwner;
+    const zone = pendingChoice.scoreTriggerZone;
+    if (!remainingIds || !owner || !zone) return resolved;
+    if (resolved.pendingChoice) {
+      return {
+        ...resolved,
+        pendingChoice: {
+          ...resolved.pendingChoice,
+          remainingScoreItemTriggerIds: remainingIds,
+          scoreTriggerOwner: owner,
+          scoreTriggerZone: zone,
+          resumeTurnAdvance: true,
+        },
+      };
+    }
+    return continueScoreItemTriggers(resolved, owner, zone, remainingIds);
+  };
 
   if (pendingChoice.kind === 'luxTarget') {
     const resolved = resolveLuxTargetChoice(state, pendingChoice, selectedInstanceIds);
@@ -1702,24 +1730,24 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'neutralTarget') {
     const resolved = resolveNeutralTargetChoice(state, pendingChoice, selectedInstanceIds);
-    if (!('error' in resolved) && pendingChoice.resumeTurnAdvance && !resolved.pendingChoice) {
-      return finishAdvanceToNextTurnAfterScoring(resolved);
+    if ('error' in resolved) return resolved;
+    const continued = continueQueuedScoreItems(resolved);
+    if (pendingChoice.resumeTurnAdvance && !continued.pendingChoice) {
+      return finishAdvanceToNextTurnAfterScoring(continued);
     }
-    return resolved;
+    return continued;
   }
 
   if (pendingChoice.kind === 'caelumTarget') {
     const resolved = resolveCaelumTargetChoice(state, pendingChoice, selectedInstanceIds);
-    if (
-      !('error' in resolved) &&
-      pendingChoice.resumeTurnAdvance &&
-      !resolved.pendingChoice
-    ) {
+    if ('error' in resolved) return resolved;
+    const continued = continueQueuedScoreItems(resolved);
+    if (pendingChoice.resumeTurnAdvance && !continued.pendingChoice) {
       return pendingChoice.effect === 'unyieldingStormSweep'
-        ? advanceToNextTurn(resolved)
-        : finishAdvanceToNextTurnAfterScoring(resolved);
+        ? advanceToNextTurn(continued)
+        : finishAdvanceToNextTurnAfterScoring(continued);
     }
-    return resolved;
+    return continued;
   }
 
   if (pendingChoice.kind === 'caelumZone') {
@@ -2083,7 +2111,8 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
         suffix: `${pendingChoice.sourceName} caused you to discard ${discardedCard.card.name}.`,
       }),
     };
-    return pendingChoice.resumeTurnAdvance ? finishAdvanceToNextTurnAfterScoring(resolvedState) : resolvedState;
+    const continued = continueQueuedScoreItems(resolvedState);
+    return pendingChoice.resumeTurnAdvance && !continued.pendingChoice ? finishAdvanceToNextTurnAfterScoring(continued) : continued;
   }
 
   return { error: 'That pending choice is not supported.' };

@@ -276,6 +276,7 @@ type ExtraControlsCopy = {
   chooseFirst: string;
   rollingFirst: string;
   youFirst: string;
+  opponentFirst: string;
 };
 
 const OPENING_HAND_COPY: Record<Locale, Pick<ExtraControlsCopy, 'openingHand' | 'keepHand' | 'mulligan'>> = {
@@ -288,12 +289,12 @@ const OPENING_HAND_COPY: Record<Locale, Pick<ExtraControlsCopy, 'openingHand' | 
 };
 
 const EXTRA_CONTROLS_COPY: Record<Locale, Omit<ExtraControlsCopy, 'openingHand' | 'keepHand' | 'mulligan'>> = {
-  en: { availableCounters: 'Available counters', backToLobby: 'Back to lobby', botFirst: 'Bot first', concedeDescription: 'This will leave the current room and return you to the lobby.', cost: 'Cost', lobby: 'Lobby', noCounters: 'No counters played.', passTurnDescription: 'This will end your actions for this turn and pass priority to the bot.', rematch: 'Rematch', resolvesNext: 'Resolves next', setup: 'Setup', startingSupply: 'Choose 1 card from your hand to place as starting supply.', chooseFirst: 'Choose who takes the first turn.', rollingFirst: 'Rolling to choose who takes the first turn.', youFirst: 'You first' },
-  fr: { availableCounters: 'Contres disponibles', backToLobby: 'Retour au salon', botFirst: 'Bot en premier', concedeDescription: 'Vous quitterez la partie en cours et retournerez au salon.', cost: 'Coût', lobby: 'Salon', noCounters: 'Aucun contre joué.', passTurnDescription: 'Vos actions se terminent et la priorité passe au bot.', rematch: 'Rejouer', resolvesNext: 'Se résout ensuite', setup: 'Mise en place', startingSupply: 'Choisissez 1 carte de votre main comme ravitaillement de départ.', chooseFirst: 'Choisissez qui joue en premier.', rollingFirst: 'Tirage au sort du premier joueur.', youFirst: 'Vous en premier' },
-  de: { availableCounters: 'Verfügbare Konter', backToLobby: 'Zurück zur Lobby', botFirst: 'Bot beginnt', concedeDescription: 'Du verlässt das aktuelle Spiel und kehrst zur Lobby zurück.', cost: 'Kosten', lobby: 'Lobby', noCounters: 'Keine Konter gespielt.', passTurnDescription: 'Deine Aktionen enden und die Priorität geht an den Bot.', rematch: 'Revanche', resolvesNext: 'Wird als Nächstes aufgelöst', setup: 'Vorbereitung', startingSupply: 'Wähle 1 Handkarte als Startversorgung.', chooseFirst: 'Wähle, wer den ersten Zug hat.', rollingFirst: 'Der erste Spieler wird ausgelost.', youFirst: 'Du beginnst' },
-  ms: { availableCounters: 'Balas yang tersedia', backToLobby: 'Kembali ke lobi', botFirst: 'Bot dahulu', concedeDescription: 'Anda akan meninggalkan permainan semasa dan kembali ke lobi.', cost: 'Kos', lobby: 'Lobi', noCounters: 'Tiada balas dimainkan.', passTurnDescription: 'Tindakan anda tamat dan keutamaan diberikan kepada bot.', rematch: 'Lawan semula', resolvesNext: 'Diselesaikan seterusnya', setup: 'Persediaan', startingSupply: 'Pilih 1 kad dari tangan sebagai bekalan permulaan.', chooseFirst: 'Pilih siapa mengambil giliran pertama.', rollingFirst: 'Mengundi pemain pertama.', youFirst: 'Anda dahulu' },
-  'zh-CN': { availableCounters: '可用反制牌', backToLobby: '返回大厅', botFirst: '机器人先手', concedeDescription: '这将离开当前对局并返回大厅。', cost: '费用', lobby: '大厅', noCounters: '尚未打出反制牌。', passTurnDescription: '这将结束你本回合的行动，并把优先权交给机器人。', rematch: '再来一局', resolvesNext: '下一个结算', setup: '设置', startingSupply: '从手牌中选择 1 张作为起始补给。', chooseFirst: '选择谁先开始回合。', rollingFirst: '正在随机决定先手。', youFirst: '你先手' },
-  ja: { availableCounters: '使用可能なカウンター', backToLobby: 'ロビーに戻る', botFirst: 'ボットが先攻', concedeDescription: '現在のゲームを終了してロビーに戻ります。', cost: 'コスト', lobby: 'ロビー', noCounters: 'カウンターはプレイされていません。', passTurnDescription: 'このターンの行動を終了し、優先権をボットに渡します。', rematch: '再戦', resolvesNext: '次に解決', setup: 'セットアップ', startingSupply: '手札から1枚を開始時のサプライとして選んでください。', chooseFirst: '先攻プレイヤーを選んでください。', rollingFirst: '先攻プレイヤーを抽選しています。', youFirst: 'あなたが先攻' },
+  en: { availableCounters: 'Available counters', backToLobby: 'Back to lobby', botFirst: 'Bot first', concedeDescription: 'This will leave the current room and return you to the lobby.', cost: 'Cost', lobby: 'Lobby', noCounters: 'No counters played.', passTurnDescription: 'This will end your actions for this turn and pass priority to the bot.', rematch: 'Rematch', resolvesNext: 'Resolves next', setup: 'Setup', startingSupply: 'Choose 1 card from your hand to place as starting supply.', chooseFirst: 'Choose who takes the first turn.', rollingFirst: 'Rolling to choose who takes the first turn.', youFirst: 'You first', opponentFirst: 'Opponent first' },
+  fr: { availableCounters: 'Contres disponibles', backToLobby: 'Retour au salon', botFirst: 'Bot en premier', concedeDescription: 'Vous quitterez la partie en cours et retournerez au salon.', cost: 'Coût', lobby: 'Salon', noCounters: 'Aucun contre joué.', passTurnDescription: 'Vos actions se terminent et la priorité passe au bot.', rematch: 'Rejouer', resolvesNext: 'Se résout ensuite', setup: 'Mise en place', startingSupply: 'Choisissez 1 carte de votre main comme ravitaillement de départ.', chooseFirst: 'Choisissez qui joue en premier.', rollingFirst: 'Tirage au sort du premier joueur.', youFirst: 'Vous en premier', opponentFirst: 'Adversaire en premier' },
+  de: { availableCounters: 'Verfügbare Konter', backToLobby: 'Zurück zur Lobby', botFirst: 'Bot beginnt', concedeDescription: 'Du verlässt das aktuelle Spiel und kehrst zur Lobby zurück.', cost: 'Kosten', lobby: 'Lobby', noCounters: 'Keine Konter gespielt.', passTurnDescription: 'Deine Aktionen enden und die Priorität geht an den Bot.', rematch: 'Revanche', resolvesNext: 'Wird als Nächstes aufgelöst', setup: 'Vorbereitung', startingSupply: 'Wähle 1 Handkarte als Startversorgung.', chooseFirst: 'Wähle, wer den ersten Zug hat.', rollingFirst: 'Der erste Spieler wird ausgelost.', youFirst: 'Du beginnst', opponentFirst: 'Gegner beginnt' },
+  ms: { availableCounters: 'Balas yang tersedia', backToLobby: 'Kembali ke lobi', botFirst: 'Bot dahulu', concedeDescription: 'Anda akan meninggalkan permainan semasa dan kembali ke lobi.', cost: 'Kos', lobby: 'Lobi', noCounters: 'Tiada balas dimainkan.', passTurnDescription: 'Tindakan anda tamat dan keutamaan diberikan kepada bot.', rematch: 'Lawan semula', resolvesNext: 'Diselesaikan seterusnya', setup: 'Persediaan', startingSupply: 'Pilih 1 kad dari tangan sebagai bekalan permulaan.', chooseFirst: 'Pilih siapa mengambil giliran pertama.', rollingFirst: 'Mengundi pemain pertama.', youFirst: 'Anda dahulu', opponentFirst: 'Lawan dahulu' },
+  'zh-CN': { availableCounters: '可用反制牌', backToLobby: '返回大厅', botFirst: '机器人先手', concedeDescription: '这将离开当前对局并返回大厅。', cost: '费用', lobby: '大厅', noCounters: '尚未打出反制牌。', passTurnDescription: '这将结束你本回合的行动，并把优先权交给机器人。', rematch: '再来一局', resolvesNext: '下一个结算', setup: '设置', startingSupply: '从手牌中选择 1 张作为起始补给。', chooseFirst: '选择谁先开始回合。', rollingFirst: '正在随机决定先手。', youFirst: '你先手', opponentFirst: '对手先手' },
+  ja: { availableCounters: '使用可能なカウンター', backToLobby: 'ロビーに戻る', botFirst: 'ボットが先攻', concedeDescription: '現在のゲームを終了してロビーに戻ります。', cost: 'コスト', lobby: 'ロビー', noCounters: 'カウンターはプレイされていません。', passTurnDescription: 'このターンの行動を終了し、優先権をボットに渡します。', rematch: '再戦', resolvesNext: '次に解決', setup: 'セットアップ', startingSupply: '手札から1枚を開始時のサプライとして選んでください。', chooseFirst: '先攻プレイヤーを選んでください。', rollingFirst: '先攻プレイヤーを抽選しています。', youFirst: 'あなたが先攻', opponentFirst: '相手が先攻' },
 };
 
 export function getPlayControlsCopy(locale: Locale): PlayControlsCopy & ExtraControlsCopy {
@@ -314,6 +315,21 @@ export type PlayLobbyCopy = {
   chooseYourDeck: string;
   createLobby: string;
   createLobbyDescription: string;
+  cancelRoom: string;
+  createRoom: string;
+  joinRoom: string;
+  roomCode: string;
+  roomCodePlaceholder: string;
+  roomCancelled: string;
+  roomWaiting: string;
+  roomReady: string;
+  roomRequestFailed: string;
+  roomSignInPrompt: string;
+  opponentDisconnected: string;
+  opponentRequestedRematch: string;
+  opponentDeclinedRematch: string;
+  shareRoom: string;
+  roomLinkCopied: string;
   findMatch: (queue: string) => string;
   loadingDecks: string;
   matchmaking: string;
@@ -344,7 +360,8 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     cardCount: (count) => `${count} ${count === 1 ? 'card' : 'cards'}`,
     cardCountSelected: (count) => `${count} ${count === 1 ? 'card' : 'cards'} selected`,
     casual: 'Casual', change: 'Change', chooseBotDeck: 'Choose bot deck', chooseBotDeckDescription: 'Choose one of your saved decks for the bot opponent.',
-    chooseYourDeck: 'Choose your deck', createLobby: 'Create Lobby', createLobbyDescription: 'Create a custom game and invite a friend with a room code. Coming soon.',
+    chooseYourDeck: 'Choose your deck', createLobby: 'Create Lobby', createLobbyDescription: 'Create a private game or join a friend with their six-character code.', cancelRoom: 'Cancel room',
+    createRoom: 'Create room', joinRoom: 'Join room', roomCode: 'Room code', roomCodePlaceholder: 'ABC123', roomCancelled: 'This room was cancelled.', roomWaiting: 'Waiting for another player...', roomReady: 'Both players joined. Preparing the match…', roomRequestFailed: 'The room request failed. Please try again.', roomSignInPrompt: 'You need to be signed in to create or join a room.', opponentDisconnected: 'Opponent disconnected. Waiting up to 60 seconds for them to reconnect…', opponentRequestedRematch: 'Your opponent requested a rematch.', opponentDeclinedRematch: 'Your opponent declined the rematch.', shareRoom: 'Copy invite link', roomLinkCopied: 'Invite link copied',
     findMatch: (queue) => `Find ${queue} match`, loadingDecks: 'Loading your decks...', matchmaking: 'Matchmaking',
     matchmakingTitle: (queue) => `${queue} matchmaking`, multiplayerComingSoon: 'Multiplayer is coming soon.', noSavedDecks: 'No saved decks found.',
     openMatchRoom: 'Opening match room...', pickSavedDeckForPractice: 'Pick a saved deck for practice', practice: 'Practice', practiceVsBot: 'Practice vs Bot',
@@ -357,7 +374,8 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     cardCount: (count) => `${count} carte${count === 1 ? '' : 's'}`,
     cardCountSelected: (count) => `${count} carte${count === 1 ? '' : 's'} sélectionnée${count === 1 ? '' : 's'}`,
     casual: 'amical', change: 'Changer', chooseBotDeck: 'Choisir le deck du bot', chooseBotDeckDescription: 'Choisissez un de vos decks enregistrés pour le bot.',
-    chooseYourDeck: 'Choisissez votre deck', createLobby: 'Créer un salon', createLobbyDescription: 'Créez une partie personnalisée et invitez un ami avec un code de salon. Bientôt disponible.',
+    chooseYourDeck: 'Choisissez votre deck', createLobby: 'Créer un salon', createLobbyDescription: 'Créez une partie privée ou rejoignez un ami avec son code à six caractères.', cancelRoom: 'Annuler la salle',
+    createRoom: 'Créer une salle', joinRoom: 'Rejoindre', roomCode: 'Code de salle', roomCodePlaceholder: 'ABC123', roomCancelled: 'Cette salle a été annulée.', roomWaiting: 'En attente d’un autre joueur…', roomReady: 'Les deux joueurs sont présents. Préparation de la partie…', roomRequestFailed: 'La demande a échoué. Réessayez.', roomSignInPrompt: 'Vous devez être connecté pour créer ou rejoindre une salle.', opponentDisconnected: 'L’adversaire est déconnecté. Reconnexion attendue pendant 60 secondes…', opponentRequestedRematch: 'Votre adversaire demande une revanche.', opponentDeclinedRematch: 'Votre adversaire a refusé la revanche.', shareRoom: 'Copier le lien d’invitation', roomLinkCopied: 'Lien d’invitation copié',
     findMatch: (queue) => `Trouver une partie ${queue}`, loadingDecks: 'Chargement de vos decks...', matchmaking: 'Matchmaking',
     matchmakingTitle: (queue) => `Matchmaking ${queue}`, multiplayerComingSoon: 'Le multijoueur arrive bientôt.', noSavedDecks: 'Aucun deck enregistré trouvé.',
     openMatchRoom: 'Ouverture de la salle de match...', pickSavedDeckForPractice: 'Choisissez un deck enregistré pour l’entraînement', practice: 'Entraînement', practiceVsBot: 'Entraînement contre le bot',
@@ -370,7 +388,8 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     cardCount: (count) => `${count} ${count === 1 ? 'Karte' : 'Karten'}`,
     cardCountSelected: (count) => `${count} ${count === 1 ? 'Karte' : 'Karten'} ausgewählt`,
     casual: 'locker', change: 'Ändern', chooseBotDeck: 'Bot-Deck wählen', chooseBotDeckDescription: 'Wähle eines deiner gespeicherten Decks für den Bot-Gegner.',
-    chooseYourDeck: 'Wähle dein Deck', createLobby: 'Lobby erstellen', createLobbyDescription: 'Erstelle ein eigenes Spiel und lade einen Freund mit einem Raumcode ein. Demnächst verfügbar.',
+    chooseYourDeck: 'Wähle dein Deck', createLobby: 'Lobby erstellen', createLobbyDescription: 'Erstelle ein privates Spiel oder tritt mit einem sechsstelligen Code bei.', cancelRoom: 'Raum abbrechen',
+    createRoom: 'Raum erstellen', joinRoom: 'Raum beitreten', roomCode: 'Raumcode', roomCodePlaceholder: 'ABC123', roomCancelled: 'Dieser Raum wurde abgebrochen.', roomWaiting: 'Warten auf einen weiteren Spieler…', roomReady: 'Beide Spieler sind beigetreten. Das Spiel wird vorbereitet…', roomRequestFailed: 'Die Raumanfrage ist fehlgeschlagen.', roomSignInPrompt: 'Du musst angemeldet sein, um einen Raum zu erstellen oder beizutreten.', opponentDisconnected: 'Gegner getrennt. Warte bis zu 60 Sekunden auf die Wiederverbindung…', opponentRequestedRematch: 'Dein Gegner hat eine Revanche angefordert.', opponentDeclinedRematch: 'Dein Gegner hat die Revanche abgelehnt.', shareRoom: 'Einladungslink kopieren', roomLinkCopied: 'Einladungslink kopiert',
     findMatch: (queue) => `${queue}-Match suchen`, loadingDecks: 'Deine Decks werden geladen...', matchmaking: 'Matchmaking',
     matchmakingTitle: (queue) => `${queue}-Matchmaking`, multiplayerComingSoon: 'Mehrspieler kommt bald.', noSavedDecks: 'Keine gespeicherten Decks gefunden.',
     openMatchRoom: 'Matchraum wird geöffnet...', pickSavedDeckForPractice: 'Wähle ein gespeichertes Deck fürs Training', practice: 'Training', practiceVsBot: 'Training gegen Bot',
@@ -383,7 +402,8 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     cardCount: (count) => `${count} kad`,
     cardCountSelected: (count) => `${count} kad dipilih`,
     casual: 'kasual', change: 'Tukar', chooseBotDeck: 'Pilih dek bot', chooseBotDeckDescription: 'Pilih salah satu dek tersimpan anda untuk lawan bot.',
-    chooseYourDeck: 'Pilih dek anda', createLobby: 'Cipta lobi', createLobbyDescription: 'Cipta permainan tersuai dan jemput rakan dengan kod bilik. Akan datang.',
+    chooseYourDeck: 'Pilih dek anda', createLobby: 'Cipta lobi', createLobbyDescription: 'Cipta permainan peribadi atau sertai rakan dengan kod enam aksara.', cancelRoom: 'Batalkan bilik',
+    createRoom: 'Cipta bilik', joinRoom: 'Sertai bilik', roomCode: 'Kod bilik', roomCodePlaceholder: 'ABC123', roomCancelled: 'Bilik ini telah dibatalkan.', roomWaiting: 'Menunggu pemain lain…', roomReady: 'Kedua-dua pemain telah sertai. Menyediakan perlawanan…', roomRequestFailed: 'Permintaan bilik gagal. Cuba lagi.', roomSignInPrompt: 'Anda perlu log masuk untuk mencipta atau menyertai bilik.', opponentDisconnected: 'Lawan terputus. Menunggu sehingga 60 saat untuk sambungan semula…', opponentRequestedRematch: 'Lawan anda meminta perlawanan semula.', opponentDeclinedRematch: 'Lawan anda menolak perlawanan semula.', shareRoom: 'Salin pautan jemputan', roomLinkCopied: 'Pautan jemputan disalin',
     findMatch: (queue) => `Cari perlawanan ${queue}`, loadingDecks: 'Memuatkan dek anda...', matchmaking: 'Pencarian lawan',
     matchmakingTitle: (queue) => `Pencarian lawan ${queue}`, multiplayerComingSoon: 'Berbilang pemain akan datang.', noSavedDecks: 'Tiada dek tersimpan ditemui.',
     openMatchRoom: 'Membuka bilik perlawanan...', pickSavedDeckForPractice: 'Pilih dek tersimpan untuk latihan', practice: 'Latihan', practiceVsBot: 'Latihan lawan bot',
@@ -396,7 +416,8 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     cardCount: (count) => `${count} 张卡`,
     cardCountSelected: (count) => `已选择 ${count} 张卡`,
     casual: '休闲', change: '更换', chooseBotDeck: '选择机器人牌组', chooseBotDeckDescription: '为机器人对手选择一个你保存的牌组。',
-    chooseYourDeck: '选择你的牌组', createLobby: '创建大厅', createLobbyDescription: '创建自定义对局并用房间代码邀请好友。即将推出。',
+    chooseYourDeck: '选择你的牌组', createLobby: '创建大厅', createLobbyDescription: '创建私人对局，或使用六位代码加入好友。', cancelRoom: '取消房间',
+    createRoom: '创建房间', joinRoom: '加入房间', roomCode: '房间代码', roomCodePlaceholder: 'ABC123', roomCancelled: '该房间已取消。', roomWaiting: '正在等待另一位玩家…', roomReady: '双方均已加入，正在准备对局…', roomRequestFailed: '房间请求失败，请重试。', roomSignInPrompt: '你需要登录才能创建或加入房间。', opponentDisconnected: '对手已断开连接，等待其在 60 秒内重新连接…', opponentRequestedRematch: '你的对手请求再来一局。', opponentDeclinedRematch: '你的对手拒绝了再来一局。', shareRoom: '复制邀请链接', roomLinkCopied: '邀请链接已复制',
     findMatch: (queue) => `寻找${queue}匹配`, loadingDecks: '正在加载你的牌组...', matchmaking: '匹配',
     matchmakingTitle: (queue) => `${queue}匹配`, multiplayerComingSoon: '多人游戏即将推出。', noSavedDecks: '未找到已保存的牌组。',
     openMatchRoom: '正在打开对战房间...', pickSavedDeckForPractice: '选择一个已保存的牌组进行练习', practice: '练习', practiceVsBot: '对战机器人练习',
@@ -409,7 +430,8 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     cardCount: (count) => `${count}枚`,
     cardCountSelected: (count) => `${count}枚選択中`,
     casual: 'カジュアル', change: '変更', chooseBotDeck: 'ボットデッキを選択', chooseBotDeckDescription: 'ボットの対戦相手に使う保存済みデッキを選んでください。',
-    chooseYourDeck: 'あなたのデッキを選択', createLobby: 'ロビーを作成', createLobbyDescription: 'カスタムゲームを作成し、ルームコードで友だちを招待できます。近日対応予定です。',
+    chooseYourDeck: 'あなたのデッキを選択', createLobby: 'ロビーを作成', createLobbyDescription: 'プライベートゲームを作成するか、6文字のコードで参加します。', cancelRoom: 'ルームをキャンセル',
+    createRoom: 'ルームを作成', joinRoom: 'ルームに参加', roomCode: 'ルームコード', roomCodePlaceholder: 'ABC123', roomCancelled: 'このルームはキャンセルされました。', roomWaiting: 'ほかのプレイヤーを待っています…', roomReady: '両プレイヤーが参加しました。対戦を準備しています…', roomRequestFailed: 'ルームの操作に失敗しました。もう一度お試しください。', roomSignInPrompt: 'ルームを作成または参加するにはサインインが必要です。', opponentDisconnected: '対戦相手が切断しました。再接続を最大60秒待っています…', opponentRequestedRematch: '対戦相手が再戦を希望しています。', opponentDeclinedRematch: '対戦相手が再戦を辞退しました。', shareRoom: '招待リンクをコピー', roomLinkCopied: '招待リンクをコピーしました',
     findMatch: (queue) => `${queue}マッチを探す`, loadingDecks: 'デッキを読み込み中...', matchmaking: 'マッチメイキング',
     matchmakingTitle: (queue) => `${queue}マッチメイキング`, multiplayerComingSoon: 'マルチプレイヤーは近日対応予定です。', noSavedDecks: '保存済みデッキが見つかりません。',
     openMatchRoom: 'マッチルームを開いています...', pickSavedDeckForPractice: '練習用の保存済みデッキを選択', practice: '練習', practiceVsBot: 'ボットと練習',
@@ -488,6 +510,15 @@ const ACTION_LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, stri
 
 export function translateGameLogText(locale: Locale, text: string): string {
   if (locale === 'en') return text;
+  if (text === 'Opponent did not reconnect before the grace period expired.') {
+    return {
+      fr: 'L’adversaire ne s’est pas reconnecté avant la fin du délai.',
+      de: 'Der Gegner hat sich nicht innerhalb der Frist wieder verbunden.',
+      ms: 'Lawan tidak menyambung semula sebelum tempoh tamat.',
+      'zh-CN': '对手未在宽限时间结束前重新连接。',
+      ja: '対戦相手は猶予時間内に再接続しませんでした。',
+    }[locale];
+  }
   if (text === 'Kept the opening hand.') {
     return {
       fr: 'Main de départ conservée.',
