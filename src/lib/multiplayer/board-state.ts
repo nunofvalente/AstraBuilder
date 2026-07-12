@@ -1,4 +1,4 @@
-import { buildInitialGameState, startGameAfterSetup, type GameCardInstance, type GameState, type Owner, type PendingChoice, type PrivateZones, type SavedDeck } from '@/app/[locale]/play/game-rules';
+import { buildInitialGameState, startGameAfterSetup, type GameCardInstance, type GameState, type LogEntry, type Owner, type PendingChoice, type PrivateZones, type SavedDeck } from '@/app/[locale]/play/game-rules';
 
 import type { MatchDeckSnapshot, PlayerSetupState, SetupCard } from './match-setup';
 import type { Card } from '@/app/[locale]/create/deck-builder/types';
@@ -40,6 +40,23 @@ function swapLogText(text: string): string {
     .replace(/\bBot\b/g, 'You')
     .replace(/__HOST_POSSESSIVE__/g, "Bot's")
     .replace(/__HOST__/g, 'Bot');
+}
+
+function redactOpponentSupplyLog(entry: LogEntry, viewerOwner: Owner): LogEntry {
+  if (entry.activePlayer === viewerOwner || !entry.cardName) return entry;
+  const isStartingSupply = entry.prefix === 'Placed ' && entry.suffix.startsWith(' as starting supply');
+  const isManualSupply = entry.prefix === 'Supplied ' && entry.suffix.startsWith(' and drew ');
+  if (!isStartingSupply && !isManualSupply) return entry;
+  const actor = entry.activePlayer === 'opponent' ? 'Bot' : 'You';
+  return {
+    ...entry,
+    prefix: undefined,
+    cardName: undefined,
+    cardNames: undefined,
+    suffix: isStartingSupply
+      ? `${actor} placed a card${entry.suffix}`
+      : `${actor} supplied a card${entry.suffix}`,
+  };
 }
 
 export function swapGameStatePerspective(state: GameState): GameState {
@@ -93,6 +110,7 @@ export function projectViewerGameState(state: GameState, seat: 'host' | 'guest')
   const ownZones = orientPrivateZones(ownSource, swap, false);
   const opponentZones = orientPrivateZones(opponentSource, swap, true);
   const ownsPendingChoice = Boolean(state.pendingChoice && (state.pendingChoice.owner === (seat === 'host' ? 'player' : 'opponent')));
+  const viewerOwner: Owner = seat === 'host' ? 'player' : 'opponent';
   return {
     ...state,
     deckId: seat === 'host' ? state.deckId : state.botDeckId ?? '',
@@ -129,6 +147,7 @@ export function projectViewerGameState(state: GameState, seat: 'host' | 'guest')
     pendingChoice: ownsPendingChoice && state.pendingChoice
       ? ({ ...state.pendingChoice, owner: 'player' } as PendingChoice)
       : null,
+    log: state.log.map((entry) => redactOpponentSupplyLog(entry, viewerOwner)),
   };
 }
 
