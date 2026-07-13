@@ -7,17 +7,23 @@ const HIDDEN_CARD: Card = {
   id: 'hidden-card', name: 'Hidden card', type: '', affinity: '', number: null, cost: 0, attack: 0, health: 0,
   subtype: '', rarity: '', artist: '', influence: null, rulesText: '', description: '', imageSrc: '', searchContent: '', detailLabel: '',
 };
+const HIDDEN_TERRITORY_CARD: Card = { ...HIDDEN_CARD, type: 'Territory' };
 
 function swapOwner(owner: Owner): Owner {
   return owner === 'player' ? 'opponent' : 'player';
 }
 
-function orientInstance(instance: GameCardInstance, swap: boolean, hideCard = false): GameCardInstance {
+function orientInstance(
+  instance: GameCardInstance,
+  swap: boolean,
+  hideCard = false,
+  hiddenCard: Card = HIDDEN_CARD
+): GameCardInstance {
   return {
     ...instance,
     owner: swap ? swapOwner(instance.owner) : instance.owner,
     controller: instance.controller ? (swap ? swapOwner(instance.controller) : instance.controller) : undefined,
-    card: hideCard ? HIDDEN_CARD : instance.card,
+    card: hideCard ? hiddenCard : instance.card,
   };
 }
 
@@ -42,12 +48,40 @@ function swapLogText(text: string): string {
     .replace(/__HOST__/g, 'Bot');
 }
 
-function redactOpponentSupplyLog(entry: LogEntry, viewerOwner: Owner): LogEntry {
+function redactPrivateLog(
+  entry: LogEntry,
+  viewerOwner: Owner,
+  hiddenFaceDownTerritoryNames: ReadonlySet<string>
+): LogEntry {
+  if (entry.privateToOwner && entry.privateToOwner !== viewerOwner) {
+    return {
+      ...entry,
+      prefix: entry.redactedPrefix,
+      cardName: undefined,
+      cardNames: undefined,
+      suffix: entry.redactedSuffix ?? 'A private card action occurred.',
+      privateToOwner: undefined,
+      redactedPrefix: undefined,
+      redactedSuffix: undefined,
+    };
+  }
   if (entry.activePlayer === viewerOwner || !entry.cardName) return entry;
   const isStartingSupply = entry.prefix === 'Placed ' && entry.suffix.startsWith(' as starting supply');
   const isManualSupply = entry.prefix === 'Supplied ' && entry.suffix.startsWith(' and drew ');
-  if (!isStartingSupply && !isManualSupply) return entry;
   const actor = entry.activePlayer === 'opponent' ? 'Bot' : 'You';
+  if (!isStartingSupply && !isManualSupply) {
+    const faceDownDestination = hiddenFaceDownTerritoryNames.has(entry.cardName)
+      ? entry.suffix.match(/^ from Hand to (Battlefield [123])(?:, replacing .+)?\.$/)?.[1]
+      : null;
+    if (!faceDownDestination) return entry;
+    return {
+      ...entry,
+      prefix: undefined,
+      cardName: undefined,
+      cardNames: undefined,
+      suffix: `${actor} played a face-down territory in ${faceDownDestination}.`,
+    };
+  }
   return {
     ...entry,
     prefix: undefined,
@@ -99,7 +133,15 @@ export function swapGameStatePerspective(state: GameState): GameState {
     } : null,
     pendingChoice: state.pendingChoice ? ({ ...state.pendingChoice, owner: swapOwner(state.pendingChoice.owner) } as PendingChoice) : null,
     scoreLocks: state.scoreLocks?.map((lock) => ({ ...lock, blockedOwner: swapOwner(lock.blockedOwner), expiresAtStartOfOwner: swapOwner(lock.expiresAtStartOfOwner) })),
-    log: state.log.map((entry) => ({ ...entry, activePlayer: entry.activePlayer ? swapOwner(entry.activePlayer) : null, prefix: entry.prefix ? swapLogText(entry.prefix) : undefined, suffix: swapLogText(entry.suffix) })),
+    log: state.log.map((entry) => ({
+      ...entry,
+      activePlayer: entry.activePlayer ? swapOwner(entry.activePlayer) : null,
+      privateToOwner: entry.privateToOwner ? swapOwner(entry.privateToOwner) : undefined,
+      prefix: entry.prefix ? swapLogText(entry.prefix) : undefined,
+      suffix: swapLogText(entry.suffix),
+      redactedPrefix: entry.redactedPrefix ? swapLogText(entry.redactedPrefix) : undefined,
+      redactedSuffix: entry.redactedSuffix ? swapLogText(entry.redactedSuffix) : undefined,
+    })),
   };
 }
 
@@ -111,6 +153,19 @@ export function projectViewerGameState(state: GameState, seat: 'host' | 'guest')
   const opponentZones = orientPrivateZones(opponentSource, swap, true);
   const ownsPendingChoice = Boolean(state.pendingChoice && (state.pendingChoice.owner === (seat === 'host' ? 'player' : 'opponent')));
   const viewerOwner: Owner = seat === 'host' ? 'player' : 'opponent';
+  const opponentOwner: Owner = seat === 'host' ? 'opponent' : 'player';
+  const battlefieldForViewer = (cards: GameCardInstance[]) => cards.map((card) =>
+    orientInstance(card, swap, card.faceDown && card.owner === opponentOwner, HIDDEN_TERRITORY_CARD)
+  );
+  const hiddenFaceDownTerritoryNames = new Set(
+    [
+      ...state.zones.battlefieldLeft,
+      ...state.zones.battlefieldCenter,
+      ...state.zones.battlefieldRight,
+    ]
+      .filter((card) => card.faceDown && card.owner === opponentOwner)
+      .map((card) => card.card.name)
+  );
   return {
     ...state,
     deckId: seat === 'host' ? state.deckId : state.botDeckId ?? '',
@@ -132,9 +187,9 @@ export function projectViewerGameState(state: GameState, seat: 'host' | 'guest')
     opponentTemporarySupply: seat === 'host' ? state.opponentTemporarySupply : state.playerTemporarySupply,
     zones: {
       ...ownZones,
-      battlefieldLeft: state.zones.battlefieldLeft.map((card) => orientInstance(card, swap)),
-      battlefieldCenter: state.zones.battlefieldCenter.map((card) => orientInstance(card, swap)),
-      battlefieldRight: state.zones.battlefieldRight.map((card) => orientInstance(card, swap)),
+      battlefieldLeft: battlefieldForViewer(state.zones.battlefieldLeft),
+      battlefieldCenter: battlefieldForViewer(state.zones.battlefieldCenter),
+      battlefieldRight: battlefieldForViewer(state.zones.battlefieldRight),
     },
     opponentZones,
     pendingCombat: state.pendingCombat ? {
@@ -147,7 +202,7 @@ export function projectViewerGameState(state: GameState, seat: 'host' | 'guest')
     pendingChoice: ownsPendingChoice && state.pendingChoice
       ? ({ ...state.pendingChoice, owner: 'player' } as PendingChoice)
       : null,
-    log: state.log.map((entry) => redactOpponentSupplyLog(entry, viewerOwner)),
+    log: state.log.map((entry) => redactPrivateLog(entry, viewerOwner, hiddenFaceDownTerritoryNames)),
   };
 }
 
@@ -206,6 +261,7 @@ export function buildMultiplayerSetupState(
 export function projectBoardState(state: GameState, seat: 'host' | 'guest') {
   const ownZones = seat === 'host' ? state.zones : state.opponentZones;
   const opponentZones = seat === 'host' ? state.opponentZones : state.zones;
+  const viewerState = projectViewerGameState(state, seat);
   return {
     revisionIndependentState: {
       turn: state.turn,
@@ -217,12 +273,21 @@ export function projectBoardState(state: GameState, seat: 'host' | 'guest') {
       hostVictoryPoints: state.playerVictoryPoints,
       guestVictoryPoints: state.opponentVictoryPoints,
       battlefield: {
-        left: state.zones.battlefieldLeft,
-        center: state.zones.battlefieldCenter,
-        right: state.zones.battlefieldRight,
+        left: viewerState.zones.battlefieldLeft,
+        center: viewerState.zones.battlefieldCenter,
+        right: viewerState.zones.battlefieldRight,
       },
     },
-    you: { zones: ownZones },
+    you: {
+      zones: {
+        deck: ownZones.deck,
+        hand: ownZones.hand,
+        staging: ownZones.staging,
+        supply: ownZones.supply,
+        graveyard: ownZones.graveyard,
+        banish: ownZones.banish,
+      },
+    },
     opponent: {
       handCount: opponentZones.hand.length,
       deckCount: opponentZones.deck.length,
@@ -231,6 +296,6 @@ export function projectBoardState(state: GameState, seat: 'host' | 'guest') {
       graveyard: opponentZones.graveyard,
       banish: opponentZones.banish,
     },
-    viewerState: projectViewerGameState(state, seat),
+    viewerState,
   };
 }

@@ -341,6 +341,8 @@ function placeSupply(
         prefix: 'Placed ',
         cardName: setupSupply.selectedCard.card.name,
         suffix: ` as starting supply and drew ${setupSupply.replacementDraw.length} replacement card.`,
+        privateToOwner: owner,
+        redactedSuffix: `${owner === 'player' ? 'You' : 'Bot'} placed a card as starting supply and drew ${setupSupply.replacementDraw.length} replacement card.`,
       }),
     }, owner, setupSupply.replacementDraw.length);
 
@@ -381,6 +383,8 @@ function placeSupply(
             prefix: 'Supplied ',
             cardName: suppliedCard.selectedCard.card.name,
             suffix: ` and drew ${suppliedCard.replacementDraw.length} card.`,
+            privateToOwner: owner,
+            redactedSuffix: `You supplied a card and drew ${suppliedCard.replacementDraw.length} card.`,
           }
         : {
             suffix: `Bot supplied a card and drew ${suppliedCard.replacementDraw.length} card.`,
@@ -667,6 +671,11 @@ function moveCard(
       ? ownerZones.staging.find((instance) => instance.instanceId === options.attachToInstanceId)?.card.name ?? null
       : null;
   const movedZoneState = applyOwnerZoneMap(paidState, owner, stabilizedAttachments.zones);
+  const isFaceDownTerritoryPlay =
+    fromZone === 'hand' &&
+    BATTLEFIELD_ZONES.has(toZone) &&
+    isTerritoryCard(card.card) &&
+    options.faceDown === true;
   let movedState = {
     ...movedZoneState,
     ...(isDemonicAdvanceUnitPlay
@@ -688,6 +697,12 @@ function moveCard(
             : battlefieldPlacement.replacedTerritory
               ? ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}, replacing ${battlefieldPlacement.replacedTerritory.card.name}.`
               : ` from ${ZONE_LABELS[fromZone]} to ${ZONE_LABELS[toZone]}.`,
+          ...(isFaceDownTerritoryPlay
+            ? {
+                privateToOwner: owner,
+                redactedSuffix: `${owner === 'player' ? 'You' : 'Bot'} played a face-down territory in ${ZONE_LABELS[toZone]}.`,
+              }
+            : null),
         }),
   };
 

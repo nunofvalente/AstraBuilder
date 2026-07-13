@@ -8,6 +8,8 @@ import { CARD_BACK_IMAGE_SRC } from './game-client-support';
 import { BattlefieldPanel, CombinedStagingSupplyPanel, HandStrip } from './game-board-ui';
 import {
   buildInitialGameState,
+  getCurrentUnitAttack,
+  getCurrentUnitHealth,
   type GameCardInstance,
   type GameState,
   type SavedDeck,
@@ -136,6 +138,91 @@ describe('CombinedStagingSupplyPanel', () => {
     );
 
     expect(screen.getByLabelText('Vermillion, Ghastly Researcher has 2 influence')).toHaveTextContent('2');
+  });
+
+  it('distinguishes a Guinea Pig played from the graveyard from one played from hand', () => {
+    const graveyardGuineaPig: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'graveyard-guinea-pig',
+      card: createTestCard({ id: 'IMP007', name: 'Guinea Pig', type: 'Unit' }),
+      banishOnDeath: true,
+    };
+    const handGuineaPig: GameCardInstance = {
+      ...graveyardGuineaPig,
+      instanceId: 'hand-guinea-pig',
+      banishOnDeath: false,
+    };
+
+    render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[graveyardGuineaPig, handGuineaPig]}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+      />,
+    );
+
+    const markedCard = screen.getByLabelText('Banish on death').closest('[data-card-instance-id]');
+    expect(markedCard).toHaveAttribute('data-card-instance-id', graveyardGuineaPig.instanceId);
+    expect(screen.getAllByLabelText('Banish on death')).toHaveLength(1);
+  });
+
+  it('shows Selena ready and exhausted stat bonuses on allied units', () => {
+    const selena: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'selena',
+      card: createTestCard({ id: 'IMP046', name: 'Selena, Voice of Unity', type: 'Renowned Unit', attack: 3, health: 5 }),
+      ready: true,
+    };
+    const ally: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'selena-ally',
+      card: createTestCard({ id: 'selena-ally', name: 'Selena Ally', type: 'Unit', attack: 2, health: 2 }),
+      ready: true,
+    };
+    const baseState = makeGameState();
+    const readyState = { ...baseState, zones: { ...baseState.zones, staging: [selena, ally] } };
+    const { rerender } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={readyState.zones.staging}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        currentCombatStatsByInstanceId={{
+          [ally.instanceId]: {
+            attack: getCurrentUnitAttack(readyState, ally),
+            health: getCurrentUnitHealth(readyState, ally),
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText('Selena Ally has 3 attack and 2 health, modified')).toBeInTheDocument();
+
+    const exhaustedSelena = { ...selena, ready: false };
+    const exhaustedState = {
+      ...baseState,
+      zones: { ...baseState.zones, staging: [exhaustedSelena, ally] },
+    };
+    rerender(
+      <CombinedStagingSupplyPanel
+        stagingCards={exhaustedState.zones.staging}
+        supplyCards={[]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        currentCombatStatsByInstanceId={{
+          [ally.instanceId]: {
+            attack: getCurrentUnitAttack(exhaustedState, ally),
+            health: getCurrentUnitHealth(exhaustedState, ally),
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText('Selena Ally has 2 attack and 3 health, modified')).toBeInTheDocument();
   });
 
   it('renders generic temporary supply as distinct supply cards', () => {
@@ -502,6 +589,27 @@ describe('BattlefieldPanel', () => {
 
     expect(previewImage).toHaveAttribute('src', expect.stringContaining('hidden-territory.webp'));
     expect(previewImage).not.toHaveAttribute('src', expect.stringContaining(encodeURIComponent(CARD_BACK_IMAGE_SRC)));
+  });
+
+  it('opens Battlefield 3 card previews in the center of the viewport', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'right-battlefield-unit',
+      card: createTestCard({ id: 'right-battlefield-unit', name: 'Right Battlefield Unit', type: 'Unit' }),
+    };
+    const { container } = render(
+      <BattlefieldPanel
+        zone="battlefieldRight"
+        cards={[unit]}
+        onMove={() => undefined}
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /open right battlefield unit actions/i }));
+
+    expect(container.querySelector('[data-card-zoom-preview]')).toHaveClass('left-[55%]', '-translate-x-1/2', 'top-8');
+    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('left-5');
+    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('right-5');
   });
 
   it('zooms face-down opponent territories as card backs', () => {

@@ -13,6 +13,9 @@ export function createLogEntry({
   cardName,
   cardNames,
   suffix,
+  privateToOwner,
+  redactedPrefix,
+  redactedSuffix,
 }: {
   turn?: number | null;
   phase?: GamePhase | null;
@@ -21,6 +24,9 @@ export function createLogEntry({
   cardName?: string;
   cardNames?: string[];
   suffix: string;
+  privateToOwner?: Owner;
+  redactedPrefix?: string;
+  redactedSuffix?: string;
 }): LogEntry {
   return {
     id: crypto.randomUUID(),
@@ -31,6 +37,9 @@ export function createLogEntry({
     cardName,
     cardNames,
     suffix,
+    privateToOwner,
+    redactedPrefix,
+    redactedSuffix,
   };
 }
 
