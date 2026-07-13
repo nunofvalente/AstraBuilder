@@ -9,6 +9,9 @@ import {
   buildInitialGameState,
   declareBattlefieldAttack,
   getModifiedPlayCost,
+  getCounterTargetOptions,
+  passCounterPriority,
+  playCounterCard,
   readyCardsForOwner,
   removeUnitFromPlay,
   resolveBattlefieldAttack,
@@ -277,6 +280,10 @@ describe('Caelum card abilities', () => {
     const airdropPending = triggerCardAbilities(state, 'onPlay', { source: airdrop, controller: 'player', zone: 'graveyard' });
     const airdropped = resolvePendingChoice(airdropPending, [top.instanceId]);
     expect('error' in airdropped ? null : airdropped.zones.hand[0]?.instanceId).toBe(top.instanceId);
+    expect('error' in airdropped ? null : airdropped.log[0]).toMatchObject({
+      privateToOwner: 'player',
+      redactedSuffix: 'Airdrop: put the top card into hand.',
+    });
 
     const handAirdrop = makeUnit('IMP082', 'player', {
       card: createTestCard({ id: 'IMP082', name: 'Airdrop', type: 'Tactic', cost: 0, affinity: 'Caelum' }),
@@ -306,6 +313,10 @@ describe('Caelum card abilities', () => {
     expect('error' in suppliedByAirdrop ? null : suppliedByAirdrop.zones.supply[0]).toMatchObject({
       instanceId: supplyTop.instanceId,
       ready: false,
+    });
+    expect('error' in suppliedByAirdrop ? null : suppliedByAirdrop.log[0]).toMatchObject({
+      privateToOwner: 'player',
+      redactedSuffix: 'Airdrop: moved the top card to supply exhausted.',
     });
 
     const transportPending = triggerCardAbilities(state, 'onEnter', { source: transport, controller: 'player', zone: 'staging' });
@@ -378,6 +389,85 @@ describe('Caelum card abilities', () => {
       ready: false,
       skipNextReady: false,
       abandonLabBanishOnDeathUntilTurn: undefined,
+      abandonLabReturnController: undefined,
+      abandonLabReturnAfterTurn: undefined,
+    });
+  });
+
+  it('targets and saves a battlefield unit when Abandon the Lab is played as a counter', () => {
+    const abandon = makeUnit('IMP087', 'player', {
+      card: createTestCard({
+        id: 'IMP087',
+        name: 'Abandon the Lab',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        affinity: 'Caelum',
+      }),
+    });
+    const defender = makeUnit('counter-target', 'player', {
+      card: createTestCard({ id: 'counter-target', name: 'Counter Target', type: 'Unit', attack: 0, health: 1 }),
+    });
+    const attacker = makeUnit('attacker', 'opponent', {
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const baseState = makeState();
+    const combatState = {
+      ...baseState,
+      activePlayer: 'opponent' as const,
+      zones: {
+        ...baseState.zones,
+        hand: [abandon],
+        battlefieldLeft: [defender],
+      },
+      opponentZones: {
+        ...baseState.opponentZones,
+        staging: [attacker],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(combatState, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect(declared).not.toHaveProperty('error');
+    if ('error' in declared) return;
+    expect(getCounterTargetOptions(declared.state, abandon).map((target) => target.instanceId)).toEqual([defender.instanceId]);
+    expect(playCounterCard(declared.state, 'player', abandon.instanceId)).toEqual({
+      error: 'Choose a target for Abandon the Lab.',
+    });
+
+    const played = playCounterCard(declared.state, 'player', abandon.instanceId, {
+      targetInstanceId: defender.instanceId,
+    });
+    expect(played).not.toHaveProperty('error');
+    if ('error' in played) return;
+    expect(played.state.pendingCombat?.counterStack).toEqual([
+      expect.objectContaining({
+        instanceId: abandon.instanceId,
+        selectedAbilityTargetInstanceIds: [defender.instanceId],
+      }),
+    ]);
+    expect(played.state.zones.battlefieldLeft[0]).not.toHaveProperty('abandonLabBanishOnDeathUntilTurn');
+    const opponentPassed = passCounterPriority(played.state, 'opponent');
+    expect(opponentPassed).not.toHaveProperty('error');
+    if ('error' in opponentPassed) return;
+    const resolved = passCounterPriority(opponentPassed.state, 'player');
+    expect(resolved).not.toHaveProperty('error');
+    if ('error' in resolved) return;
+
+    expect(resolved.state.pendingChoice).toBeNull();
+    expect(resolved.state.zones.banish.find((card) => card.instanceId === defender.instanceId)).toMatchObject({
+      abandonLabReturnController: 'player',
+      abandonLabReturnAfterTurn: combatState.turn + 1,
+    });
+    expect(resolved.state.zones.graveyard.some((card) => card.instanceId === defender.instanceId)).toBe(false);
+
+    const returned = runTurnStart({
+      ...resolved.state,
+      activePlayer: 'player',
+      turn: combatState.turn + 1,
+    });
+    expect(returned.zones.banish.some((card) => card.instanceId === defender.instanceId)).toBe(false);
+    expect(returned.zones.staging.find((card) => card.instanceId === defender.instanceId)).toMatchObject({
+      ready: false,
       abandonLabReturnController: undefined,
       abandonLabReturnAfterTurn: undefined,
     });

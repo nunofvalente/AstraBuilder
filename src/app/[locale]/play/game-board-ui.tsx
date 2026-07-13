@@ -34,7 +34,7 @@ import {
   getReadyStateClassName,
   useCloseOnOutsidePointerDown,
 } from './game-client-ui';
-import { getLocalizedCardDisplay, getPlayBoardCopy } from './play-localization';
+import { getBanishOnDeathLabel, getLocalizedCardDisplay, getPlayBoardCopy } from './play-localization';
 
 export type BattlefieldZoneId = 'battlefieldLeft' | 'battlefieldCenter' | 'battlefieldRight';
 type AttackBattlefieldHandler = (attackerInstanceId: string, targetZone: ZoneId) => void;
@@ -186,9 +186,11 @@ export function RuinsProgressBadge({ instance }: { instance: GameCardInstance })
 export function EffectSourceBadges({
   instance,
   zoneCards = [],
+  banishOnDeathLabel = 'Banish on death',
 }: {
   instance: GameCardInstance;
   zoneCards?: GameCardInstance[];
+  banishOnDeathLabel?: string;
 }) {
   if (instance.faceDown || !isUnitCard(instance.card)) {
     return null;
@@ -196,6 +198,14 @@ export function EffectSourceBadges({
 
   const badges: Array<{ key: string; label: string; title: string }> = [];
   const attachedItems = getAttachedCards(zoneCards, instance.instanceId).filter((card) => !card.faceDown);
+
+  if (instance.banishOnDeath) {
+    badges.push({
+      key: 'banish-on-death',
+      label: banishOnDeathLabel,
+      title: banishOnDeathLabel,
+    });
+  }
 
   if (instance.protectedFromEnemyTacticsUntilTurn !== undefined) {
     badges.push({
@@ -590,7 +600,7 @@ export function BattlefieldPanel({
             attachedCards={getAttachedCards(cards, instance.instanceId)}
             cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
           />
-          <EffectSourceBadges instance={instance} zoneCards={cards} />
+          <EffectSourceBadges instance={instance} zoneCards={cards} banishOnDeathLabel={getBanishOnDeathLabel(locale)} />
           <DamageBadge instance={instance} />
           <CombatStatsBadge
             instance={instance}
@@ -619,6 +629,7 @@ export function BattlefieldPanel({
       <CardZoomPreview
         cards={previewCards}
         interactive
+        side={zone === 'battlefieldRight' ? 'center' : 'right'}
         onMouseEnter={cancelPreviewClear}
         onMouseLeave={() => {
           cancelPreviewClear();
@@ -955,7 +966,7 @@ export function CombinedStagingSupplyPanel({
                       attachedCards={attachedItems}
                       cardsDrawnThisTurnByOwner={cardsDrawnThisTurnByOwner}
                     />
-                    <EffectSourceBadges instance={instance} zoneCards={stagingCards} />
+                    <EffectSourceBadges instance={instance} zoneCards={stagingCards} banishOnDeathLabel={getBanishOnDeathLabel(locale)} />
                     <DamageBadge instance={instance} />
                     <CombatStatsBadge
                       instance={instance}

@@ -42,6 +42,7 @@ export function CardZoomPreview({
   card = null,
   cards = null,
   interactive = false,
+  side = 'right',
   zIndexClassName = 'z-50',
   onMouseEnter,
   onMouseLeave,
@@ -49,6 +50,7 @@ export function CardZoomPreview({
   card?: Card | null;
   cards?: GameCardInstance[] | null;
   interactive?: boolean;
+  side?: 'left' | 'center' | 'right';
   zIndexClassName?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
@@ -70,7 +72,7 @@ export function CardZoomPreview({
   return (
     <div
       data-card-zoom-preview
-      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} fixed right-5 top-20 ${zIndexClassName} hidden w-80 lg:block`}
+      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} fixed ${side === 'left' ? 'left-5' : side === 'center' ? 'left-[55%] -translate-x-1/2' : 'right-5'} top-8 ${zIndexClassName} hidden w-80 lg:block`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >

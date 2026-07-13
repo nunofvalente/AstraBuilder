@@ -734,6 +734,10 @@ export function getCounterTargetOptions(state: GameState, counter: GameCardInsta
     return getFriendlyUnitsInPlay(state, counterController).filter((unit) => !unit.ready);
   }
 
+  if (counter.card.id === 'IMP087') {
+    return getFriendlyUnitsInPlay(state, counterController);
+  }
+
   if (counter.card.id === 'IMP121') {
     return getFriendlyUnitsInPlay(state, counterController);
   }
@@ -2848,7 +2852,7 @@ export function getCounterPlayError(state: GameState, owner: Owner, instanceId: 
   }
 
   if (
-    ['IMP026', 'IMP027', 'IMP045', 'IMP057', 'IMP058', 'IMP088', 'IMP121', 'IMP150', 'IMP151', 'IMP163'].includes(counter.card.id) &&
+    ['IMP026', 'IMP027', 'IMP045', 'IMP057', 'IMP058', 'IMP087', 'IMP088', 'IMP121', 'IMP150', 'IMP151', 'IMP163'].includes(counter.card.id) &&
     getCounterTargetOptions(state, counter).length === 0
   ) {
     return `${counter.card.name} has no valid target.`;

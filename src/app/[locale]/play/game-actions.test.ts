@@ -152,6 +152,10 @@ describe('deterministic player card actions', () => {
       secondSupply.instanceId,
       replacement.instanceId,
     ]);
+    expect(supplied.state.log[0]).toMatchObject({
+      privateToOwner: 'player',
+      redactedSuffix: 'You supplied a card and drew 1 card.',
+    });
     expect(suppliedAgain.applied).toBe(false);
     expect(suppliedAgain.error).toBe('You have already supplied a card this turn.');
   });
@@ -230,7 +234,12 @@ describe('deterministic player card actions', () => {
       faceDownEnteredTurn: faceDownPlay.state.turn,
     });
     expect(faceDownPlay.state.zones.supply[0]?.ready).toBe(true);
+    expect(faceDownPlay.state.log[0]).toMatchObject({
+      privateToOwner: 'player',
+      redactedSuffix: 'You played a face-down territory in Battlefield 1.',
+    });
     expect(faceUpPlay.state.zones.battlefieldCenter[0]?.faceDown).toBe(false);
+    expect(faceUpPlay.state.log[0]?.privateToOwner).toBeUndefined();
     expect(faceUpPlay.state.zones.supply[0]?.ready).toBe(false);
   });
 
