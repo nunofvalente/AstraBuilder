@@ -82,6 +82,9 @@ export type LogEntry = {
   cardName?: string;
   cardNames?: string[];
   suffix: string;
+  privateToOwner?: Owner;
+  redactedPrefix?: string;
+  redactedSuffix?: string;
 };
 
 export type LogEntryInput = Omit<LogEntry, 'id' | 'turn' | 'phase' | 'activePlayer'> & Partial<Pick<LogEntry, 'turn' | 'phase' | 'activePlayer'>>;

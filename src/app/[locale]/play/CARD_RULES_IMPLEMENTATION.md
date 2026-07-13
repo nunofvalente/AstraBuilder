@@ -58,10 +58,13 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Renowned units are limited to one in play per card name for each controller.
 - Equipment must be attached to one of your units in staging when played.
 - Attached equipment is rendered tucked under its host unit instead of as a separate free-standing staging card.
+- Units with persistent or temporary rule changes render effect badges; this includes Guinea Pig copies played from the graveyard, which are visibly marked to be banished on death.
+- Unit cards render their current attack, health, and influence on the board, including Selena's ready/exhausted ally bonus and Vermillion's draw-based influence.
 - Attachment state is stabilized after board moves; equipment without a legal same-zone unit host is sent to graveyard automatically.
 - Territories can be played face down to a battlefield at 0 cost.
 - Face-down territories can be flipped face up on a later turn during your main phase by paying their printed supply cost.
 - Manual moves to deck, hand, graveyard, and banish are blocked unless a future card ability implements them.
+- Multiplayer projections redact opponent deck, hand, face-down supply, face-down territory, and unrevealed Airdrop identities from both board payloads and action-log metadata.
 - Combat, death, scoring, counter windows, targeted choices, token creation, and turn-duration effects are active.
 
 ## Database Guidance

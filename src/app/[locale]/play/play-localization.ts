@@ -47,6 +47,19 @@ export function getPlayBoardCopy(locale: Locale): PlayBoardCopy {
   return BOARD_COPY[locale];
 }
 
+const BANISH_ON_DEATH_COPY: Record<Locale, string> = {
+  en: 'Banish on death',
+  fr: 'Bannir à la mort',
+  de: 'Beim Tod verbannen',
+  ms: 'Buang apabila mati',
+  'zh-CN': '死亡时放逐',
+  ja: '死亡時に追放',
+};
+
+export function getBanishOnDeathLabel(locale: Locale): string {
+  return BANISH_ON_DEATH_COPY[locale];
+}
+
 type LocalizedCardOverride = Partial<Pick<Card, 'name' | 'rulesText' | 'description'>>;
 
 const CARD_TYPE_COPY: Record<Locale, Record<string, string>> = {
@@ -456,6 +469,8 @@ const LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, string]>> =
 const ACTION_LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, string]>> = {
   fr: [
     ['Counter priority opened', 'Priorité de contre ouverte'], ['Declared attack', 'Attaque déclarée'], ['Resolved counter', 'Contre résolu'],
+    ['You played a face-down territory in', 'Vous avez joué un territoire face cachée dans'], ['Bot played a face-down territory in', 'Le bot a joué un territoire face cachée dans'], ['played a face-down territory in', 'a joué un territoire face cachée dans'],
+    ['moved the top card to supply exhausted', 'a déplacé la carte du dessus vers le ravitaillement épuisé'], ['put the top card into hand', 'a mis la carte du dessus en main'],
     ['as starting supply', 'comme ravitaillement de départ'], ['replacement card', 'carte de remplacement'], ['and drew', 'et a pioché'],
     ['Bot supplied a card', 'Le bot a ravitaillé une carte'], ['Supplied', 'Ravitaillé'], ['Bot played', 'Le bot a joué'], ['You played', 'Vous avez joué'], ['Played', 'Joué'],
     ['Bot moved', 'Le bot a déplacé'], ['Moved', 'Déplacé'], ['Bot discarded', 'Le bot a défaussé'], ['Discarded', 'Défaussé'],
@@ -466,6 +481,8 @@ const ACTION_LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, stri
   ],
   de: [
     ['Counter priority opened', 'Konterpriorität eröffnet'], ['Declared attack', 'Angriff angesagt'], ['Resolved counter', 'Konter aufgelöst'],
+    ['You played a face-down territory in', 'Du spieltest ein verdecktes Gebiet in'], ['Bot played a face-down territory in', 'Der Bot spielte ein verdecktes Gebiet in'], ['played a face-down territory in', 'spielte ein verdecktes Gebiet in'],
+    ['moved the top card to supply exhausted', 'legte die oberste Karte erschöpft in die Versorgung'], ['put the top card into hand', 'nahm die oberste Karte auf die Hand'],
     ['as starting supply', 'als Startversorgung'], ['replacement card', 'Ersatzkarte'], ['and drew', 'und zog'],
     ['Bot supplied a card', 'Der Bot versorgte eine Karte'], ['Supplied', 'Versorgt'], ['Bot played', 'Der Bot spielte'], ['You played', 'Du spieltest'], ['Played', 'Ausgespielt'],
     ['Bot moved', 'Der Bot bewegte'], ['Moved', 'Bewegt'], ['Bot discarded', 'Der Bot warf ab'], ['Discarded', 'Abgeworfen'],
@@ -476,6 +493,8 @@ const ACTION_LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, stri
   ],
   ms: [
     ['Counter priority opened', 'Keutamaan balas dibuka'], ['Declared attack', 'Serangan diisytiharkan'], ['Resolved counter', 'Balas diselesaikan'],
+    ['You played a face-down territory in', 'Anda memainkan wilayah tertutup di'], ['Bot played a face-down territory in', 'Bot memainkan wilayah tertutup di'], ['played a face-down territory in', 'memainkan wilayah tertutup di'],
+    ['moved the top card to supply exhausted', 'memindahkan kad teratas ke bekalan dalam keadaan letih'], ['put the top card into hand', 'meletakkan kad teratas ke dalam tangan'],
     ['as starting supply', 'sebagai bekalan permulaan'], ['replacement card', 'kad gantian'], ['and drew', 'dan menarik'],
     ['Bot supplied a card', 'Bot membekalkan satu kad'], ['Supplied', 'Dibekalkan'], ['Bot played', 'Bot memainkan'], ['You played', 'Anda memainkan'], ['Played', 'Dimainkan'],
     ['Bot moved', 'Bot memindahkan'], ['Moved', 'Dipindahkan'], ['Bot discarded', 'Bot membuang'], ['Discarded', 'Dibuang'],
@@ -486,6 +505,8 @@ const ACTION_LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, stri
   ],
   'zh-CN': [
     ['Counter priority opened', '反制优先权已开启'], ['Declared attack', '宣告攻击'], ['Resolved counter', '已结算反制'],
+    ['You played a face-down territory in', '你在以下位置打出了一张面朝下的领地：'], ['Bot played a face-down territory in', '机器人在以下位置打出了一张面朝下的领地：'], ['played a face-down territory in', '在以下位置打出了一张面朝下的领地：'],
+    ['moved the top card to supply exhausted', '将牌库顶牌以耗竭状态移至补给区'], ['put the top card into hand', '将牌库顶牌置入手牌'],
     ['as starting supply', '作为起始补给'], ['replacement card', '替代卡'], ['and drew', '并抽取了'],
     ['Bot supplied a card', '机器人将一张卡充作补给'], ['Supplied', '充作补给'], ['Bot played', '机器人打出了'], ['You played', '你打出了'], ['Played', '打出'],
     ['Bot moved', '机器人移动了'], ['Moved', '移动'], ['Bot discarded', '机器人弃置了'], ['Discarded', '弃置'],
@@ -497,6 +518,8 @@ const ACTION_LOG_REPLACEMENTS: Record<Exclude<Locale, 'en'>, Array<[string, stri
   ],
   ja: [
     ['Counter priority opened', 'カウンター優先権を開始'], ['Declared attack', '攻撃を宣言'], ['Resolved counter', 'カウンターを解決'],
+    ['You played a face-down territory in', 'あなたは裏向きの領地を次にプレイしました：'], ['Bot played a face-down territory in', 'ボットは裏向きの領地を次にプレイしました：'], ['played a face-down territory in', 'は裏向きの領地を次にプレイしました：'],
+    ['moved the top card to supply exhausted', 'はデッキの一番上のカードを消耗状態でサプライに移しました'], ['put the top card into hand', 'はデッキの一番上のカードを手札に加えました'],
     ['as starting supply', '開始時のサプライとして'], ['replacement card', '補充カード'], ['and drew', 'さらに引きました：'],
     ['Bot supplied a card', 'ボットはカード1枚をサプライに置き'], ['Supplied', 'サプライに置いたカード：'], ['Bot played', 'ボットがプレイ：'], ['You played', 'あなたがプレイ：'], ['Played', 'プレイ：'],
     ['Bot moved', 'ボットが移動：'], ['Moved', '移動：'], ['Bot discarded', 'ボットが捨てたカード：'], ['Discarded', '捨てたカード：'],

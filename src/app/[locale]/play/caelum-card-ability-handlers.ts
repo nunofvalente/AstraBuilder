@@ -621,6 +621,16 @@ function markUnitForAbandonTheLab(state: GameState, unit: GameCardInstance, cont
 function resolveAbandonTheLab({ state, event }: AbilityContext): AbilityResolution {
   const targets = getFriendlyUnitsInPlay(state, event.controller);
   if (targets.length === 0) return { state, resolved: false };
+  const selectedTargetId = event.targets?.find((target) => target.type === 'card')?.instanceId;
+  if (selectedTargetId) {
+    const selectedTarget = targets.find((target) => target.instanceId === selectedTargetId);
+    if (!selectedTarget) return { state, resolved: false };
+    return {
+      state: markUnitForAbandonTheLab(state, selectedTarget, event.controller),
+      resolved: true,
+      message: `${event.source.card.name} marked ${selectedTarget.card.name}; if it dies this turn, it returns next main phase.`,
+    };
+  }
   if (event.controller === 'player') {
     return {
       state: createPlayerChoice(state, event, 'abandonLab', targets, 'Choose a friendly unit to escape Abandon the Lab.'),
@@ -777,6 +787,8 @@ export function resolveCaelumTargetChoice(
         },
         log: addLogEntry(state, {
           suffix: `${pendingChoice.sourceName}: ${top.card.name} went to your supply exhausted.`,
+          privateToOwner: 'player',
+          redactedSuffix: `${pendingChoice.sourceName}: moved the top card to supply exhausted.`,
         }),
       };
     }
@@ -807,7 +819,14 @@ export function resolveCaelumTargetChoice(
           hand: [...nextState.zones.hand, top],
         },
       };
-      nextState = logAbilityOutcome(nextState, pendingChoice.sourceName, `${top.card.name} went to your hand.`);
+      nextState = {
+        ...nextState,
+        log: addLogEntry(nextState, {
+          suffix: `${pendingChoice.sourceName}: ${top.card.name} went to your hand.`,
+          privateToOwner: 'player',
+          redactedSuffix: `${pendingChoice.sourceName}: put the top card into hand.`,
+        }),
+      };
       break;
     }
     case 'confessionDamage':
