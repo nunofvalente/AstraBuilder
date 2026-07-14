@@ -7,6 +7,8 @@ import {
   buildInitialGameState,
   declareBattlefieldAttack,
   getBattlefieldAttackError,
+  passCounterPriority,
+  playCounterCard,
   resolveBattlefieldAttack,
   type GameCardInstance,
   type GameState,
@@ -1173,12 +1175,41 @@ describe('deterministic player card actions', () => {
     });
 
     expect(result.applied).toBe(true);
-    expect(result.state.pendingCombat).toEqual(counterState.pendingCombat);
+    expect(result.state.pendingCombat).toMatchObject({
+      priorityOwner: 'opponent',
+      lastCounterActionOwner: 'player',
+    });
     expect(result.state.zones.battlefieldLeft[0]).toMatchObject({
       instanceId: territory.instanceId,
       faceDown: false,
     });
     expect(result.state.zones.supply[0]?.ready).toBe(false);
+
+    const opponentPassed = passCounterPriority(result.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) return;
+
+    const secondCounter = makeInstance({
+      instanceId: 'swift-acrobatics',
+      card: createTestCard({
+        id: 'swift-acrobatics',
+        name: 'Swift Acrobatics',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+      }),
+    });
+    const afterPass = {
+      ...opponentPassed.state,
+      zones: {
+        ...opponentPassed.state.zones,
+        hand: [secondCounter],
+      },
+    };
+
+    expect(playCounterCard(afterPass, 'player', secondCounter.instanceId)).toEqual({
+      error: 'Counter cards can only be played during a counter window.',
+    });
   });
 
   it('rejects arbitrary zone movement and actions during pending combat', () => {

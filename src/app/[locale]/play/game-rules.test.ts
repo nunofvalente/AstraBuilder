@@ -1455,6 +1455,7 @@ describe('game rules', () => {
     expect(played.state.pendingCombat).toMatchObject({
       priorityOwner: 'player',
       lastPassedOwner: null,
+      lastCounterActionOwner: 'opponent',
       counterStack: [counter],
     });
     expect(getCounterPlayError(played.state, 'opponent', counter.instanceId)).toBe(
@@ -1517,20 +1518,15 @@ describe('game rules', () => {
     if ('error' in playerPassed) {
       return;
     }
-    const opponentPassed = passCounterPriority(playerPassed.state, 'opponent');
-    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
-    if ('error' in opponentPassed) {
-      return;
-    }
 
-    expect(opponentPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(defender.instanceId);
-    expect(opponentPassed.state.zones.battlefieldLeft[0]?.damage).toBe(0);
-    expect(opponentPassed.state.zones.staging[0]).toMatchObject({
+    expect(playerPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(defender.instanceId);
+    expect(playerPassed.state.zones.battlefieldLeft[0]?.damage).toBe(0);
+    expect(playerPassed.state.zones.staging[0]).toMatchObject({
       instanceId: attacker.instanceId,
       ready: false,
       damage: 0,
     });
-    expect(opponentPassed.state.log.some((entry) =>
+    expect(playerPassed.state.log.some((entry) =>
       entry.suffix === 'Selena, Voice of Unity dealt 0 damage to Dreadscythe Myrmidon. Dreadscythe Myrmidon dealt 0 damage to Selena, Voice of Unity.'
     )).toBe(true);
   });
@@ -1608,15 +1604,9 @@ describe('game rules', () => {
     if ('error' in opponentPassed) {
       return;
     }
-    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) {
-      return;
-    }
-
-    expect(playerPassed.state.opponentZones.graveyard.some((card) => card.instanceId === defender.instanceId)).toBe(true);
-    expect(playerPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
-    expect(playerPassed.state.zones.graveyard[0]?.instanceId).toBe(quash.instanceId);
+    expect(opponentPassed.state.opponentZones.graveyard.some((card) => card.instanceId === defender.instanceId)).toBe(true);
+    expect(opponentPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(opponentPassed.state.zones.graveyard[0]?.instanceId).toBe(quash.instanceId);
   });
 
   it('captures the battlefield uncontested when a later counter removes the defender before combat damage', () => {
@@ -1700,21 +1690,15 @@ describe('game rules', () => {
       return;
     }
 
-    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) {
-      return;
-    }
-
-    expect(playerPassed.state.pendingCombat).toBeNull();
-    expect(playerPassed.state.zones.staging.some((card) => card.instanceId === attacker.instanceId)).toBe(false);
-    expect(playerPassed.state.zones.battlefieldCenter[0]).toMatchObject({
+    expect(opponentPassed.state.pendingCombat).toBeNull();
+    expect(opponentPassed.state.zones.staging.some((card) => card.instanceId === attacker.instanceId)).toBe(false);
+    expect(opponentPassed.state.zones.battlefieldCenter[0]).toMatchObject({
       instanceId: attacker.instanceId,
       damage: 0,
     });
-    expect(playerPassed.state.opponentZones.deck[0]?.instanceId).toBe(defender.instanceId);
-    expect(playerPassed.state.opponentZones.staging.some((card) => card.instanceId === medic.instanceId)).toBe(true);
-    expect(playerPassed.state.log.some((entry) => entry.cardName === 'Imperial Fortress' && entry.prefix === 'Attacked ')).toBe(true);
+    expect(opponentPassed.state.opponentZones.deck[0]?.instanceId).toBe(defender.instanceId);
+    expect(opponentPassed.state.opponentZones.staging.some((card) => card.instanceId === medic.instanceId)).toBe(true);
+    expect(opponentPassed.state.log.some((entry) => entry.cardName === 'Imperial Fortress' && entry.prefix === 'Attacked ')).toBe(true);
   });
 
   it('lets Quash Insurrection target a cheap attacking unit', () => {
@@ -1778,14 +1762,8 @@ describe('game rules', () => {
     if ('error' in opponentPassed) {
       return;
     }
-    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) {
-      return;
-    }
-
-    expect(playerPassed.state.opponentZones.graveyard.some((card) => card.instanceId === attacker.instanceId)).toBe(true);
-    expect(playerPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
+    expect(opponentPassed.state.opponentZones.graveyard.some((card) => card.instanceId === attacker.instanceId)).toBe(true);
+    expect(opponentPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
   });
 
   it('lets Void Warp put the attacking unit on top of its owner deck before combat damage resolves', () => {
@@ -1847,19 +1825,13 @@ describe('game rules', () => {
     if ('error' in opponentPassed) {
       return;
     }
-    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) {
-      return;
-    }
-
-    expect(playerPassed.state.pendingCombat).toBeNull();
-    expect(playerPassed.state.opponentZones.deck[0]?.instanceId).toBe(attacker.instanceId);
-    expect(playerPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
-    expect(playerPassed.state.log.some((entry) =>
+    expect(opponentPassed.state.pendingCombat).toBeNull();
+    expect(opponentPassed.state.opponentZones.deck[0]?.instanceId).toBe(attacker.instanceId);
+    expect(opponentPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
+    expect(opponentPassed.state.log.some((entry) =>
       entry.suffix === 'Enemy Attacker was removed before combat damage, so combat ends without damage.'
     )).toBe(true);
-    expect(playerPassed.resolvedCombat).toMatchObject({
+    expect(opponentPassed.resolvedCombat).toMatchObject({
       attackerDestroyed: true,
       defenderDestroyed: false,
       captured: false,
@@ -1925,19 +1897,13 @@ describe('game rules', () => {
     if ('error' in opponentPassed) {
       return;
     }
-    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) {
-      return;
-    }
-
-    expect(playerPassed.state.pendingCombat).toBeNull();
-    expect(playerPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
-    expect(playerPassed.state.opponentZones.graveyard.some((card) => card.instanceId === attacker.instanceId)).toBe(true);
-    expect(playerPassed.state.log.some((entry) =>
+    expect(opponentPassed.state.pendingCombat).toBeNull();
+    expect(opponentPassed.state.zones.battlefieldLeft[0]).toMatchObject({ instanceId: defender.instanceId, damage: 0 });
+    expect(opponentPassed.state.opponentZones.graveyard.some((card) => card.instanceId === attacker.instanceId)).toBe(true);
+    expect(opponentPassed.state.log.some((entry) =>
       entry.suffix === 'Enemy Attacker was removed before combat damage, so combat ends without damage.'
     )).toBe(true);
-    expect(playerPassed.resolvedCombat).toMatchObject({
+    expect(opponentPassed.resolvedCombat).toMatchObject({
       attackerDestroyed: true,
       defenderDestroyed: false,
       captured: false,
@@ -2065,26 +2031,20 @@ describe('game rules', () => {
     if ('error' in opponentPassed) {
       throw new Error(opponentPassed.error);
     }
-    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
 
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) {
-      return;
-    }
-
-    expect(playerPassed.resolvedCounters.map((counter) => counter.instanceId)).toEqual([
+    expect(opponentPassed.resolvedCounters.map((counter) => counter.instanceId)).toEqual([
       playerCounter.instanceId,
       opponentCounter.instanceId,
     ]);
-    expect(playerPassed.state.zones.graveyard[0]?.instanceId).toBe(playerCounter.instanceId);
-    expect(playerPassed.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
-    expect(playerPassed.state.opponentZones.graveyard[1]?.instanceId).toBe(opponentCounter.instanceId);
-    expect(playerPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
-    expect(playerPassed.state.log.map((entry) => entry.cardName).filter(Boolean)).toEqual(
+    expect(opponentPassed.state.zones.graveyard[0]?.instanceId).toBe(playerCounter.instanceId);
+    expect(opponentPassed.state.opponentZones.graveyard[0]?.instanceId).toBe(defender.instanceId);
+    expect(opponentPassed.state.opponentZones.graveyard[1]?.instanceId).toBe(opponentCounter.instanceId);
+    expect(opponentPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(opponentPassed.state.log.map((entry) => entry.cardName).filter(Boolean)).toEqual(
       expect.arrayContaining([playerCounter.card.name, opponentCounter.card.name])
     );
     expect(
-      playerPassed.state.log.filter((entry) => entry.prefix === 'Resolved counter ').every(
+      opponentPassed.state.log.filter((entry) => entry.prefix === 'Resolved counter ').every(
         (entry) => entry.suffix === ', but its printed effect is not implemented yet.'
       )
     ).toBe(true);
@@ -2142,14 +2102,8 @@ describe('game rules', () => {
     if ('error' in playerPassed) {
       throw new Error(playerPassed.error);
     }
-    const opponentPassed = passCounterPriority(playerPassed.state, 'opponent');
 
-    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
-    if ('error' in opponentPassed) {
-      return;
-    }
-
-    expect(opponentPassed.state.opponentZones.staging[0]).toMatchObject({
+    expect(playerPassed.state.opponentZones.staging[0]).toMatchObject({
       instanceId: swiftCounter.instanceId,
       ready: false,
     });

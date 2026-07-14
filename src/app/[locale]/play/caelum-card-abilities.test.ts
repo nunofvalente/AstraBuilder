@@ -449,19 +449,16 @@ describe('Caelum card abilities', () => {
     const opponentPassed = passCounterPriority(played.state, 'opponent');
     expect(opponentPassed).not.toHaveProperty('error');
     if ('error' in opponentPassed) return;
-    const resolved = passCounterPriority(opponentPassed.state, 'player');
-    expect(resolved).not.toHaveProperty('error');
-    if ('error' in resolved) return;
 
-    expect(resolved.state.pendingChoice).toBeNull();
-    expect(resolved.state.zones.banish.find((card) => card.instanceId === defender.instanceId)).toMatchObject({
+    expect(opponentPassed.state.pendingChoice).toBeNull();
+    expect(opponentPassed.state.zones.banish.find((card) => card.instanceId === defender.instanceId)).toMatchObject({
       abandonLabReturnController: 'player',
       abandonLabReturnAfterTurn: combatState.turn + 1,
     });
-    expect(resolved.state.zones.graveyard.some((card) => card.instanceId === defender.instanceId)).toBe(false);
+    expect(opponentPassed.state.zones.graveyard.some((card) => card.instanceId === defender.instanceId)).toBe(false);
 
     const returned = runTurnStart({
-      ...resolved.state,
+      ...opponentPassed.state,
       activePlayer: 'player',
       turn: combatState.turn + 1,
     });
