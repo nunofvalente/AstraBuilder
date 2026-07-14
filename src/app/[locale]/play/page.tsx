@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildPageMetadata } from '@/lib/metadata/locale';
 import { isSimulatorEnabled } from '@/lib/features';
 
 import { getStaticCards } from '../create/deck-builder/data';
@@ -23,7 +24,12 @@ export async function generateMetadata({ params }: SimulatorPageProps): Promise<
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['play']);
+  const dictionary = await getDictionary(locale);
+
+  return buildPageMetadata(locale, ['play'], {
+    title: `${dictionary.topBar.play} | AstraBuilder`,
+    description: dictionary.home.battlefieldBanner.description,
+  });
 }
 
 export default async function SimulatorPage({ params }: SimulatorPageProps) {

@@ -15,11 +15,11 @@ describe('site metadata helpers', () => {
   it('uses the fallback site URL when configuration is empty or invalid', async () => {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     let helpers = await importSiteHelpers();
-    expect(helpers.getSiteUrl()).toBe('https://www.astrabuilder.com');
+    expect(helpers.getSiteUrl()).toBe('https://www.astra-builder.com');
 
     process.env.NEXT_PUBLIC_SITE_URL = 'not a url';
     helpers = await importSiteHelpers();
-    expect(helpers.getSiteUrl()).toBe('https://www.astrabuilder.com');
+    expect(helpers.getSiteUrl()).toBe('https://www.astra-builder.com');
   });
 
   it('normalizes configured origins and builds absolute URLs', async () => {

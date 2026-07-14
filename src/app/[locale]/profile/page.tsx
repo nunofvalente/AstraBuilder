@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { ProfileForm } from '@/components/profile/profile-form';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildNoIndexMetadata } from '@/lib/metadata/locale';
 
 interface ProfilePageParams {
   locale: string;
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['profile']);
+  return buildNoIndexMetadata(locale, ['profile']);
 }
 
 export default async function ProfilePage({ params }: ProfilePageProps) {

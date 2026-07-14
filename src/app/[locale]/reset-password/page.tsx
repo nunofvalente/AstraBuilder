@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { ResetPasswordForm } from '@/components/auth/reset-password-form';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildNoIndexMetadata } from '@/lib/metadata/locale';
 
 interface ResetPasswordPageParams {
   locale: string;
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: ResetPasswordPageProps): Prom
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['reset-password']);
+  return buildNoIndexMetadata(locale, ['reset-password']);
 }
 
 export default async function ResetPasswordPage({ params }: ResetPasswordPageProps) {

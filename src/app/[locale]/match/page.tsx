@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { isLocale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildNoIndexMetadata } from '@/lib/metadata/locale';
 import { isSimulatorEnabled } from '@/lib/features';
 
 import { getStaticCards } from '../create/deck-builder/data';
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: MatchPageProps): Promise<Meta
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['match']);
+  return buildNoIndexMetadata(locale, ['match']);
 }
 
 export default async function MatchPage({ params }: MatchPageProps) {

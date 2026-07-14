@@ -7,7 +7,7 @@ import { isLocale } from '@/i18n/config';
 import { getProfileById } from '@/lib/supabase/profiles';
 import { getPublicDeckSummariesByAuthor } from '@/lib/supabase/decks';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildPageMetadata } from '@/lib/metadata/locale';
 
 interface PlayerPageParams {
   locale: string;
@@ -29,7 +29,24 @@ export async function generateMetadata({ params }: PlayerPageProps): Promise<Met
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['players', profileId]);
+  const [dictionary, profile, decks] = await Promise.all([
+    getDictionary(locale),
+    getProfileById(profileId),
+    getPublicDeckSummariesByAuthor(profileId),
+  ]);
+
+  if (!profile) {
+    notFound();
+  }
+
+  const username = profile.username?.trim() || dictionary.publicProfile.unknownUser;
+  const description = profile.bio?.trim() || dictionary.publicProfile.subtitle;
+
+  return buildPageMetadata(locale, ['players', profileId], {
+    title: `${username} | AstraBuilder`,
+    description,
+    index: decks.length > 0,
+  });
 }
 
 function ensureHttps(url: string | null | undefined): string | null {

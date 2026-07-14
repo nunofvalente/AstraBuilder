@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildPageMetadata } from '@/lib/metadata/locale';
 
 import { CollectionClient } from '../collection-client';
 import { getStaticCards } from '../create/deck-builder/data';
@@ -25,7 +25,12 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['collection']);
+  const dictionary = await getDictionary(locale);
+
+  return buildPageMetadata(locale, ['collection'], {
+    title: `${dictionary.cards.title} | AstraBuilder`,
+    description: `${dictionary.cards.title} - Echoes of Astra. ${dictionary.builder.searchPlaceholder}.`,
+  });
 }
 
 export default async function CollectionPage({ params }: CollectionPageProps) {

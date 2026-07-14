@@ -6,8 +6,8 @@ import { cookies } from 'next/headers';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
-import { getAccessibleDeckDetailById } from '@/lib/supabase/decks';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { getAccessibleDeckDetailById, getPublicDeckSummaryById } from '@/lib/supabase/decks';
+import { buildNoIndexMetadata, buildPageMetadata } from '@/lib/metadata/locale';
 
 import { DeckDetailClient } from './deck-detail-client';
 
@@ -29,17 +29,36 @@ export async function generateMetadata({ params }: DeckDetailsPageProps): Promis
     notFound();
   }
 
-  if (!deckId || deckId.trim().length === 0) {
+  if (!/^\d+$/.test(deckId)) {
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['decks', deckId]);
+  const [dictionary, deck] = await Promise.all([
+    getDictionary(locale),
+    getPublicDeckSummaryById(deckId),
+  ]);
+
+  if (!deck) {
+    return buildNoIndexMetadata(locale, ['decks', deckId]);
+  }
+
+  const deckTitle = deck.title?.trim() || dictionary.myDecks.untitledLabel;
+  const description = deck.description?.trim() || dictionary.deckDetails.description;
+
+  return buildPageMetadata(locale, ['decks', deckId], {
+    title: `${deckTitle} | AstraBuilder`,
+    description,
+  });
 }
 
 export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) {
   const { locale, deckId } = await params;
 
   if (!isLocale(locale)) {
+    notFound();
+  }
+
+  if (!/^\d+$/.test(deckId)) {
     notFound();
   }
 
@@ -55,6 +74,10 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
   const deck = supabaseAdmin
     ? await getAccessibleDeckDetailById(deckId, user?.id ?? null, supabaseAdmin)
     : null;
+
+  if (!deck) {
+    notFound();
+  }
 
   return (
     <DeckDetailClient
