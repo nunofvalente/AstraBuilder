@@ -24,4 +24,12 @@ describe('i18n config', () => {
       topBar: { builder: 'ビルダー' },
     });
   });
+
+  it('provides localized deck-builder metadata for every locale', async () => {
+    const dictionaries = await Promise.all(SUPPORTED_LOCALES.map((locale) => getDictionary(locale)));
+
+    for (const dictionary of dictionaries) {
+      expect(dictionary.builder.metadataDescription.trim().length).toBeGreaterThan(40);
+    }
+  });
 });

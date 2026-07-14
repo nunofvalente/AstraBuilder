@@ -45,6 +45,7 @@
     "removeButton": "Entfernen",
     "searchLabel": "Karten suchen",
     "title": "Deck-Builder",
+    "metadataDescription": "Baue, bearbeite, importiere, exportiere und teile Echoes of Astra Decks mit dem AstraBuilder Deck-Builder.",
     "deckHeading": "Deckliste",
     "totalCardsLabel": "Gesamtanzahl",
     "filtersDescription": "Filteroptionen folgen bald.",

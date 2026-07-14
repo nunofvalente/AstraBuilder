@@ -49,6 +49,7 @@ type AffinityPageDictionary = {
 type BuilderDictionary = {
   builder: {
     title: string;
+    metadataDescription: string;
     searchLabel: string;
     searchPlaceholder: string;
     cardsHeading: string;
