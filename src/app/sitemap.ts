@@ -22,6 +22,7 @@ function entry(
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries = SUPPORTED_LOCALES.flatMap((locale) => [
     entry(buildLocalePath(locale), { changeFrequency: 'daily', priority: 1 }),
+    entry(buildLocalePath(locale, 'create'), { changeFrequency: 'weekly', priority: 0.9 }),
     entry(buildLocalePath(locale, 'decks'), { changeFrequency: 'daily', priority: 0.9 }),
     entry(buildLocalePath(locale, 'collection'), { changeFrequency: 'weekly', priority: 0.8 }),
     ...(isSimulatorEnabled()

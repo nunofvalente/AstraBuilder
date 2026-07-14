@@ -45,6 +45,7 @@
     "removeButton": "Retirer",
     "searchLabel": "Rechercher des cartes",
     "title": "Constructeur de deck",
+    "metadataDescription": "Construisez, modifiez, importez, exportez et partagez vos decks Echoes of Astra avec le constructeur AstraBuilder.",
     "deckHeading": "Liste du deck",
     "totalCardsLabel": "Total cartes",
     "filtersDescription": "Les options de filtrage arrivent bientot.",
