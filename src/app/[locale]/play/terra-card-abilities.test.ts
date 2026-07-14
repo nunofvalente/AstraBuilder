@@ -450,10 +450,7 @@ describe('Terra card abilities', () => {
     const opponentPassed = passCounterPriority(played.state, 'opponent');
     expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
     if ('error' in opponentPassed) return;
-    const playerPassed = passCounterPriority(opponentPassed.state, 'player');
-    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
-    if ('error' in playerPassed) return;
-    expect(playerPassed.state.zones.staging.some((unit) => unit.instanceId === ally.instanceId)).toBe(true);
+    expect(opponentPassed.state.zones.staging.some((unit) => unit.instanceId === ally.instanceId)).toBe(true);
   });
 
   it('returns Lifecycle Katana defenders and draws from Elorhain', () => {

@@ -407,7 +407,7 @@ function flipTerritory(
     return rejected(state, 'Only your face-down territories can be flipped manually.');
   }
 
-  const canFlipDuringMain = state.phase === 'main' && state.activePlayer === owner;
+  const canFlipDuringMain = !state.pendingCombat && state.phase === 'main' && state.activePlayer === owner;
   const canFlipAsCounter = state.pendingCombat?.priorityOwner === owner;
 
   if (!canFlipDuringMain && !canFlipAsCounter) {
@@ -433,8 +433,19 @@ function flipTerritory(
         instance.instanceId === card.instanceId ? flippedCard : instance
       ),
     });
+  const priorityState = canFlipAsCounter && flippedState.pendingCombat
+    ? {
+        ...flippedState,
+        pendingCombat: {
+          ...flippedState.pendingCombat,
+          priorityOwner: owner === 'player' ? 'opponent' as const : 'player' as const,
+          lastPassedOwner: null,
+          lastCounterActionOwner: owner,
+        },
+      }
+    : flippedState;
   const loggedState = {
-    ...flippedState,
+    ...priorityState,
     log: addLogEntry(paidState, {
       prefix: owner === 'player' ? 'Flipped ' : 'Bot flipped ',
       cardName: card.card.name,
