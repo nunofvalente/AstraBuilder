@@ -1,4 +1,4 @@
-const FALLBACK_SITE_URL = 'https://www.astrabuilder.com';
+const FALLBACK_SITE_URL = 'https://www.astra-builder.com';
 
 function normalizeSiteUrl(value: string): string | null {
   const trimmed = value.trim();

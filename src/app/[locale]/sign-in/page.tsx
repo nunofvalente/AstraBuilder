@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { SignInForm } from '@/components/auth/sign-in-form';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildNoIndexMetadata } from '@/lib/metadata/locale';
 
 interface SignInPageParams {
   locale: string;
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: SignInPageProps): Promise<Met
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['sign-in']);
+  return buildNoIndexMetadata(locale, ['sign-in']);
 }
 
 export default async function SignInPage({ params }: SignInPageProps) {

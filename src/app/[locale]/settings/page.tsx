@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildNoIndexMetadata } from '@/lib/metadata/locale';
 
 import { SettingsClient } from './settings-client';
 
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: SettingsPageProps): Promise<M
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['settings']);
+  return buildNoIndexMetadata(locale, ['settings']);
 }
 
 export default async function SettingsPage({ params }: SettingsPageProps) {

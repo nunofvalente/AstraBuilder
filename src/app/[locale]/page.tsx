@@ -18,7 +18,7 @@ import {
   type AffinityPairingStat,
 } from '@/lib/decks/affinity-pairings';
 import { isSimulatorEnabled } from '@/lib/features';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildPageMetadata } from '@/lib/metadata/locale';
 import { DeckSummaryCard } from '@/components/deck-summary-card';
 
 const HOME_TRENDING_LIMIT = 4;
@@ -39,7 +39,16 @@ export async function generateMetadata({ params }: LocalePageProps): Promise<Met
     notFound();
   }
 
-  return buildCanonicalMetadata(locale);
+  const dictionary = await getDictionary(locale);
+  const tagline = [dictionary.home.tagline?.intro, dictionary.home.tagline?.highlight]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(' ');
+  const description = [tagline, dictionary.deckFeed.description].filter(Boolean).join('. ');
+
+  return buildPageMetadata(locale, [], {
+    title: `${dictionary.home.title} | ${dictionary.builder.title} - Echoes of Astra`,
+    description,
+  });
 }
 
 export default async function HomePage({ params }: LocalePageProps) {
