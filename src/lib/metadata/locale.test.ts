@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCanonicalMetadata, buildLanguageAlternates, buildLocalePath } from './locale';
+import {
+  buildCanonicalMetadata,
+  buildLanguageAlternates,
+  buildLocalePath,
+  buildNoIndexMetadata,
+  buildPageMetadata,
+} from './locale';
 
 describe('locale metadata helpers', () => {
   it('builds locale paths while trimming and encoding segments', () => {
@@ -32,6 +38,39 @@ describe('locale metadata helpers', () => {
           ja: '/ja/collection',
           'x-default': '/en/collection',
         },
+      },
+    });
+  });
+
+  it('builds localized page metadata with social fields', () => {
+    expect(
+      buildPageMetadata('fr', ['decks'], {
+        title: 'Decks de la communaute | AstraBuilder',
+        description: 'Decouvrez les decks publics.',
+      })
+    ).toMatchObject({
+      title: 'Decks de la communaute | AstraBuilder',
+      description: 'Decouvrez les decks publics.',
+      alternates: { canonical: '/fr/decks' },
+      openGraph: {
+        title: 'Decks de la communaute | AstraBuilder',
+        description: 'Decouvrez les decks publics.',
+        locale: 'fr',
+      },
+      twitter: {
+        title: 'Decks de la communaute | AstraBuilder',
+        description: 'Decouvrez les decks publics.',
+      },
+    });
+  });
+
+  it('marks utility pages as noindex while allowing link discovery', () => {
+    expect(buildNoIndexMetadata('en', ['create'])).toMatchObject({
+      alternates: { canonical: '/en/create' },
+      robots: {
+        index: false,
+        follow: true,
+        googleBot: { index: false, follow: true },
       },
     });
   });

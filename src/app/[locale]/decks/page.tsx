@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildPageMetadata } from '@/lib/metadata/locale';
 import { getPublicDeckSummaries } from '@/lib/supabase/decks';
 import { CommunityDecksClient } from './community-decks-client';
 
@@ -24,7 +24,12 @@ export async function generateMetadata({ params }: DecksPageProps): Promise<Meta
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['decks']);
+  const dictionary = await getDictionary(locale);
+
+  return buildPageMetadata(locale, ['decks'], {
+    title: `${dictionary.deckFeed.heading} | AstraBuilder`,
+    description: dictionary.deckFeed.description,
+  });
 }
 
 export default async function DecksPage({ params }: DecksPageProps) {

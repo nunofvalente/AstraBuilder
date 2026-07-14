@@ -44,3 +44,58 @@ export function buildCanonicalMetadata(locale: Locale, segments: Array<string | 
     },
   };
 }
+
+type PageMetadataOptions = {
+  title: string;
+  description: string;
+  index?: boolean;
+};
+
+export function buildPageMetadata(
+  locale: Locale,
+  segments: Array<string | number>,
+  { title, description, index = true }: PageMetadataOptions
+): Metadata {
+  return {
+    ...buildCanonicalMetadata(locale, segments),
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      locale,
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+    },
+    ...(!index
+      ? {
+          robots: {
+            index: false,
+            follow: true,
+            googleBot: {
+              index: false,
+              follow: true,
+            },
+          },
+        }
+      : {}),
+  };
+}
+
+export function buildNoIndexMetadata(locale: Locale, segments: Array<string | number> = []): Metadata {
+  return {
+    ...buildCanonicalMetadata(locale, segments),
+    robots: {
+      index: false,
+      follow: true,
+      googleBot: {
+        index: false,
+        follow: true,
+      },
+    },
+  };
+}

@@ -11,7 +11,7 @@ import {
   parseAffinityPairingSlug,
 } from '@/lib/decks/affinity-pairings';
 import { CommunityDecksClient } from '@/app/[locale]/decks/community-decks-client';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildPageMetadata } from '@/lib/metadata/locale';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +36,20 @@ export async function generateMetadata({ params }: AffinityPairingPageProps): Pr
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['affinity', pairingSlug]);
+  const dictionary = await getDictionary(locale);
+  const decks = await getPublicDeckSummaries();
+  const matchingDecks = decks.filter((deck) => deckMatchesAffinityPairing(deck, pairingAffinities));
+  const pairingLabel = formatAffinityPairingLabel(pairingAffinities);
+  const title = dictionary.affinityPage.resultsHeading.replace('{pairing}', pairingLabel);
+  const deckCountLabel = matchingDecks.length === 1
+    ? dictionary.home.sections.affinityPairings.deckLabel
+    : dictionary.home.sections.affinityPairings.decksLabel;
+
+  return buildPageMetadata(locale, ['affinity', pairingSlug], {
+    title: `${title} | AstraBuilder`,
+    description: `${title}. ${matchingDecks.length} ${deckCountLabel}. ${dictionary.deckFeed.description}`,
+    index: matchingDecks.length > 0,
+  });
 }
 
 export default async function AffinityPairingPage({ params }: AffinityPairingPageProps) {

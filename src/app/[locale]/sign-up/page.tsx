@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { SignUpForm } from '@/components/auth/sign-up-form';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
-import { buildCanonicalMetadata } from '@/lib/metadata/locale';
+import { buildNoIndexMetadata } from '@/lib/metadata/locale';
 
 interface SignUpPageParams {
   locale: string;
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: SignUpPageProps): Promise<Met
     notFound();
   }
 
-  return buildCanonicalMetadata(locale, ['sign-up']);
+  return buildNoIndexMetadata(locale, ['sign-up']);
 }
 
 export default async function SignUpPage({ params }: SignUpPageProps) {
