@@ -97,6 +97,7 @@ export type PendingCombat = {
   flankingOriginZone?: ZoneId;
   priorityOwner: Owner;
   lastPassedOwner: Owner | null;
+  lastCounterActionOwner?: Owner | null;
   counterStack: GameCardInstance[];
 };
 

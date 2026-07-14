@@ -2701,6 +2701,7 @@ export function declareBattlefieldAttack(
     ...(flankingOriginZone ? { flankingOriginZone } : {}),
     priorityOwner: defendingOwner,
     lastPassedOwner: null,
+    lastCounterActionOwner: null,
     counterStack: [],
   };
 
@@ -2924,6 +2925,7 @@ export function playCounterCard(
         ...pendingCombat,
         priorityOwner: nextPriorityOwner,
         lastPassedOwner: null,
+        lastCounterActionOwner: owner,
         counterStack: [...pendingCombat.counterStack, stackedCounter],
       },
       log: addLogEntry(nextState, {
@@ -3015,6 +3017,7 @@ export function passCounterPriority(state: GameState, owner: Owner): CounterPrio
 
   if (
     pendingCombat.counterStack.length === 0 ||
+    (pendingCombat.lastCounterActionOwner && pendingCombat.lastCounterActionOwner !== owner) ||
     (pendingCombat.lastPassedOwner && pendingCombat.lastPassedOwner !== owner)
   ) {
     const resolvedCounters = [...pendingCombat.counterStack].reverse();
@@ -3057,6 +3060,7 @@ export function passCounterPriority(state: GameState, owner: Owner): CounterPrio
         ...pendingCombat,
         priorityOwner: nextPriorityOwner,
         lastPassedOwner: owner,
+        lastCounterActionOwner: null,
       },
       log: addLogEntry(state, {
         suffix: `${owner === 'player' ? 'You pass' : 'Bot passes'} counter priority.`,
