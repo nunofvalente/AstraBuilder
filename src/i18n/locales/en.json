@@ -45,6 +45,7 @@
     "removeButton": "Remove",
     "searchLabel": "Search cards",
     "title": "Deck builder",
+    "metadataDescription": "Build, edit, import, export, and share Echoes of Astra decks with the AstraBuilder deck builder.",
     "deckHeading": "Deck list",
     "totalCardsLabel": "Total cards",
     "filtersDescription": "Filtering options coming soon.",

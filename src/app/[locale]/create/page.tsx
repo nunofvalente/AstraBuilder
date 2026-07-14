@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale } from '@/i18n/config';
-import { buildNoIndexMetadata } from '@/lib/metadata/locale';
+import { buildPageMetadata } from '@/lib/metadata/locale';
 
 import { DeckBuilder } from './deck-builder-client';
 import { getStaticCards } from './deck-builder/data';
@@ -25,7 +25,12 @@ export async function generateMetadata({ params }: CreateDeckPageProps): Promise
     notFound();
   }
 
-  return buildNoIndexMetadata(locale, ['create']);
+  const dictionary = await getDictionary(locale);
+
+  return buildPageMetadata(locale, ['create'], {
+    title: `${dictionary.builder.title} | AstraBuilder`,
+    description: dictionary.builder.metadataDescription,
+  });
 }
 
 export default async function CreateDeckPage({ params }: CreateDeckPageProps) {

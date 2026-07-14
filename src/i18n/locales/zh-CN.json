@@ -18,6 +18,7 @@
     "removeButton": "移除",
     "searchLabel": "搜索卡牌",
     "title": "牌组构筑器",
+    "metadataDescription": "使用 AstraBuilder 牌组构筑器构筑、编辑、导入、导出并分享 Echoes of Astra 牌组。",
     "deckHeading": "牌组列表",
     "totalCardsLabel": "卡牌总数",
     "filtersDescription": "筛选选项即将推出。",

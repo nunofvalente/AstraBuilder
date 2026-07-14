@@ -18,6 +18,7 @@
     "removeButton": "削除",
     "searchLabel": "カードを検索",
     "title": "デッキビルダー",
+    "metadataDescription": "AstraBuilder のデッキビルダーで Echoes of Astra のデッキを構築、編集、インポート、エクスポート、共有できます。",
     "deckHeading": "デッキリスト",
     "totalCardsLabel": "カード合計",
     "filtersDescription": "フィルター機能は近日公開予定です。",
