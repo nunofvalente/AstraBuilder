@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
@@ -70,10 +70,103 @@ describe('HandStrip', () => {
 
     expect(container.querySelector('section')).toHaveClass('pointer-events-none');
     expect(container.querySelector('button')).toHaveClass('pointer-events-auto');
+    expect(container.querySelector('[data-card-instance-id="hand-card"]')).toHaveAttribute('data-card-zone', 'hand');
+  });
+
+  it('deals the opening hand from the player deck in sequence', async () => {
+    const openingCards = ['opening-card-1', 'opening-card-2'].map((instanceId) => ({
+      ...makeInstance(),
+      instanceId,
+      card: createTestCard({ id: instanceId, name: instanceId, type: 'Unit' }),
+    }));
+    const setupState = {
+      ...makeGameState(),
+      phase: 'setup' as const,
+      playerOpeningHandConfirmed: false,
+    };
+
+    const { container } = render(
+      <>
+        <CombinedStagingSupplyPanel
+          stagingCards={[]}
+          supplyCards={[]}
+          graveyardCards={[]}
+          banishCards={[]}
+          deckCards={[makeInstance()]}
+        />
+        <HandStrip
+          cards={openingCards}
+          gameState={setupState}
+          onMove={() => undefined}
+          canSupplyFromHand
+          canPlayFromHand
+          friendlyUnitsInPlay={[]}
+          graveyardCards={[]}
+          readySupplyCount={0}
+          stagingUnits={[]}
+          demonicAdvanceActive={false}
+          battlefieldCardsByZone={{
+            battlefieldLeft: [],
+            battlefieldCenter: [],
+            battlefieldRight: [],
+          }}
+        />
+      </>,
+    );
+
+    const dealtCards = container.querySelectorAll('[data-opening-hand-card]');
+    expect(container.querySelector('[data-player-deck]')).toBeInTheDocument();
+    expect(dealtCards).toHaveLength(2);
+    await waitFor(() => expect(dealtCards[0]).toHaveClass('opening-hand-card-deal'));
+    expect(dealtCards[0]).toHaveStyle('--opening-draw-delay: 0ms');
+    expect(dealtCards[1]).toHaveStyle('--opening-draw-delay: 85ms');
   });
 });
 
 describe('CombinedStagingSupplyPanel', () => {
+  it('provides stable animation anchors for staging and supply cards', () => {
+    const stagingCard = { ...makeInstance(), instanceId: 'staging-card', ready: true };
+    const supplyCard = { ...makeInstance(), instanceId: 'supply-card' };
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[stagingCard]}
+        supplyCards={[supplyCard]}
+        graveyardCards={[]}
+        banishCards={[]}
+        deckCards={[]}
+        canInspectSupplyCards
+      />,
+    );
+
+    expect(container.querySelector('[data-card-instance-id="staging-card"]')).toHaveAttribute('data-card-zone', 'staging');
+    expect(container.querySelector('[data-card-instance-id="staging-card"]')).toHaveAttribute('data-card-owner', 'player');
+    expect(container.querySelector('[data-card-instance-id="supply-card"]')).toHaveAttribute('data-card-zone', 'supply');
+    expect(container.querySelector('[data-card-instance-id="supply-card"]')).toHaveAttribute('data-card-owner', 'player');
+  });
+
+  it('provides opponent deck and destination anchors for bot animations', () => {
+    const stagingCard = { ...makeInstance(), instanceId: 'bot-staging-card', owner: 'opponent' as const, ready: true };
+    const supplyCard = { ...makeInstance(), instanceId: 'bot-supply-card', owner: 'opponent' as const };
+    const graveyardCard = { ...makeInstance(), instanceId: 'bot-graveyard-card', owner: 'opponent' as const };
+    const banishCard = { ...makeInstance(), instanceId: 'bot-banish-card', owner: 'opponent' as const };
+    const { container } = render(
+      <CombinedStagingSupplyPanel
+        stagingCards={[stagingCard]}
+        supplyCards={[supplyCard]}
+        graveyardCards={[graveyardCard]}
+        banishCards={[banishCard]}
+        deckCards={[makeInstance()]}
+        mirror
+      />,
+    );
+
+    expect(container.querySelector('[data-opponent-deck]')).toBeInTheDocument();
+    expect(container.querySelector('[data-card-instance-id="bot-staging-card"]')).toHaveAttribute('data-card-owner', 'opponent');
+    expect(container.querySelector('[data-card-instance-id="bot-supply-card"]')).toHaveAttribute('data-card-owner', 'opponent');
+    expect(container.querySelector('[data-card-instance-id="bot-graveyard-card"]')).toHaveAttribute('data-card-zone', 'graveyard');
+    expect(container.querySelector('[data-card-instance-id="bot-banish-card"]')).toHaveAttribute('data-card-zone', 'banish');
+  });
+
   it('zooms graveyard cards on hover above the graveyard dialog', () => {
     const graveyardCard = makeInstance();
     const { container } = render(
