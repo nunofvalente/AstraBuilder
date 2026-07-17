@@ -6,7 +6,11 @@ import { cookies } from 'next/headers';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { isLocale, type Locale } from '@/i18n/config';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
-import { getAccessibleDeckDetailById, getPublicDeckSummaryById } from '@/lib/supabase/decks';
+import {
+  getAccessibleDeckDetailById,
+  getDeckAccessMetadata,
+  getPublicDeckSummaryById,
+} from '@/lib/supabase/decks';
 import { buildNoIndexMetadata, buildPageMetadata } from '@/lib/metadata/locale';
 
 import { DeckDetailClient } from './deck-detail-client';
@@ -76,7 +80,13 @@ export default async function DeckDetailsPage({ params }: DeckDetailsPageProps) 
     : null;
 
   if (!deck) {
-    notFound();
+    const access = supabaseAdmin
+      ? await getDeckAccessMetadata(deckId, user?.id ?? null, supabaseAdmin)
+      : null;
+
+    if (!access) {
+      notFound();
+    }
   }
 
   return (
