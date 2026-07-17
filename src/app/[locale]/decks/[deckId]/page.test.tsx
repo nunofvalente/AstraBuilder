@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getAccessibleDeckDetailById: vi.fn(),
+  getDeckAccessMetadata: vi.fn(),
   getPublicDeckSummaryById: vi.fn(),
   getUser: vi.fn(),
 }));
@@ -24,6 +25,26 @@ vi.mock('@/i18n/get-dictionary', () => ({
   getDictionary: vi.fn(async () => ({
     myDecks: { untitledLabel: 'Untitled deck' },
     deckDetails: { description: 'Card breakdown and statistics for this deck.' },
+    publicProfile: {},
+    builder: {
+      emptyDeck: 'Empty deck',
+      menuExport: 'Export',
+      exportOptionTTS: 'Tabletop Simulator',
+      exportOptionText: 'Text',
+      exportCopy: 'Copy',
+      exportCopySuccess: 'Copied',
+      exportCopyError: 'Copy failed',
+      deckHeading: 'Deck',
+      totalCardsLabel: 'Total cards',
+      shareButton: 'Share',
+      shareGenerating: 'Generating',
+      shareDownload: 'Download',
+      shareCopy: 'Copy image',
+      shareCopySuccess: 'Image copied',
+      shareCopyError: 'Image copy failed',
+      shareEmpty: 'Empty deck',
+      shareError: 'Share failed',
+    },
   })),
 }));
 
@@ -33,6 +54,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/lib/supabase/decks', () => ({
   getAccessibleDeckDetailById: mocks.getAccessibleDeckDetailById,
+  getDeckAccessMetadata: mocks.getDeckAccessMetadata,
   getPublicDeckSummaryById: mocks.getPublicDeckSummaryById,
 }));
 
@@ -45,6 +67,7 @@ import DeckDetailsPage, { generateMetadata } from './page';
 describe('deck details page indexing', () => {
   beforeEach(() => {
     mocks.getAccessibleDeckDetailById.mockReset();
+    mocks.getDeckAccessMetadata.mockReset();
     mocks.getPublicDeckSummaryById.mockReset();
     mocks.getUser.mockReset();
     mocks.getUser.mockResolvedValue({ data: { user: null } });
@@ -52,10 +75,26 @@ describe('deck details page indexing', () => {
 
   it('returns a real not-found response when the deck is inaccessible', async () => {
     mocks.getAccessibleDeckDetailById.mockResolvedValue(null);
+    mocks.getDeckAccessMetadata.mockResolvedValue(null);
 
     await expect(
-      DeckDetailsPage({ params: Promise.resolve({ locale: 'en', deckId: 'missing' }) })
+      DeckDetailsPage({ params: Promise.resolve({ locale: 'en', deckId: '999' }) })
     ).rejects.toThrow('NEXT_NOT_FOUND');
+  });
+
+  it('allows an existing private deck to load through the authenticated client fallback', async () => {
+    mocks.getAccessibleDeckDetailById.mockResolvedValue(null);
+    mocks.getDeckAccessMetadata.mockResolvedValue({
+      deckId: '793',
+      ownerId: 'owner-1',
+      isPublic: false,
+      isOwner: false,
+    });
+
+    const page = await DeckDetailsPage({ params: Promise.resolve({ locale: 'en', deckId: '793' }) });
+
+    expect(page.props).toMatchObject({ deck: null, deckId: '793' });
+    expect(mocks.getDeckAccessMetadata).toHaveBeenCalledWith('793', null, {});
   });
 
   it('rejects malformed deck ids before querying Supabase', async () => {
@@ -63,6 +102,7 @@ describe('deck details page indexing', () => {
       DeckDetailsPage({ params: Promise.resolve({ locale: 'en', deckId: 'not-a-number' }) })
     ).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mocks.getAccessibleDeckDetailById).not.toHaveBeenCalled();
+    expect(mocks.getDeckAccessMetadata).not.toHaveBeenCalled();
   });
 
   it('uses public deck content for unique metadata', async () => {
