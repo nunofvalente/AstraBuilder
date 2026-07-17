@@ -496,8 +496,15 @@ export function applyTerraEndTurnAbilities(state: GameState, owner: Owner): Game
   for (const zone of BATTLEFIELD_ZONE_IDS) {
     const wilds = next.zones[zone].find((card) => card.card.id === 'IMP156' && !card.faceDown);
     const unit = next.zones[zone].find((card) => isUnitCard(card.card));
-    if (wilds && unit && getCardController(unit) !== getCardController(wilds)) {
+    if (wilds && unit && unit.ready && getCardController(unit) !== getCardController(wilds)) {
       next = updateInPlay(next, unit.instanceId, (card) => ({ ...card, ready: false }));
+      next = {
+        ...next,
+        log: addLogEntry(next, {
+          cardName: wilds.card.name,
+          suffix: ` exhausted ${unit.card.name} at the end of the turn.`,
+        }),
+      };
     }
   }
   const routeEntry = BATTLEFIELD_ZONE_IDS.map((zone) => ({

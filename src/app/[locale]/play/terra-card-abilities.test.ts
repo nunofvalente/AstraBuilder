@@ -486,6 +486,10 @@ describe('Terra card abilities', () => {
       zones: { ...base.zones, battlefieldLeft: [enemy, wilds], battlefieldCenter: [route] },
     }, 'player');
     expect(endApplied.zones.battlefieldLeft[0]?.ready).toBe(false);
+    expect(endApplied.log).toContainEqual(expect.objectContaining({
+      cardName: 'Wilds',
+      suffix: ' exhausted enemy at the end of the turn.',
+    }));
     const advanced = advanceToNextTurn({
       ...base,
       zones: { ...base.zones, battlefieldLeft: [enemy, wilds], battlefieldCenter: [route] },
@@ -509,6 +513,38 @@ describe('Terra card abilities', () => {
     expect(moved.state.pendingChoice).toMatchObject({ effect: 'factoryDraw' });
     const paid = resolvePendingChoice(moved.state, [factory.instanceId]);
     expect('error' in paid ? null : paid.zones.hand.some((item) => item.instanceId === draw.instanceId)).toBe(true);
+  });
+
+  it('logs Entangling Wilds at either player end turn when it exhausts an enemy', () => {
+    const wilds = card('IMP156', 'player', {
+      card: createTestCard({ id: 'IMP156', name: 'Entangling Wilds', type: 'Territory' }),
+    });
+    const enemy = card('enemy', 'opponent', {
+      card: createTestCard({ id: 'enemy', name: 'Enemy Unit', type: 'Unit' }),
+    });
+    const ownTurn = state();
+    const afterOwnTurn = advanceToNextTurn({
+      ...ownTurn,
+      zones: { ...ownTurn.zones, battlefieldLeft: [enemy, wilds] },
+    });
+
+    expect(afterOwnTurn.zones.battlefieldLeft[0]?.ready).toBe(true);
+    expect(afterOwnTurn.log).toContainEqual(expect.objectContaining({
+      cardName: 'Entangling Wilds',
+      suffix: ' exhausted Enemy Unit at the end of the turn.',
+    }));
+
+    const opponentTurn = { ...state(), activePlayer: 'opponent' as const };
+    const afterOpponentTurn = advanceToNextTurn({
+      ...opponentTurn,
+      zones: { ...opponentTurn.zones, battlefieldLeft: [enemy, wilds] },
+    });
+
+    expect(afterOpponentTurn.zones.battlefieldLeft[0]?.ready).toBe(false);
+    expect(afterOpponentTurn.log).toContainEqual(expect.objectContaining({
+      cardName: 'Entangling Wilds',
+      suffix: ' exhausted Enemy Unit at the end of the turn.',
+    }));
   });
 
   it('pays for or sacrifices Escape Route and logs the outcome', () => {

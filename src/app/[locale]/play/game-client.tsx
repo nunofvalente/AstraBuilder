@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Bot, Check, ChevronDown, ChevronsRight, Flag, Play, RotateCcw, Sparkles, Swords, Users } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
@@ -84,6 +85,8 @@ import {
   RequiredActionToast,
 } from './game-client-ui';
 import { getPlayBoardCopy, getPlayControlsCopy, getPlayLobbyCopy } from './play-localization';
+import { startCardMoveViewTransition } from './card-move-animation';
+import { useCardExitAnimations } from './card-exit-animation';
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'auth' | 'error';
 type PlayMode = 'matchmaking' | 'lobby' | 'practice';
@@ -92,6 +95,25 @@ type PendingHandPlayCost = {
   sourceInstanceId: string;
   costType: 'sacrifice' | 'discard' | 'reanimate';
 };
+
+type OpponentHandMove = {
+  instanceId: string;
+  destination: 'staging' | 'supply';
+};
+
+function getOpponentHandMove(previous: GameState, next: GameState): OpponentHandMove | null {
+  for (const instance of previous.opponentZones.hand) {
+    if (next.opponentZones.supply.some((candidate) => candidate.instanceId === instance.instanceId)) {
+      return { instanceId: instance.instanceId, destination: 'supply' };
+    }
+
+    if (next.opponentZones.staging.some((candidate) => candidate.instanceId === instance.instanceId)) {
+      return { instanceId: instance.instanceId, destination: 'staging' };
+    }
+  }
+
+  return null;
+}
 
 export type GameClientProps = {
   locale: Locale;
@@ -206,6 +228,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [isPlayerDeckMenuOpen, setIsPlayerDeckMenuOpen] = useState(false);
   const [isBotDeckMenuOpen, setIsBotDeckMenuOpen] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const gameStateRef = useRef<GameState | null>(null);
+  useCardExitAnimations(gameState);
   const [pendingAbilitySourceId, setPendingAbilitySourceId] = useState<string | null>(null);
   const [pendingCounterTargetSourceId, setPendingCounterTargetSourceId] = useState<string | null>(null);
   const [pendingHandPlayCost, setPendingHandPlayCost] = useState<PendingHandPlayCost | null>(null);
@@ -291,6 +315,48 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     }
 
     botTurnTimersRef.current = [];
+  }
+
+  function applyAutomaticBotStep(step: (typeof BOT_TURN_STEPS)[number]) {
+    const previous = gameStateRef.current;
+    if (!previous) {
+      return;
+    }
+
+    const next = applyBotTurnStep(previous, step);
+    if (next === previous) {
+      return;
+    }
+
+    const commitState = () => {
+      gameStateRef.current = next;
+      setGameState(next);
+    };
+    const move = getOpponentHandMove(previous, next);
+
+    if (move && typeof document !== 'undefined') {
+      const source = document.querySelector(
+        `[data-card-instance-id="${CSS.escape(move.instanceId)}"][data-card-zone="hand"][data-card-owner="opponent"]`
+      );
+      if (
+        source instanceof HTMLElement &&
+        startCardMoveViewTransition({
+          source,
+          destination: move.destination,
+          update: () => flushSync(commitState),
+          findTarget: () => {
+            const target = document.querySelector(
+              `[data-card-instance-id="${CSS.escape(move.instanceId)}"][data-card-zone="${move.destination}"][data-card-owner="opponent"]`
+            );
+            return target instanceof HTMLElement ? target : null;
+          },
+        })
+      ) {
+        return;
+      }
+    }
+
+    commitState();
   }
 
   function scheduleBotTimer(callback: () => void, delayMs: number) {
@@ -396,19 +462,14 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
   function playAutomaticBotTurn(botTurnState: GameState) {
     clearBotTurnTimers();
+    gameStateRef.current = botTurnState;
     setGameState(botTurnState);
 
     const setupSteps = BOT_TURN_STEPS.filter((step) => step !== 'attackBattlefield');
 
     for (const [index, step] of setupSteps.entries()) {
       scheduleBotTimer(() => {
-        setGameState((previous) => {
-          if (!previous) {
-            return previous;
-          }
-
-          return applyBotTurnStep(previous, step);
-        });
+        applyAutomaticBotStep(step);
       }, BOT_TURN_STEP_DELAY_MS * (index + 1));
     }
 
@@ -416,6 +477,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   }
 
   useEffect(() => clearBotTurnTimers, []);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   useEffect(() => {
     if (gameState?.winner) {
@@ -758,29 +823,60 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       }
     }
 
-    setGameState((previous) => {
-      if (!previous) {
-        return previous;
+    const applyMove = () => {
+      setGameState((previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        const setupFirstPlayer =
+          fromZone === 'hand' &&
+          toZone === 'supply' &&
+          !previous.playerStartingSupplyPlaced &&
+          previous.sessionMode === 'multiplayer'
+            ? rollFirstPlayer()
+            : undefined;
+
+        return applyPlayerCardAction(previous, {
+          instanceId,
+          fromZone,
+          toZone,
+          options: {
+            ...options,
+            setupFirstPlayer,
+          },
+        }).state;
+      });
+    };
+
+    if (
+      gameState &&
+      fromZone === 'hand' &&
+      (toZone === 'supply' || toZone === 'staging') &&
+      typeof document !== 'undefined'
+    ) {
+      const source = document.querySelector(
+        `[data-card-instance-id="${CSS.escape(instanceId)}"][data-card-zone="hand"]`
+      );
+      if (
+        source instanceof HTMLElement &&
+        startCardMoveViewTransition({
+          source,
+          destination: toZone,
+          update: () => flushSync(applyMove),
+          findTarget: () => {
+            const target = document.querySelector(
+              `[data-card-instance-id="${CSS.escape(instanceId)}"][data-card-zone="${toZone}"]`
+            );
+            return target instanceof HTMLElement ? target : null;
+          },
+        })
+      ) {
+        return;
       }
+    }
 
-      const setupFirstPlayer =
-        fromZone === 'hand' &&
-        toZone === 'supply' &&
-        !previous.playerStartingSupplyPlaced &&
-        previous.sessionMode === 'multiplayer'
-          ? rollFirstPlayer()
-          : undefined;
-
-      return applyPlayerCardAction(previous, {
-        instanceId,
-        fromZone,
-        toZone,
-        options: {
-          ...options,
-          setupFirstPlayer,
-        },
-      }).state;
-    });
+    applyMove();
   }
 
   function resolvePendingHandPlayCost(targetInstanceId: string) {
@@ -2310,7 +2406,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             ) : null
           }
         />
-        <OpponentHandStrip cards={gameState.opponentZones.hand} locale={locale} />
+        <OpponentHandStrip
+          cards={gameState.opponentZones.hand}
+          dealOpeningHand={gameState.phase === 'setup' && !gameState.playerOpeningHandConfirmed}
+          locale={locale}
+        />
         <HandStrip
           cards={gameState.zones.hand}
           gameState={gameState}
