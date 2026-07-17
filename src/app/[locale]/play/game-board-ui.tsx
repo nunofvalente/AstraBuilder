@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Locale } from '@/i18n/config';
 import type { Card } from '../create/deck-builder/types';
 import { hasCardKeyword } from './card-definitions';
+import { useOpeningHandDeal } from './opening-hand-animation';
 import {
   getAttachedCards,
   getCardController,
@@ -580,6 +581,8 @@ export function BattlefieldPanel({
         ref={isActive ? triggerRef : undefined}
         type="button"
         data-card-instance-id={instance.instanceId}
+        data-card-zone={zone}
+        data-card-owner={getCardController(instance)}
         onClick={() => !disabled && setActiveInstanceId((current) => (current === instance.instanceId ? null : instance.instanceId))}
         onMouseEnter={() => openPreview(instance)}
         onFocus={() => openPreview(instance)}
@@ -907,6 +910,8 @@ export function CombinedStagingSupplyPanel({
                     ref={activeStagingCardId === instance.instanceId ? activeStagingTriggerRef : undefined}
                     type="button"
                     data-card-instance-id={instance.instanceId}
+                    data-card-zone="staging"
+                    data-card-owner={mirror ? 'opponent' : 'player'}
                     onClick={(event) => {
                       if ((!onMove && !onAttack && !onActivate) || disabled) {
                         return;
@@ -980,22 +985,32 @@ export function CombinedStagingSupplyPanel({
           </div>
           <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
           <div className="grid min-h-0 w-[4.5rem] grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center min-[2560px]:w-20">
-            <div className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20">
+            <div
+              className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
+              data-opponent-deck={mirror ? true : undefined}
+            >
               <CompactZoneStack
                 label={mirror ? copy.deck : copy.banish}
                 cards={mirror ? deckCards : banishCards}
                 faceDown={mirror}
                 compact
+                animationZone={mirror ? undefined : 'banish'}
+                animationOwner={mirror ? undefined : 'player'}
                 onClick={mirror ? undefined : () => setIsBanishOpen(true)}
               />
             </div>
             <div className="mx-2 h-px bg-[color:var(--border)]/70" aria-hidden="true" />
-            <div className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20">
+            <div
+              className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
+              data-player-deck={!mirror ? true : undefined}
+            >
               <CompactZoneStack
                 label={mirror ? copy.banish : copy.deck}
                 cards={mirror ? banishCards : deckCards}
                 faceDown={!mirror}
                 compact
+                animationZone={mirror ? 'banish' : undefined}
+                animationOwner={mirror ? 'opponent' : undefined}
                 onClick={mirror ? () => setIsBanishOpen(true) : undefined}
               />
             </div>
@@ -1042,6 +1057,9 @@ export function CombinedStagingSupplyPanel({
                       {canInspectSupplyCards ? (
                         <button
                           type="button"
+                          data-card-instance-id={instance.instanceId}
+                          data-card-zone="supply"
+                          data-card-owner={mirror ? 'opponent' : 'player'}
                           className={`relative aspect-[5/7] h-16 min-[2560px]:h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
                           aria-label={`Inspect supply card ${instance.card.name}`}
                           onMouseEnter={() => openSupplyPreview(instance)}
@@ -1052,7 +1070,12 @@ export function CombinedStagingSupplyPanel({
                           <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
                         </button>
                       ) : (
-                        <div className={`relative aspect-[5/7] h-16 min-[2560px]:h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}>
+                        <div
+                          data-card-instance-id={instance.instanceId}
+                          data-card-zone="supply"
+                          data-card-owner={mirror ? 'opponent' : 'player'}
+                          className={`relative aspect-[5/7] h-16 min-[2560px]:h-20 ${getReadyStateClassName(instance)} overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md`}
+                        >
                           <Image src={CARD_BACK_IMAGE_SRC} alt="" fill sizes="56px" className="object-cover" />
                         </div>
                       )}
@@ -1064,7 +1087,14 @@ export function CombinedStagingSupplyPanel({
             </div>
             <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
             <div className="flex min-h-0 w-[4.5rem] items-center justify-center px-0 min-[2560px]:w-20">
-              <CompactZoneStack label={copy.graveyard} cards={graveyardCards} compact onClick={() => setIsGraveyardOpen(true)} />
+              <CompactZoneStack
+                label={copy.graveyard}
+                cards={graveyardCards}
+                compact
+                animationZone="graveyard"
+                animationOwner={mirror ? 'opponent' : 'player'}
+                onClick={() => setIsGraveyardOpen(true)}
+              />
             </div>
           </div>
         </div>
@@ -1342,6 +1372,12 @@ export function HandStrip({
       })
     : [];
   const activeCardDisplay = activeInstance ? getLocalizedCardDisplay(locale, activeInstance.card) : null;
+  const shouldDealOpeningHand = gameState.phase === 'setup' && !gameState.playerOpeningHandConfirmed;
+  const openingDeal = useOpeningHandDeal({
+    enabled: shouldDealOpeningHand,
+    deckSelector: '[data-player-deck]',
+    fallbackDeckY: typeof window === 'undefined' ? 0 : window.innerHeight - 240,
+  });
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [activeHandTriggerRef, handMenuRef], closeHandMenu);
 
@@ -1418,7 +1454,7 @@ export function HandStrip({
           {copy.emptyHand}
         </p>
       ) : (
-        <div className="mx-auto flex h-28 max-w-4xl items-end justify-center overflow-visible px-2 pb-0">
+        <div ref={openingDeal.containerRef} className="mx-auto flex h-28 max-w-4xl items-end justify-center overflow-visible px-2 pb-0">
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
@@ -1433,12 +1469,16 @@ export function HandStrip({
             return (
             <article
               key={instance.instanceId}
-              className="relative flex w-16 flex-none justify-center hover:z-40"
+              data-opening-hand-card={shouldDealOpeningHand ? true : undefined}
+              className={`relative flex w-16 flex-none justify-center hover:z-40 ${openingDeal.cardClassName}`}
               style={{ zIndex: activeCardId === instance.instanceId ? 30 : index + 1 }}
             >
               <button
                 ref={activeCardId === instance.instanceId ? activeHandTriggerRef : undefined}
                 type="button"
+                data-card-instance-id={instance.instanceId}
+                data-card-zone="hand"
+                data-card-owner="player"
                 onClick={() => !disabled && setActiveCardId((current) => (current === instance.instanceId ? null : instance.instanceId))}
                 onMouseEnter={() => setPreviewCard(instance.card)}
                 onFocus={() => setPreviewCard(instance.card)}

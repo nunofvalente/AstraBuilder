@@ -5,9 +5,10 @@ import type { Locale } from '@/i18n/config';
 import { useEffect, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 import type { Card } from '../create/deck-builder/types';
-import { type GameCardInstance, type GameState } from './game-rules';
+import { type GameCardInstance, type GameState, type Owner } from './game-rules';
 import { getPlayBoardCopy, translateGameLogText } from './play-localization';
 import { CARD_BACK_IMAGE_SRC } from './game-client-support';
+import { useOpeningHandDeal } from './opening-hand-animation';
 
 export function useCloseOnOutsidePointerDown(
   isOpen: boolean,
@@ -165,12 +166,16 @@ export function CompactZoneStack({
   cards,
   faceDown = false,
   compact = false,
+  animationZone,
+  animationOwner,
   onClick,
 }: {
   label: string;
   cards: GameCardInstance[];
   faceDown?: boolean;
   compact?: boolean;
+  animationZone?: 'graveyard' | 'banish';
+  animationOwner?: Owner;
   onClick?: () => void;
 }) {
   const topCard = cards[0] ?? null;
@@ -185,13 +190,20 @@ export function CompactZoneStack({
       >
         {showCardImage ? (
           <>
-            <Image
-              src={faceDown ? CARD_BACK_IMAGE_SRC : topCard?.card.imageSrc || CARD_BACK_IMAGE_SRC}
-              alt=""
-              fill
-              sizes={compact ? '(min-width: 2560px) 56px, 44px' : '56px'}
-              className="object-cover"
-            />
+            <span
+              className="absolute inset-0"
+              data-card-instance-id={animationZone ? topCard?.instanceId : undefined}
+              data-card-zone={animationZone}
+              data-card-owner={animationZone ? animationOwner : undefined}
+            >
+              <Image
+                src={faceDown ? CARD_BACK_IMAGE_SRC : topCard?.card.imageSrc || CARD_BACK_IMAGE_SRC}
+                alt=""
+                fill
+                sizes={compact ? '(min-width: 2560px) 56px, 44px' : '56px'}
+                className="object-cover"
+              />
+            </span>
             <span className="absolute inset-0 flex items-center justify-center">
               <span className="rounded-full bg-black/70 px-2 py-0.5 text-sm font-bold text-white shadow-sm">
                 {cards.length}
@@ -231,8 +243,22 @@ export function CompactZoneStack({
   );
 }
 
-export function OpponentHandStrip({ cards, locale = 'en' }: { cards: GameCardInstance[]; locale?: Locale }) {
+export function OpponentHandStrip({
+  cards,
+  dealOpeningHand = false,
+  locale = 'en',
+}: {
+  cards: GameCardInstance[];
+  dealOpeningHand?: boolean;
+  locale?: Locale;
+}) {
   const copy = getPlayBoardCopy(locale);
+  const openingDeal = useOpeningHandDeal({
+    enabled: dealOpeningHand,
+    deckSelector: '[data-opponent-deck]',
+    fallbackDeckY: 240,
+  });
+
   return (
     <section className="pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pb-2 xl:left-[13.5rem] xl:right-4">
       {cards.length === 0 ? (
@@ -240,7 +266,7 @@ export function OpponentHandStrip({ cards, locale = 'en' }: { cards: GameCardIns
           {copy.opponentHand}
         </p>
       ) : (
-        <div className="mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
+        <div ref={openingDeal.containerRef} className="mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
@@ -256,10 +282,14 @@ export function OpponentHandStrip({ cards, locale = 'en' }: { cards: GameCardIns
             return (
               <article
                 key={instance.instanceId}
-                className="relative flex w-16 flex-none justify-center"
+                data-opening-hand-card={dealOpeningHand ? true : undefined}
+                className={`relative flex w-16 flex-none justify-center ${openingDeal.cardClassName}`}
                 style={{ zIndex: index + 1 }}
               >
                 <div
+                  data-card-instance-id={instance.instanceId}
+                  data-card-zone="hand"
+                  data-card-owner="opponent"
                   className="relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] transform-gpu overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
                   style={handCardStyle}
                 >

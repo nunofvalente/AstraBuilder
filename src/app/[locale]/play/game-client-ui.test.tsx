@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
@@ -69,5 +69,20 @@ describe('OpponentHandStrip', () => {
     expect(image).toHaveAttribute('src', expect.stringContaining('opponent-card.webp'));
     expect(image).not.toHaveAttribute('src', expect.stringContaining(encodeURIComponent(CARD_BACK_IMAGE_SRC)));
     expect(container).toHaveTextContent('Revealed');
+  });
+
+  it('deals face-down opening cards from the opponent deck', async () => {
+    const { container } = render(
+      <>
+        <div data-opponent-deck />
+        <OpponentHandStrip cards={[makeInstance()]} dealOpeningHand />
+      </>,
+    );
+
+    const dealtCard = container.querySelector('[data-opening-hand-card]');
+    await waitFor(() => expect(dealtCard).toHaveClass('opening-hand-card-deal'));
+    expect(dealtCard).toHaveStyle('--opening-draw-delay: 0ms');
+    expect(container.querySelector('[data-card-owner="opponent"]')).toHaveAttribute('data-card-zone', 'hand');
+    expect(container.querySelector('img')).toHaveAttribute('src', expect.stringContaining(encodeURIComponent(CARD_BACK_IMAGE_SRC)));
   });
 });
