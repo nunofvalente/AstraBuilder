@@ -2,15 +2,21 @@ import { cache } from 'react';
 
 import type { Card } from '@/app/[locale]/create/deck-builder/types';
 import { normaliseCard } from '@/app/[locale]/create/deck-builder/utils';
+import { getSupabaseCardRows } from '@/lib/supabase/cards';
 
 import { fetchAstraCardCatalog } from './astra-card-catalog';
 import { mapAstraCardsToCardRows } from './astra-card-mapper';
 
 const getCachedAstraCards = cache(async (): Promise<Card[]> => {
-  const astraCards = await fetchAstraCardCatalog();
-  const rows = mapAstraCardsToCardRows(astraCards);
+  const { rows } = await getSupabaseCardRows();
+  if (rows.length > 0) {
+    return rows.map((row, index) => normaliseCard(row, index));
+  }
 
-  return rows.map((row, index) => normaliseCard(row, index));
+  const astraCards = await fetchAstraCardCatalog();
+  const astraRows = mapAstraCardsToCardRows(astraCards);
+
+  return astraRows.map((row, index) => normaliseCard(row, index));
 });
 
 const getCachedAstraCardLookup = cache(async (): Promise<Map<string, Card>> => {
