@@ -1223,22 +1223,41 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
     if (!gameState) {
       return (
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center">
-          <section className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-2xl shadow-black/20">
-            <div className="flex flex-col gap-5">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center py-2">
+          <section className="play-lobby-shell relative overflow-hidden border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl shadow-black/25">
+            <div className="play-lobby-header relative border-b border-[color:var(--border)] px-6 py-4 sm:px-7">
+              <div className="relative z-10 max-w-2xl">
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-[color:var(--accent)]">
+                  {playCopy.setup}
+                </p>
+                <h1 className="mt-1 font-serif text-3xl font-semibold text-[color:var(--text-primary)]">
+                  {lobbyCopy.battlefield}
+                </h1>
+                <p className="mt-1 text-sm leading-5 text-[color:var(--text-secondary)]">
+                  {lobbyCopy.setupDescription}
+                </p>
+              </div>
+              <Swords className="play-lobby-header-mark" aria-hidden="true" />
+            </div>
+            <div className="relative flex flex-col gap-4 p-4 sm:p-5">
               <div
-                className="flex flex-col gap-3 rounded-lg border border-[color:var(--border)] px-5 py-4 shadow-inner shadow-white/5 sm:flex-row sm:items-center sm:justify-between"
+                className="relative flex flex-col gap-3 overflow-hidden border border-white/15 px-5 py-3.5 shadow-inner shadow-white/5 sm:flex-row sm:items-center sm:justify-between"
                 style={{ background: selectedDeckBannerBackground }}
               >
+                <span className="absolute inset-y-0 left-0 w-1 bg-[color:var(--accent)]" aria-hidden="true" />
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-white/15 bg-black/25 px-1.5 text-white shadow-inner">
                     <DeckAffinityIcons affinities={selectedDeckBannerAffinities} />
                   </span>
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <h2 className="min-w-0 truncate text-base font-bold text-[color:var(--text-primary)]">
-                      {selectedDeck?.title?.trim() || lobbyCopy.untitledDeck}
-                    </h2>
-                    <div ref={playerDeckMenuRef} className="relative">
+                  <div className="min-w-0">
+                    <p className="mb-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/65">
+                      {lobbyCopy.yourDeck}
+                    </p>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h2 className="min-w-0 truncate text-base font-bold text-[color:var(--text-primary)]">
+                        {selectedDeck?.title?.trim() || lobbyCopy.untitledDeck}
+                      </h2>
+                      <div ref={playerDeckMenuRef} className="relative">
                       <button
                         type="button"
                         aria-haspopup="listbox"
@@ -1304,6 +1323,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           </div>
                         </div>
                       ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1312,17 +1332,17 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </span>
               </div>
 
-              <div className="rounded-full border border-[color:var(--border)] bg-black/20 p-1" role="tablist" aria-label={playCopy.setup}>
-                <div className="grid gap-1 sm:grid-cols-3">
+              <div className="border border-[color:var(--border)] bg-black/20 p-1.5" role="tablist" aria-label={playCopy.setup}>
+                <div className="grid gap-1.5 sm:grid-cols-3">
                 <button
                   type="button"
                   role="tab"
                   aria-selected={selectedMode === 'matchmaking'}
                   onClick={() => setSelectedMode('matchmaking')}
-                  className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                  className={`inline-flex items-center justify-center gap-2 border px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
                     selectedMode === 'matchmaking'
-                      ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
-                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
+                      ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/18 text-[color:var(--text-primary)]'
+                      : 'border-transparent text-[color:var(--text-secondary)] hover:border-white/10 hover:bg-white/5 hover:text-[color:var(--text-primary)]'
                   }`}
                 >
                   <Swords className="h-4 w-4" aria-hidden="true" />
@@ -1333,10 +1353,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   role="tab"
                   aria-selected={selectedMode === 'lobby'}
                   onClick={() => setSelectedMode('lobby')}
-                  className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                  className={`inline-flex items-center justify-center gap-2 border px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
                     selectedMode === 'lobby'
-                      ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
-                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
+                      ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/18 text-[color:var(--text-primary)]'
+                      : 'border-transparent text-[color:var(--text-secondary)] hover:border-white/10 hover:bg-white/5 hover:text-[color:var(--text-primary)]'
                   }`}
                 >
                   <Users className="h-4 w-4" aria-hidden="true" />
@@ -1347,10 +1367,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   role="tab"
                   aria-selected={selectedMode === 'practice'}
                   onClick={() => setSelectedMode('practice')}
-                  className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+                  className={`inline-flex items-center justify-center gap-2 border px-4 py-3 text-sm font-bold transition focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
                     selectedMode === 'practice'
-                      ? 'bg-[color:var(--text-primary)] text-[color:var(--background)]'
-                      : 'text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]'
+                      ? 'border-[color:var(--accent)] bg-[color:var(--accent)]/18 text-[color:var(--text-primary)]'
+                      : 'border-transparent text-[color:var(--text-secondary)] hover:border-white/10 hover:bg-white/5 hover:text-[color:var(--text-primary)]'
                   }`}
                 >
                   <Bot className="h-4 w-4" aria-hidden="true" />
@@ -1359,7 +1379,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="grid gap-4">
                 <div className="flex flex-col gap-4">
                   {selectedMode === 'matchmaking' ? (
                     <>
@@ -1399,7 +1419,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                     </>
                   ) : selectedMode === 'practice' ? (
                     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">
-                      <div className="flex min-h-56 items-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)]/20 px-6 py-8">
+                      <div className="play-mode-brief flex min-h-44 items-center border border-[color:var(--border)] bg-[color:var(--surface-muted)]/20 px-7 py-6">
                         <div className="flex items-center gap-3">
                           <span className="flex h-11 w-11 items-center justify-center rounded-md bg-[color:var(--accent)]/15 text-[color:var(--accent)]">
                             <Bot className="h-5 w-5" aria-hidden="true" />
@@ -1410,7 +1430,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                           </div>
                         </div>
                       </div>
-                      <div className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
+                      <div className="border border-[color:var(--border)] bg-black/15 p-4">
                         <h2 id="simulator-bot-deck-label" className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">
                           {lobbyCopy.botDeck}
                         </h2>
@@ -1574,37 +1594,13 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                   )}
                 </div>
 
-                <aside className="rounded-lg border border-[color:var(--border)] bg-black/15 p-4">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-[color:var(--text-primary)]">{lobbyCopy.yourDeck}</h2>
-                  {selectedDeck ? (
-                    <div className="relative mt-4">
-                      <div className="absolute inset-x-4 -bottom-2 h-5 rounded-full bg-[color:var(--accent)]/35 blur-xl" aria-hidden="true" />
-                      <div
-                        className="relative overflow-hidden rounded-lg border border-white/15 px-3 py-3 text-white shadow-xl shadow-black/25"
-                        style={{ background: selectedDeckBannerBackground }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-white/15 bg-black/25 px-1.5 shadow-inner">
-                            <DeckAffinityIcons affinities={selectedDeckBannerAffinities} />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-bold">
-                              {selectedDeck.title?.trim() || lobbyCopy.untitledDeck}
-                            </p>
-                            <p className="mt-0.5 text-xs font-semibold text-white/78">{lobbyCopy.cardCountSelected(selectedDeck.cardCount)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                </aside>
               </div>
 
               <button
                 type="button"
                 onClick={selectedMode === 'lobby' ? () => void submitRoomRequest('create') : startSelectedDeck}
                 disabled={!selectedDeck || (selectedMode === 'practice' ? !selectedBotDeck : selectedMode === 'matchmaking' || !currentUserId || isRoomRequestPending || Boolean(room))}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[color:var(--text-primary)] px-4 py-4 text-base font-bold text-[color:var(--background)] transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55"
+                className="inline-flex w-full items-center justify-center gap-2 border border-[color:var(--accent)] bg-[linear-gradient(135deg,#d89034,#f0bd6d)] px-4 py-3.5 text-base font-black text-[#1c150c] shadow-lg shadow-black/20 transition hover:brightness-110 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-50"
               >
                 <Play className="h-4 w-4" aria-hidden="true" />
                 {selectedMode === 'practice'

@@ -14,8 +14,15 @@
         "unknownLabel": "Unknown pairing"
       },
       "trending": {
-        "title": "Trending Decks",
+        "title": "Top Decks",
         "placeholder": "See which Echoes of Astra decks the community is buzzing about."
+      },
+      "topCards": {
+        "title": "Top Cards",
+        "description": "The cards included in the largest share of public community decks.",
+        "placeholder": "Top cards will appear as public decks are shared.",
+        "usageLabel": "Used in {percentage}% of public decks",
+        "browseAction": "Browse all cards"
       }
     },
     "actions": {
@@ -27,10 +34,27 @@
       "decks": "Explore community decks",
       "catalog": "Browse card catalog"
     },
+    "showcaseIntro": {
+      "eyebrow": "Deckbuilding, discovery, and practice",
+      "title": "Build your deck. Discover what it can do.",
+      "description": "Shape a deck at your own pace, learn from lists shared by the community, and see how your choices perform in a practice game.",
+      "features": {
+        "builder": { "description": "Search, filter, and assemble a complete deck while your list updates in real time.", "action": "Start building" },
+        "catalog": { "description": "Browse the full card catalog, inspect card text, and find the tools your strategy needs.", "action": "Browse the catalog" },
+        "play": { "title": "Battlefield", "description": "Bring a saved deck to the Battlefield and play against a bot or challenge another player online.", "action": "Start a match" },
+        "decks": { "description": "Study decks shared by other players and discover new ideas for your next build.", "action": "Explore decks" }
+      },
+      "community": "Join the community",
+      "discordAction": "Join us on Discord"
+    },
     "battlefieldBanner": {
       "title": "Join the battlefield",
       "description": "Take your saved deck into a practice match and test your lines against a bot opponent.",
       "action": "Go to Battlefield"
+    },
+    "footer": {
+      "disclaimer": "AstraBuilder is an unofficial, fan-made deckbuilding companion for Echoes of Astra.",
+      "copyright": "(c) 2026 AstraBuilder."
     }
   },
   "affinityPage": {
@@ -172,7 +196,24 @@
     "favoriteAdd": "Add to favorites",
     "favoriteRemove": "Remove from favorites",
     "favoriteSignIn": "Sign in to favorite decks.",
-    "favoriteError": "We couldn't update your favorites. Please try again."
+    "favoriteError": "We couldn't update your favorites. Please try again.",
+    "analysisHeading": "Deck analysis",
+    "uniqueCardsLabel": "Unique cards",
+    "averageCostLabel": "Average cost",
+    "costCurveHeading": "Cost curve",
+    "compositionHeading": "Composition",
+    "costLabel": "Cost",
+    "affinityUnitsHeading": "Units by affinity",
+    "unitStatsHeading": "Average unit stats",
+    "attackLabel": "Attack",
+    "healthLabel": "Health",
+    "influenceLabel": "Influence",
+    "cardMenuViewDetails": "View card details",
+    "cardMenuSetDisplay": "Use as deck display card",
+    "cardMenuDisplaySelected": "Current display card",
+    "cardMenuUseAutomatic": "Use automatic display card",
+    "cardMenuSaving": "Saving...",
+    "cardMenuError": "The display card could not be updated."
   },
   "deckFeed": {
     "heading": "Community decks",
@@ -213,6 +254,15 @@
       "health": "Health",
       "influence": "Influence"
     }
+  },
+  "cardDetails": {
+    "backToPreviousPage": "Back to previous page",
+    "affinity": "Affinity",
+    "rarity": "Rarity",
+    "artist": "Artist",
+    "cardNumber": "Card number",
+    "rulesText": "Card text",
+    "cardStory": "Card story"
   },
   "auth": {
     "signUp": {
@@ -367,9 +417,12 @@
     "accountFallback": "Account",
     "profile": "Profile",
     "myDecks": "My Decks",
+    "myCollection": "My Collection",
     "builder": "Builder",
-    "play": "Battlefield",
+    "play": "Play",
+    "beta": "Beta",
     "decks": "Decks",
+    "communityDecks": "Community Decks",
     "collection": "Catalog",
     "settings": "Settings",
     "signOut": "Sign out",

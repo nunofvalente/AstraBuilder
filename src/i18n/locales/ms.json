@@ -14,8 +14,15 @@
         "unknownLabel": "Padanan tidak diketahui"
       },
       "trending": {
-        "title": "Dek tular",
+        "title": "Dek teratas",
         "placeholder": "Dek tular akan dipaparkan di sini tidak lama lagi."
+      },
+      "topCards": {
+        "title": "Kad teratas",
+        "description": "Kad yang digunakan dalam bahagian terbesar dek komuniti awam.",
+        "placeholder": "Kad teratas akan muncul apabila dek awam dikongsi.",
+        "usageLabel": "Digunakan dalam {percentage}% dek awam",
+        "browseAction": "Lihat semua kad"
       }
     },
     "actions": {
@@ -27,10 +34,27 @@
       "decks": "Teroka dek komuniti",
       "catalog": "Layari katalog kad"
     },
+    "showcaseIntro": {
+      "eyebrow": "Pembinaan dek, penemuan dan latihan",
+      "title": "Bina dek anda. Temui potensinya.",
+      "description": "Bina dek mengikut rentak anda, belajar daripada komuniti dan uji pilihan anda dalam perlawanan latihan.",
+      "features": {
+        "builder": { "description": "Cari, tapis dan bina dek lengkap sambil senarai anda dikemas kini dalam masa nyata.", "action": "Mula membina" },
+        "catalog": { "description": "Layari katalog penuh dan cari alat yang diperlukan oleh strategi anda.", "action": "Layari katalog" },
+        "play": { "title": "Medan Perang", "description": "Bawa dek tersimpan ke Medan Perang dan bermain menentang bot atau cabar pemain lain dalam talian.", "action": "Mulakan perlawanan" },
+        "decks": { "description": "Kaji dek yang dikongsi pemain lain dan temui idea baharu untuk binaan seterusnya.", "action": "Terokai dek" }
+      },
+      "community": "Sertai komuniti",
+      "discordAction": "Sertai kami di Discord"
+    },
     "battlefieldBanner": {
       "title": "Sertai medan perang",
       "description": "Bawa dek tersimpan anda ke perlawanan latihan dan uji strategi menentang bot.",
       "action": "Pergi ke Medan Perang"
+    },
+    "footer": {
+      "disclaimer": "AstraBuilder ialah alat bina dek tidak rasmi buatan peminat untuk Echoes of Astra.",
+      "copyright": "(c) 2026 AstraBuilder."
     }
   },
   "affinityPage": {
@@ -172,7 +196,24 @@
     "favoriteAdd": "Tambah ke kegemaran",
     "favoriteRemove": "Buang dari kegemaran",
     "favoriteSignIn": "Log masuk untuk menanda dek sebagai kegemaran.",
-    "favoriteError": "Kami tidak dapat mengemas kini kegemaran anda. Sila cuba lagi."
+    "favoriteError": "Kami tidak dapat mengemas kini kegemaran anda. Sila cuba lagi.",
+    "analysisHeading": "Analisis dek",
+    "uniqueCardsLabel": "Kad unik",
+    "averageCostLabel": "Kos purata",
+    "costCurveHeading": "Lengkung kos",
+    "compositionHeading": "Komposisi",
+    "costLabel": "Kos",
+    "affinityUnitsHeading": "Unit mengikut afiniti",
+    "unitStatsHeading": "Purata statistik unit",
+    "attackLabel": "Serangan",
+    "healthLabel": "Kesihatan",
+    "influenceLabel": "Pengaruh",
+    "cardMenuViewDetails": "Lihat butiran kad",
+    "cardMenuSetDisplay": "Guna sebagai kad paparan dek",
+    "cardMenuDisplaySelected": "Kad paparan semasa",
+    "cardMenuUseAutomatic": "Guna kad paparan automatik",
+    "cardMenuSaving": "Menyimpan...",
+    "cardMenuError": "Kad paparan tidak dapat dikemas kini."
   },
   "deckFeed": {
     "heading": "Dek komuniti",
@@ -217,6 +258,15 @@
       "health": "Kesihatan",
       "influence": "Pengaruh"
     }
+  },
+  "cardDetails": {
+    "backToPreviousPage": "Kembali ke halaman sebelumnya",
+    "affinity": "Afiniti",
+    "rarity": "Kelangkaan",
+    "artist": "Artis",
+    "cardNumber": "Nombor kad",
+    "rulesText": "Teks kad",
+    "cardStory": "Kisah kad"
   },
   "auth": {
     "signUp": {
@@ -371,9 +421,12 @@
     "accountFallback": "Akaun",
     "profile": "Profil",
     "myDecks": "Dek Saya",
+    "myCollection": "Koleksi Saya",
     "builder": "Pembina",
-    "play": "Medan Perang",
+    "play": "Main",
+    "beta": "Beta",
     "decks": "Dek",
+    "communityDecks": "Dek komuniti",
     "collection": "Katalog",
     "settings": "Tetapan",
     "signOut": "Log keluar",

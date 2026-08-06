@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createSupabaseAdminClient, resolveUserIdFromAuthorizationHeader } from '@/lib/supabase/admin';
+import { resolveDeckDisplayCardSelection } from '@/lib/decks/display-card';
 import { getAccessibleDeckDetailById, getDeckDetailById } from '@/lib/supabase/decks';
 
 type DeckCardPayload = {
@@ -113,6 +114,7 @@ export async function PATCH(
           description?: unknown;
           is_public?: unknown;
           cards?: unknown;
+          display_card_id?: unknown;
         }
       | null;
 
@@ -123,10 +125,34 @@ export async function PATCH(
     const title = typeof body.title === 'string' ? body.title.trim().slice(0, 45) : '';
     const descriptionRaw = typeof body.description === 'string' ? body.description.trim().slice(0, 100) : '';
     const isPublic = Boolean(body.is_public);
-    const cards = parseDeckCards(body.cards);
+    const hasCardsPayload = Array.isArray(body.cards);
+    const cards = hasCardsPayload ? parseDeckCards(body.cards) : [];
 
     const previousDeck = await getDeckDetailById(normalizedDeckId, supabaseAdmin);
     const previousCards = previousDeck?.entries ?? [];
+    const hasDisplayCardPayload = Object.prototype.hasOwnProperty.call(body, 'display_card_id');
+    const requestedDisplayCardId =
+      typeof body.display_card_id === 'string' && body.display_card_id.trim().length > 0
+        ? body.display_card_id.trim()
+        : null;
+    const availableCardIds = new Set(
+      (hasCardsPayload ? cards : previousCards.map((entry) => ({ card_id: entry.card.id }))).map(
+        (entry) => entry.card_id
+      )
+    );
+    const displayCardSelection = resolveDeckDisplayCardSelection({
+      availableCardIds,
+      currentDisplayCardId: previousDeck?.displayCardId ?? null,
+      hasRequestedDisplayCard: hasDisplayCardPayload,
+      requestedDisplayCardId,
+    });
+    if (displayCardSelection.invalidRequestedCard) {
+      return NextResponse.json(
+        { message: 'The display card must be part of this deck.' },
+        { status: 400 }
+      );
+    }
+    const displayCardId = displayCardSelection.displayCardId;
 
     const { error: deckUpdateError } = await supabaseAdmin
       .from('decks')
@@ -134,6 +160,7 @@ export async function PATCH(
         title: title.length > 0 ? title : 'Untitled deck',
         description: descriptionRaw.length > 0 ? descriptionRaw : null,
         is_public: isPublic,
+        display_card_id: displayCardId,
       })
       .eq('id', normalizedDeckId)
       .eq('user_id', userId);
@@ -143,13 +170,15 @@ export async function PATCH(
       return NextResponse.json({ message: 'Unable to update deck.' }, { status: 500 });
     }
 
-    const { error: deleteError } = await supabaseAdmin.from('deck_cards').delete().eq('deck_id', normalizedDeckId);
-    if (deleteError) {
-      console.error('Failed to clear deck cards before update', deleteError);
-      return NextResponse.json({ message: 'Unable to update deck cards.' }, { status: 500 });
+    if (hasCardsPayload) {
+      const { error: deleteError } = await supabaseAdmin.from('deck_cards').delete().eq('deck_id', normalizedDeckId);
+      if (deleteError) {
+        console.error('Failed to clear deck cards before update', deleteError);
+        return NextResponse.json({ message: 'Unable to update deck cards.' }, { status: 500 });
+      }
     }
 
-    if (cards.length > 0) {
+    if (hasCardsPayload && cards.length > 0) {
       const { error: insertError } = await supabaseAdmin.from('deck_cards').insert(
         cards.map((entry) => ({
           deck_id: normalizedDeckId,
@@ -169,6 +198,13 @@ export async function PATCH(
               quantity: entry.count,
             }))
           );
+        }
+        if (previousDeck?.displayCardId) {
+          await supabaseAdmin
+            .from('decks')
+            .update({ display_card_id: previousDeck.displayCardId })
+            .eq('id', normalizedDeckId)
+            .eq('user_id', userId);
         }
 
         return NextResponse.json({ message: 'Unable to update deck cards.' }, { status: 500 });

@@ -250,7 +250,7 @@ export function CommunityDecksClient({
           {deckFeedLabels.empty}
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredDecks.map((deck) => (
             <DeckSummaryCard
               key={deck.id}
@@ -263,6 +263,7 @@ export function CommunityDecksClient({
                 publicTag: myDeckLabels.publicTag,
                 privateTag: myDeckLabels.privateTag,
               }}
+              variant="compactDetailed"
               mutedMetrics
               author={deck.authorLabel ? { label: deck.authorLabel, href: deck.authorHref ?? undefined } : undefined}
             />

@@ -14,8 +14,15 @@
         "unknownLabel": "Combinaison inconnue"
       },
       "trending": {
-        "title": "Decks tendances",
+        "title": "Meilleurs decks",
         "placeholder": "Les decks tendances seront affiches ici bientot."
+      },
+      "topCards": {
+        "title": "Cartes populaires",
+        "description": "Les cartes presentes dans la plus grande part des decks publics de la communaute.",
+        "placeholder": "Les cartes populaires apparaitront avec les decks publics partages.",
+        "usageLabel": "Utilisee dans {percentage}% des decks publics",
+        "browseAction": "Voir toutes les cartes"
       }
     },
     "actions": {
@@ -27,10 +34,27 @@
       "decks": "Explorer les decks",
       "catalog": "Parcourir le catalogue"
     },
+    "showcaseIntro": {
+      "eyebrow": "Construction, decouverte et entrainement",
+      "title": "Construisez votre deck. Decouvrez son potentiel.",
+      "description": "Construisez a votre rythme, inspirez-vous des listes de la communaute et testez vos choix dans une partie d'entrainement.",
+      "features": {
+        "builder": { "description": "Recherchez, filtrez et assemblez un deck complet avec une liste mise a jour en temps reel.", "action": "Commencer a construire" },
+        "catalog": { "description": "Parcourez le catalogue complet et trouvez les outils necessaires a votre strategie.", "action": "Voir le catalogue" },
+        "play": { "title": "Champ de bataille", "description": "Emportez un deck sauvegarde sur le champ de bataille et affrontez un bot ou un autre joueur en ligne.", "action": "Lancer une partie" },
+        "decks": { "description": "Etudiez les decks partages par les joueurs et trouvez de nouvelles idees.", "action": "Explorer les decks" }
+      },
+      "community": "Rejoignez la communaute",
+      "discordAction": "Nous rejoindre sur Discord"
+    },
     "battlefieldBanner": {
       "title": "Rejoindre le champ de bataille",
       "description": "Emmenez un deck enregistre dans une partie d'entrainement et testez vos lignes contre un bot.",
       "action": "Aller au champ de bataille"
+    },
+    "footer": {
+      "disclaimer": "AstraBuilder est un compagnon de construction de deck non officiel cree par des fans pour Echoes of Astra.",
+      "copyright": "(c) 2026 AstraBuilder."
     }
   },
   "affinityPage": {
@@ -172,7 +196,24 @@
     "favoriteAdd": "Ajouter aux favoris",
     "favoriteRemove": "Retirer des favoris",
     "favoriteSignIn": "Connectez-vous pour ajouter des decks aux favoris.",
-    "favoriteError": "Impossible de mettre a jour vos favoris. Veuillez reessayer."
+    "favoriteError": "Impossible de mettre a jour vos favoris. Veuillez reessayer.",
+    "analysisHeading": "Analyse du deck",
+    "uniqueCardsLabel": "Cartes uniques",
+    "averageCostLabel": "Cout moyen",
+    "costCurveHeading": "Courbe de cout",
+    "compositionHeading": "Composition",
+    "costLabel": "Cout",
+    "affinityUnitsHeading": "Unités par affinité",
+    "unitStatsHeading": "Stats moyennes des unites",
+    "attackLabel": "Attaque",
+    "healthLabel": "Sante",
+    "influenceLabel": "Influence",
+    "cardMenuViewDetails": "Voir les details de la carte",
+    "cardMenuSetDisplay": "Utiliser comme carte d'affichage",
+    "cardMenuDisplaySelected": "Carte d'affichage actuelle",
+    "cardMenuUseAutomatic": "Utiliser la carte automatique",
+    "cardMenuSaving": "Enregistrement...",
+    "cardMenuError": "Impossible de mettre a jour la carte d'affichage."
   },
   "deckFeed": {
     "heading": "Decks de la communaute",
@@ -213,6 +254,15 @@
       "health": "Sante",
       "influence": "Influence"
     }
+  },
+  "cardDetails": {
+    "backToPreviousPage": "Retour a la page precedente",
+    "affinity": "Affinite",
+    "rarity": "Rarete",
+    "artist": "Artiste",
+    "cardNumber": "Numero de carte",
+    "rulesText": "Texte de la carte",
+    "cardStory": "Histoire de la carte"
   },
   "auth": {
     "signUp": {
@@ -367,9 +417,12 @@
     "accountFallback": "Compte",
     "profile": "Profil",
     "myDecks": "Mes decks",
+    "myCollection": "Ma collection",
     "builder": "Constructeur",
-    "play": "Champ de bataille",
+    "play": "Jouer",
+    "beta": "Beta",
     "decks": "Decks",
+    "communityDecks": "Decks de la communaute",
     "collection": "Catalogue",
     "settings": "Parametres",
     "signOut": "Se deconnecter",

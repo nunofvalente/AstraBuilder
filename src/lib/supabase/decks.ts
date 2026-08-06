@@ -2,6 +2,11 @@ import type { Card, DeckEntry } from '@/app/[locale]/create/deck-builder/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAstraCardLookup } from '@/lib/astra/astra-card-directory';
 import { normalizeAffinity } from '@/lib/cards/affinity';
+import {
+  rankCardsByPublicDeckUsage,
+  type PopularPublicDeckCard,
+  type PublicDeckCardUsageInput,
+} from '@/lib/decks/card-popularity';
 
 import { supabase } from './supabaseClient';
 
@@ -17,6 +22,9 @@ export type DeckSummary = {
   affinities: string[];
   authorId: string | null;
   authorName: string | null;
+  displayCardId?: string | null;
+  displayCardImageSrc?: string | null;
+  displayCardName?: string | null;
 };
 
 export type PublicDeckSummary = DeckSummary;
@@ -33,6 +41,7 @@ export type DeckDetailData = {
   authorId: string | null;
   authorXLink: string | null;
   authorYoutubeLink: string | null;
+  displayCardId: string | null;
   entries: DeckEntry[];
 };
 
@@ -82,6 +91,7 @@ type DeckRow = {
   created_at?: string | null;
   is_public?: boolean | null;
   user_id?: string | null;
+  display_card_id?: string | null;
   deck_cards?: DeckCardReference[] | null;
   deck_stats?: DeckStatsRelation;
   profiles?: ProfileRelation;
@@ -89,6 +99,39 @@ type DeckRow = {
 
 type DeckDetailRow = DeckRow;
 type DeckDataClient = Pick<SupabaseClient, 'from'>;
+
+async function resolveOptionalDisplayCardIds(
+  deckIds: Array<string | number>,
+  client: DeckDataClient = supabase
+): Promise<Map<string, string>> {
+  if (deckIds.length === 0) {
+    return new Map();
+  }
+
+  let data: unknown[] | null = null;
+  try {
+    const result = await client
+      .from('decks')
+      .select('id,display_card_id')
+      .in('id', deckIds);
+    if (result.error || !result.data) {
+      return new Map();
+    }
+    data = result.data as unknown[];
+  } catch {
+    return new Map();
+  }
+
+  const result = new Map<string, string>();
+  for (const row of data as Array<{ id?: string | number | null; display_card_id?: string | null }>) {
+    const id = row.id == null ? '' : String(row.id);
+    const displayCardId = row.display_card_id?.trim();
+    if (id && displayCardId) {
+      result.set(id, displayCardId);
+    }
+  }
+  return result;
+}
 
 function resolveStats(statsRelation: DeckStatsRelation): { viewsTotal: number; favoritesTotal: number } {
   if (Array.isArray(statsRelation) && statsRelation.length > 0) {
@@ -158,10 +201,18 @@ function resolveDeckCardId(entry: DeckCardReference | null | undefined): string 
 
 function buildDeckAggregates(
   deckCards: DeckCardReference[] | null | undefined,
-  astraCardLookup: Map<string, Card>
-): { cardCount: number; affinities: string[] } {
+  astraCardLookup: Map<string, Card>,
+  selectedDisplayCardId?: string | null
+): {
+  cardCount: number;
+  affinities: string[];
+  displayCardImageSrc: string | null;
+  displayCardName: string | null;
+} {
   let cardCount = 0;
   const affinityTotals = new Map<string, number>();
+  let fallbackDisplayCard: Card | null = null;
+  let selectedDisplayCard: Card | null = null;
 
   for (const entry of deckCards ?? []) {
     const quantity = Math.max(0, Number(entry?.quantity ?? 0));
@@ -173,6 +224,12 @@ function buildDeckAggregates(
     }
 
     const card = astraCardLookup.get(cardId);
+    if (card && card.id === selectedDisplayCardId && card.imageSrc) {
+      selectedDisplayCard = card;
+    }
+    if (!fallbackDisplayCard && card?.imageSrc) {
+      fallbackDisplayCard = card;
+    }
     const normalizedAffinity = normalizeAffinity(card?.affinity);
     if (!normalizedAffinity) {
       continue;
@@ -191,12 +248,22 @@ function buildDeckAggregates(
       return a[0].localeCompare(b[0]);
     })
     .map(([name]) => name);
+  const displayCard = selectedDisplayCard ?? fallbackDisplayCard;
 
-  return { cardCount, affinities };
+  return {
+    cardCount,
+    affinities,
+    displayCardImageSrc: displayCard?.imageSrc ?? null,
+    displayCardName: displayCard?.name ?? null,
+  };
 }
 
 function mapDeckRowToSummary(row: DeckRow, astraCardLookup: Map<string, Card>): DeckSummary {
-  const { cardCount, affinities } = buildDeckAggregates(row.deck_cards, astraCardLookup);
+  const { cardCount, affinities, displayCardImageSrc, displayCardName } = buildDeckAggregates(
+    row.deck_cards,
+    astraCardLookup,
+    row.display_card_id
+  );
   const { viewsTotal, favoritesTotal } = resolveStats(row.deck_stats ?? null);
   const profile = resolveProfile(row.profiles ?? null, row.user_id ?? null);
 
@@ -212,6 +279,9 @@ function mapDeckRowToSummary(row: DeckRow, astraCardLookup: Map<string, Card>): 
     affinities,
     authorId: profile.authorId ? String(profile.authorId) : null,
     authorName: profile.authorName && profile.authorName.trim().length > 0 ? profile.authorName.trim() : null,
+    displayCardId: row.display_card_id ?? null,
+    displayCardImageSrc,
+    displayCardName,
   };
 }
 
@@ -289,7 +359,13 @@ async function hydrateDeckSummariesWithProfiles(decks: DeckSummary[]): Promise<D
 
 async function resolveDeckRowsToSummaries(rows: DeckRow[]): Promise<DeckSummary[]> {
   const astraCardLookup = await getAstraCardLookup();
-  const summaries = rows.map((row) => mapDeckRowToSummary(row, astraCardLookup));
+  const displayCardIds = await resolveOptionalDisplayCardIds(rows.map((row) => row.id));
+  const summaries = rows.map((row) =>
+    mapDeckRowToSummary(
+      { ...row, display_card_id: displayCardIds.get(String(row.id)) ?? null },
+      astraCardLookup
+    )
+  );
   return hydrateDeckSummariesWithProfiles(summaries);
 }
 
@@ -479,6 +555,52 @@ export async function getAllPublicDeckSummaries(batchSize = 200, maxPages = 10):
   return resolveDeckRowsToSummaries(results);
 }
 
+export async function getTopCardsInPublicDecks(
+  limit = 6,
+  batchSize = 200,
+  maxPages = 10
+): Promise<PopularPublicDeckCard[]> {
+  const publicDecks: PublicDeckCardUsageInput[] = [];
+
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * batchSize;
+    const to = from + batchSize - 1;
+    const { data, error } = await supabase
+      .from('decks')
+      .select('id,deck_cards(*)')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    for (const row of data as Array<{ id: string | number; deck_cards?: DeckCardReference[] | null }>) {
+      publicDecks.push({
+        deckId: String(row.id),
+        cards: (row.deck_cards ?? [])
+          .map((entry) => ({
+            cardId: resolveDeckCardId(entry) ?? '',
+            quantity: Math.max(0, Number(entry.quantity ?? 0)),
+          }))
+          .filter((entry) => entry.cardId.length > 0 && entry.quantity > 0),
+      });
+    }
+
+    if (data.length < batchSize) {
+      break;
+    }
+  }
+
+  const cardLookup = await getAstraCardLookup();
+  return rankCardsByPublicDeckUsage(publicDecks, cardLookup).slice(0, Math.max(0, limit));
+}
+
 export async function getPublicDeckSummaryById(deckId: string): Promise<PublicDeckSummary | null> {
   const { data, error } = await supabase
     .from('decks')
@@ -538,6 +660,8 @@ export async function getDeckDetailById(
   }
 
   const row = data as DeckDetailRow;
+  const displayCardIds = await resolveOptionalDisplayCardIds([row.id], client);
+  row.display_card_id = displayCardIds.get(String(row.id)) ?? null;
   const astraCardLookup = await getAstraCardLookup();
   const profile = resolveProfile(row.profiles ?? null, row.user_id ?? null);
   const stats = await resolveDeckStatsWithFallback(String(row.id), row.deck_stats ?? null, client);
@@ -554,6 +678,7 @@ export async function getDeckDetailById(
     authorId: profile.authorId ? String(profile.authorId) : null,
     authorXLink: profile.authorXLink ?? null,
     authorYoutubeLink: profile.authorYoutubeLink ?? null,
+    displayCardId: row.display_card_id ?? null,
     entries: buildDeckEntries(row.deck_cards, astraCardLookup),
   };
 }
