@@ -1281,19 +1281,30 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-battlefields {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: 100%;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
   }
 
   .play-game-battlefields > .play-battlefield-panel {
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
+    min-width: 0;
+  }
+
+  .play-battlefield-lane {
+    grid-template-columns: minmax(2.8rem, 0.82fr) 1px minmax(3rem, 1fr) 1px minmax(2.8rem, 0.82fr);
+    gap: 0.35rem;
+    padding: 0.35rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='unit'] {
+    height: 4.8rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='territory'] {
+    height: 4.35rem;
+  }
+
+  .play-battlefield-attachments {
+    top: 3.35rem;
   }
 
   .play-match-workspace {
@@ -1473,14 +1484,27 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-battlefield-panel {
-    min-height: 11.5rem;
+    min-height: 7.5rem;
+    padding: 0.3rem;
     background: color-mix(in srgb, var(--surface) 84%, var(--surface-muted));
   }
 
   .play-battlefield-lane {
-    grid-template-columns: minmax(6.2rem, 0.82fr) 1px minmax(0, 1fr) 1px minmax(6.2rem, 0.82fr);
-    gap: 0.35rem;
-    padding: 0.35rem;
+    grid-template-columns: minmax(1.7rem, 0.82fr) 1px minmax(1.85rem, 1fr) 1px minmax(1.7rem, 0.82fr);
+    gap: 0.2rem;
+    padding: 0.2rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='unit'] {
+    height: 2.9rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='territory'] {
+    height: 2.7rem;
+  }
+
+  .play-battlefield-attachments {
+    top: 2.15rem;
   }
 
   .play-zone-panel {
@@ -1527,7 +1551,7 @@ body.simulator-route-active .app-top-bar {
 
 @media (max-width: 380px) {
   .play-battlefield-lane {
-    grid-template-columns: minmax(5.45rem, 0.82fr) 1px minmax(0, 1fr) 1px minmax(5.45rem, 0.82fr);
+    grid-template-columns: minmax(1.55rem, 0.82fr) 1px minmax(1.65rem, 1fr) 1px minmax(1.55rem, 0.82fr);
   }
 
   .play-player-hand-card,

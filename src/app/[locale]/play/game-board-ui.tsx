@@ -570,7 +570,7 @@ export function BattlefieldPanel({
         : 'border-[color:var(--border)]/75 bg-[color:var(--background)]/35';
     if (!instance) {
       return (
-        <div className={`flex aspect-[5/7] ${sizeClassName} ${slotClassName} items-center justify-center rounded-md border border-dashed px-1 text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]`}>
+        <div data-battlefield-slot-size={size} className={`play-battlefield-card-slot flex aspect-[5/7] ${sizeClassName} ${slotClassName} items-center justify-center rounded-md border border-dashed px-1 text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]`}>
           {label}
         </div>
       );
@@ -583,12 +583,13 @@ export function BattlefieldPanel({
         data-card-instance-id={instance.instanceId}
         data-card-zone={zone}
         data-card-owner={getCardController(instance)}
+        data-battlefield-slot-size={size}
         onClick={() => !disabled && setActiveInstanceId((current) => (current === instance.instanceId ? null : instance.instanceId))}
         onMouseEnter={() => openPreview(instance)}
         onFocus={() => openPreview(instance)}
         onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
         onBlur={() => schedulePreviewClear(instance.instanceId)}
-        className={`relative z-10 aspect-[5/7] ${sizeClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+        className={`play-battlefield-card-slot relative z-10 aspect-[5/7] ${sizeClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
         aria-expanded={isActive}
         aria-haspopup={disabled ? undefined : 'menu'}
         aria-disabled={disabled}
@@ -657,7 +658,7 @@ export function BattlefieldPanel({
         <div className="flex min-h-0 items-center justify-center overflow-visible">
           <div className="relative flex h-full items-center justify-center overflow-visible">
             {unit ? (
-              <div className="absolute left-1/2 top-[5.35rem] z-0 -translate-x-1/2">
+              <div className="play-battlefield-attachments absolute left-1/2 top-[5.35rem] z-0 -translate-x-1/2">
                 <AttachedEquipmentCards
                   cards={getAttachedCards(cards, unit.instanceId)}
                   cardHeight={isFourKViewport ? 166 : 72}
