@@ -1202,11 +1202,6 @@ body.simulator-route-active .app-top-bar {
   z-index: 1;
 }
 
-.play-mobile-sidebar-toggle,
-.play-mobile-sidebar-backdrop {
-  display: none;
-}
-
 @media (orientation: portrait) {
   .play-simulator-workspace {
     overflow-x: hidden;
@@ -1225,23 +1220,62 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-layout {
-    grid-template-columns: minmax(11rem, 0.34fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
   }
 
   .play-game-sidebar {
-    display: flex;
+    display: grid;
     min-height: 0;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(7rem, 1fr);
+    gap: 0.75rem;
     position: sticky;
     top: 4.5rem;
-    align-self: stretch;
-    max-height: min(46rem, calc(100dvh - 9rem));
+    z-index: 60;
+    align-self: auto;
+    max-height: 16rem;
+  }
+
+  .play-game-controls {
+    display: grid;
+    grid-template-columns: minmax(7rem, 0.7fr) minmax(8rem, 0.8fr) minmax(12rem, 1.2fr) minmax(10rem, 1fr);
+    align-items: center;
+    gap: 0.6rem;
+    overflow-x: auto;
+  }
+
+  .play-controls-lobby,
+  .play-controls-turn,
+  .play-controls-scores {
+    margin-bottom: 0;
+  }
+
+  .play-controls-scores {
+    grid-template-columns: repeat(2, minmax(5.5rem, 1fr));
   }
 
   .play-game-log {
-    max-height: none;
-    flex: 1 1 auto;
+    max-height: 8.5rem;
+  }
+
+  .play-game-log > ol {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+  }
+
+  .play-game-log > ol > li {
+    width: min(18rem, 66vw);
+    min-width: min(18rem, 66vw);
+    max-height: 5.25rem;
+    scroll-snap-align: start;
+  }
+
+  .play-game-log > ol > li > ol {
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .play-game-board {
@@ -1334,67 +1368,24 @@ body.simulator-route-active .app-top-bar {
 
   .play-game-layout {
     grid-template-columns: minmax(0, 1fr);
-    align-items: start;
+    align-items: center;
   }
 
   .play-game-sidebar {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    top: 50%;
-    bottom: auto;
-    left: 0;
-    z-index: 70;
-    width: min(11.5rem, 75vw);
-    height: min(46rem, calc(100dvh - 9rem));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(6.5rem, 1fr);
+    position: sticky;
+    top: 4.5rem;
+    z-index: 60;
+    width: 100%;
+    height: auto;
     min-height: 0;
-    padding: 0.35rem;
-    border: 1px solid var(--border);
-    border-left: 0;
-    border-radius: 0 0.75rem 0.75rem 0;
-    background: var(--background);
-    box-shadow: 0.65rem 0 1.5rem rgba(0, 0, 0, 0.35);
-    transform: translate(-100%, -50%);
-    transition: transform 180ms ease;
-  }
-
-  .play-game-sidebar.is-open {
-    transform: translate(0, -50%);
-  }
-
-  .play-mobile-sidebar-toggle {
-    position: absolute;
-    top: 0.75rem;
-    right: -2.5rem;
-    display: flex;
-    width: 2.5rem;
-    min-height: 4.5rem;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 0.2rem;
-    border: 1px solid var(--border);
-    border-left: 0;
-    border-radius: 0 0.65rem 0.65rem 0;
-    background: var(--surface);
-    color: var(--text-primary);
-    font-size: 0.8rem;
-    font-weight: 800;
-    box-shadow: 0.35rem 0.3rem 0.8rem rgba(0, 0, 0, 0.25);
-  }
-
-  .play-mobile-sidebar-score {
-    font-size: 0.62rem;
-    color: var(--text-secondary);
-  }
-
-  .play-mobile-sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 69;
-    display: block;
+    max-height: 14rem;
+    padding: 0;
     border: 0;
-    background: rgba(0, 0, 0, 0.42);
+    background: transparent;
+    box-shadow: none;
   }
 
   .play-game-controls,
@@ -1408,6 +1399,7 @@ body.simulator-route-active .app-top-bar {
     background: var(--surface);
     padding: 0.4rem;
     font-size: 0.7rem;
+    grid-template-columns: 6.5rem 7.5rem 11rem 9rem;
   }
 
   .play-game-controls button {
@@ -1421,9 +1413,8 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-log {
-    max-height: none;
-    min-height: 8rem;
-    flex: 1 1 auto;
+    max-height: 7.5rem;
+    min-height: 0;
     box-shadow: none;
   }
 
