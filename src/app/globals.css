@@ -1203,8 +1203,42 @@ body.simulator-route-active .app-top-bar {
 }
 
 .play-mobile-sidebar-toggle,
-.play-mobile-sidebar-backdrop {
+.play-mobile-sidebar-backdrop,
+.play-mobile-landscape-prompt {
   display: none;
+}
+
+@media (max-width: 767px) and (orientation: portrait) {
+  .play-mobile-landscape-prompt {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    background: color-mix(in srgb, var(--background) 94%, black);
+  }
+
+  .play-mobile-landscape-prompt-card {
+    display: grid;
+    max-width: 20rem;
+    place-items: center;
+    gap: 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+    border-radius: 0.85rem;
+    background: var(--surface);
+    padding: 1.5rem;
+    color: var(--text-primary);
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.4;
+    box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
+  }
+
+  .play-mobile-landscape-prompt-card svg {
+    color: var(--accent);
+  }
 }
 
 @media (orientation: portrait) {

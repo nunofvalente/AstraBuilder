@@ -52,6 +52,7 @@ describe('play localization', () => {
     expect(getPlayLobbyCopy('ja').loadingDecks).toBe('デッキを読み込み中...');
     expect(getPlayLobbyCopy('fr').cardCount(2)).toBe('2 cartes');
     expect(getPlayLobbyCopy('de').cardCountSelected(1)).toBe('1 Karte ausgewählt');
+    expect(getPlayLobbyCopy('en').simulatorUnavailable).toBe('Rotate your phone to landscape to use the simulator.');
   });
 
   it('localizes hand modal card type labels and known card copy', () => {

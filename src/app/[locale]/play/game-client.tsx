@@ -2451,6 +2451,12 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
   return (
     <main className="play-simulator-workspace flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 text-[color:var(--text-primary)] lg:px-6">
+      <div className="play-mobile-landscape-prompt" role="status" aria-live="polite">
+        <div className="play-mobile-landscape-prompt-card">
+          <RotateCcw className="h-8 w-8" aria-hidden="true" />
+          <p>{lobbyCopy.simulatorUnavailable}</p>
+        </div>
+      </div>
       <div className="flex min-h-0 flex-1 flex-col">
         {content}
       </div>
