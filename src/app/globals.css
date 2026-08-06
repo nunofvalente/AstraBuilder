@@ -1254,7 +1254,7 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-opponent-hand {
-    top: max(4.5rem, calc(50% - 31rem));
+    top: max(3.5rem, calc(50% - 32rem));
     bottom: auto;
   }
 
