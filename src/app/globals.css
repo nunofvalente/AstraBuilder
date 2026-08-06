@@ -1234,11 +1234,11 @@ body.simulator-route-active .app-top-bar {
     min-height: 0;
     flex-direction: column;
     position: sticky;
-    top: max(4.5rem, calc(50dvh - 23rem));
+    top: max(4.5rem, calc(50dvh - 25rem));
     align-self: center;
     width: 100%;
-    height: min(46rem, calc(100dvh - 9rem));
-    max-height: min(46rem, calc(100dvh - 9rem));
+    height: min(50rem, calc(100dvh - 9rem));
+    max-height: min(50rem, calc(100dvh - 9rem));
   }
 
   .play-game-log {
@@ -1348,7 +1348,7 @@ body.simulator-route-active .app-top-bar {
     left: 0;
     z-index: 70;
     width: min(11.5rem, 75vw);
-    height: min(46rem, calc(100dvh - 9rem));
+    height: min(50rem, calc(100dvh - 9rem));
     min-height: 0;
     padding: 0.35rem;
     border: 1px solid var(--border);
