@@ -236,6 +236,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [pendingLucilleSacrificeIds, setPendingLucilleSacrificeIds] = useState<string[]>([]);
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
   const [isPassTurnDialogOpen, setIsPassTurnDialogOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [attackArrow, setAttackArrow] = useState<AttackArrowState | null>(null);
   const [hoveredCounterPreviewCards, setHoveredCounterPreviewCards] = useState<GameCardInstance[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
@@ -1721,7 +1722,27 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         {attackArrow ? <AttackArrowOverlay arrow={attackArrow} /> : null}
         <CardZoomPreview cards={hoveredCounterPreviewCards} />
         <div className="play-game-layout grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
-          <div className="play-game-sidebar flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
+          {isMobileSidebarOpen ? (
+            <button
+              type="button"
+              className="play-mobile-sidebar-backdrop"
+              aria-label={playCopy.actionLog}
+              onClick={() => setIsMobileSidebarOpen(false)}
+            />
+          ) : null}
+          <div className={`play-game-sidebar flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0${isMobileSidebarOpen ? ' is-open' : ''}`}>
+            <button
+              type="button"
+              className="play-mobile-sidebar-toggle"
+              aria-label={playCopy.actionLog}
+              aria-expanded={isMobileSidebarOpen}
+              onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
+            >
+              <span aria-hidden="true">{isMobileSidebarOpen ? '<' : '>'}</span>
+              <span className="play-mobile-sidebar-score" aria-hidden="true">
+                {gameState.playerVictoryPoints}-{gameState.opponentVictoryPoints}
+              </span>
+            </button>
             <section className="play-game-controls rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <button type="button" onClick={returnToLobby} className="mb-2 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
                 {controlsCopy.backToLobby}

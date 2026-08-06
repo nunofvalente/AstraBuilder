@@ -1202,6 +1202,11 @@ body.simulator-route-active .app-top-bar {
   z-index: 1;
 }
 
+.play-mobile-sidebar-toggle,
+.play-mobile-sidebar-backdrop {
+  display: none;
+}
+
 @media (orientation: portrait) {
   .play-simulator-workspace {
     overflow-x: hidden;
@@ -1236,7 +1241,19 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-battlefields {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .play-game-battlefields > .play-battlefield-panel {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .play-match-workspace {
@@ -1279,15 +1296,67 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-layout {
-    grid-template-columns: minmax(6.75rem, 0.29fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
   }
 
   .play-game-sidebar {
     display: flex;
     flex-direction: column;
-    position: sticky;
+    position: fixed;
     top: 4.5rem;
+    bottom: 7rem;
+    left: 0;
+    z-index: 70;
+    width: min(11.5rem, 75vw);
+    min-height: 0;
+    padding: 0.35rem;
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 0.75rem 0.75rem 0;
+    background: var(--background);
+    box-shadow: 0.65rem 0 1.5rem rgba(0, 0, 0, 0.35);
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+  }
+
+  .play-game-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .play-mobile-sidebar-toggle {
+    position: absolute;
+    top: 0.75rem;
+    right: -2.5rem;
+    display: flex;
+    width: 2.5rem;
+    min-height: 4.5rem;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.2rem;
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 0.65rem 0.65rem 0;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 800;
+    box-shadow: 0.35rem 0.3rem 0.8rem rgba(0, 0, 0, 0.25);
+  }
+
+  .play-mobile-sidebar-score {
+    font-size: 0.62rem;
+    color: var(--text-secondary);
+  }
+
+  .play-mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 69;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.42);
   }
 
   .play-game-controls,
@@ -1314,9 +1383,9 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-log {
-    max-height: calc(100dvh - 26rem);
+    max-height: none;
     min-height: 8rem;
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     box-shadow: none;
   }
 
@@ -1345,8 +1414,8 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-battlefields {
-    grid-template-columns: minmax(0, 1fr);
     gap: 0.5rem;
+    padding-bottom: 0.25rem;
   }
 
   .play-battlefield-panel {
