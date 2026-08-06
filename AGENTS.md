@@ -89,6 +89,7 @@ Do not add executable rule columns to the database. Card text and card facts rem
 
 ## Git and PRs
 
+- Do not create a commit for every prompt or iteration. Keep related work uncommitted while a feature is being refined, then create one intentional commit only when the user explicitly asks to commit/push or confirms the feature is complete.
 - Stage explicit paths. Do not use `git add -A` when unrelated files are present.
 - Use terse commit messages that describe the implemented behavior.
 - Open draft PRs by default unless asked otherwise.
