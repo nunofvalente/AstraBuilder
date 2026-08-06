@@ -1249,7 +1249,7 @@ body.simulator-route-active .app-top-bar {
   .play-game-board {
     height: min(50rem, calc(100dvh - 12rem));
     min-height: min(50rem, calc(100dvh - 12rem));
-    grid-template-rows: minmax(12rem, 1fr) minmax(12.5rem, 1fr) minmax(12rem, 1fr);
+    grid-template-rows: minmax(12rem, 1fr) 14.875rem minmax(12rem, 1fr);
     align-self: center;
   }
 
