@@ -651,8 +651,8 @@ export function BattlefieldPanel({
 
   function renderTerritoryColumn(label: string, instance: GameCardInstance | null) {
     return (
-      <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] place-items-center gap-0.5">
-        <p className="truncate text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
+      <div aria-label={label} className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] place-items-center gap-0.5">
+        <p className="play-battlefield-territory-label w-full truncate text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
           {label}
         </p>
         {renderSlot(instance, null, 'territory')}
@@ -1058,9 +1058,9 @@ export function CombinedStagingSupplyPanel({
             )}
           </div>
           <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
-          <div className="grid min-h-0 w-[4.5rem] grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center min-[2560px]:w-20">
+          <div className="play-deck-banish-column grid min-h-0 w-[4.5rem] grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center min-[2560px]:w-20">
             <div
-              className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
+              className="play-deck-banish-cell flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
               data-opponent-deck={mirror ? true : undefined}
             >
               <CompactZoneStack
@@ -1075,7 +1075,7 @@ export function CombinedStagingSupplyPanel({
             </div>
             <div className="mx-2 h-px bg-[color:var(--border)]/70" aria-hidden="true" />
             <div
-              className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
+              className="play-deck-banish-cell flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
               data-player-deck={!mirror ? true : undefined}
             >
               <CompactZoneStack

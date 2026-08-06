@@ -1437,6 +1437,27 @@ body.simulator-route-active .app-top-bar {
     transform: translate(0, -50%);
   }
 
+  .play-game-sidebar-body {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .play-game-sidebar-body > .play-game-controls,
+  .play-game-sidebar-body > .play-game-log {
+    flex-shrink: 0;
+  }
+
+  .play-game-sidebar-body > .play-game-log {
+    min-height: 8rem;
+  }
+
   .play-mobile-sidebar-toggle {
     position: absolute;
     top: 0.75rem;
@@ -1716,6 +1737,87 @@ body.simulator-route-active .app-top-bar {
   }
 }
 
+@media (max-width: 767px) and (orientation: portrait) {
+  .play-game-content {
+    padding-block: 4.75rem 6rem;
+  }
+
+  .play-battlefield-territory-label {
+    display: none;
+  }
+
+  .play-game-content .play-player-hand,
+  .play-game-content .play-opponent-hand {
+    right: 0.25rem;
+    left: 0.25rem;
+  }
+
+  .play-opponent-hand {
+    top: 0.25rem;
+  }
+
+  .play-player-hand {
+    bottom: 0.25rem;
+  }
+
+  .play-player-hand-cards,
+  .play-opponent-hand-cards {
+    height: 4.5rem;
+  }
+
+  .play-player-hand-card,
+  .play-player-hand-card > span,
+  .play-opponent-hand-card {
+    width: 3.75rem;
+  }
+
+  .play-player-hand article,
+  .play-opponent-hand article {
+    width: 3.75rem;
+  }
+
+  .play-required-action {
+    bottom: 5.75rem;
+    padding-inline: 0.5rem;
+  }
+
+  .play-required-action > div {
+    max-width: calc(100vw - 1rem);
+    padding: 0.5rem 0.65rem;
+    font-size: 0.7rem;
+    line-height: 1rem;
+  }
+
+  .play-required-action > div > div {
+    margin-top: 0.4rem;
+    gap: 0.35rem;
+  }
+
+  .play-required-action button {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.68rem;
+  }
+
+  .play-deck-banish-column,
+  .play-deck-banish-cell {
+    width: 3.75rem;
+  }
+
+  .play-deck-banish-column .play-compact-zone-stack {
+    padding: 0.125rem;
+  }
+
+  .play-deck-banish-column .play-compact-zone-card {
+    height: 3.25rem;
+  }
+
+  .play-deck-banish-column .play-compact-zone-label {
+    margin-top: 0.125rem;
+    font-size: 7px;
+    letter-spacing: 0;
+  }
+}
+
 @media (max-width: 380px) {
   .play-battlefield-lane {
     grid-template-columns: minmax(1.55rem, 0.82fr) 1px minmax(1.65rem, 1fr) 1px minmax(1.55rem, 0.82fr);
@@ -1724,7 +1826,12 @@ body.simulator-route-active .app-top-bar {
   .play-player-hand-card,
   .play-player-hand-card > span,
   .play-opponent-hand-card {
-    width: 4.5rem;
+    width: 3.5rem;
+  }
+
+  .play-player-hand article,
+  .play-opponent-hand article {
+    width: 3.5rem;
   }
 }
 
