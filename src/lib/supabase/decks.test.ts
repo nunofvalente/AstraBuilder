@@ -99,6 +99,7 @@ describe('deck data helpers', () => {
       authorId: 'owner-1',
       authorXLink: 'https://x.test/owner',
       authorYoutubeLink: null,
+      displayCardId: null,
       entries: [{ card, count: 2 }],
     });
   });

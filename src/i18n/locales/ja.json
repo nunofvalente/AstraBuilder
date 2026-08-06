@@ -4,11 +4,26 @@
     "tagline": { "intro": "デッキ構築サイト：", "highlight": "Echoes of Astra" },
     "sections": {
       "affinityPairings": { "title": "アフィニティ組み合わせ別デッキ", "placeholder": "アフィニティの組み合わせは近日公開予定です。", "deckLabel": "デッキ", "decksLabel": "デッキ", "unknownLabel": "不明な組み合わせ" },
-      "trending": { "title": "トレンドデッキ", "placeholder": "コミュニティで注目されている Echoes of Astra のデッキを確認しましょう。" }
+      "trending": { "title": "人気のデッキ", "placeholder": "コミュニティで注目されている Echoes of Astra のデッキを確認しましょう。" },
+      "topCards": { "title": "人気のカード", "description": "公開コミュニティデッキで最も多く採用されているカードです。", "placeholder": "公開デッキが共有されると人気のカードが表示されます。", "usageLabel": "公開デッキの {percentage}% で使用", "browseAction": "すべてのカードを見る" }
     },
     "actions": { "browse": "すべてのデッキを見る", "create": "デッキを作成" },
     "showcaseActions": { "build": "デッキを構築", "decks": "コミュニティデッキを見る", "catalog": "カードカタログを見る" },
-    "battlefieldBanner": { "title": "戦場へ参加", "description": "保存済みデッキを練習マッチに持ち込み、ボット相手に動きを試しましょう。", "action": "戦場へ移動" }
+    "showcaseIntro": {
+      "eyebrow": "デッキ構築・発見・練習",
+      "title": "デッキを構築し、その可能性を見つけよう。",
+      "description": "自分のペースでデッキを作り、コミュニティのリストから学び、練習マッチで選択を試せます。",
+      "features": {
+        "builder": { "description": "カードを検索・絞り込みながら、リアルタイムでデッキを構築できます。", "action": "構築を始める" },
+        "catalog": { "description": "カードカタログ全体を閲覧し、戦略に必要な情報を確認できます。", "action": "カタログを見る" },
+        "play": { "title": "戦場", "description": "保存したデッキを戦場に持ち込み、ボットまたはオンラインの他プレイヤーと対戦できます。", "action": "対戦を始める" },
+        "decks": { "description": "他のプレイヤーが共有したデッキを研究し、次の構築のヒントを見つけられます。", "action": "デッキを見る" }
+      },
+      "community": "コミュニティに参加",
+      "discordAction": "Discord に参加"
+    },
+    "battlefieldBanner": { "title": "戦場へ参加", "description": "保存済みデッキを練習マッチに持ち込み、ボット相手に動きを試しましょう。", "action": "戦場へ移動" },
+    "footer": { "disclaimer": "AstraBuilder は Echoes of Astra のための非公式ファンメイドデッキ構築ツールです。", "copyright": "(c) 2026 AstraBuilder." }
   },
   "affinityPage": { "resultsHeading": "{pairing}を使用するデッキ", "empty": "このアフィニティの組み合わせに一致するデッキはまだありません。", "backLink": "デッキ一覧に戻る" },
   "builder": {
@@ -142,7 +157,24 @@
     "favoriteAdd": "お気に入りに追加",
     "favoriteRemove": "お気に入りから削除",
     "favoriteSignIn": "お気に入りに追加するにはログインしてください。",
-    "favoriteError": "お気に入りを更新できませんでした。再試行してください。"
+    "favoriteError": "お気に入りを更新できませんでした。再試行してください。",
+    "analysisHeading": "デッキ分析",
+    "uniqueCardsLabel": "カード種類",
+    "averageCostLabel": "平均コスト",
+    "costCurveHeading": "コストカーブ",
+    "compositionHeading": "構成",
+    "costLabel": "コスト",
+    "affinityUnitsHeading": "属性別ユニット数",
+    "unitStatsHeading": "ユニット平均値",
+    "attackLabel": "攻撃力",
+    "healthLabel": "体力",
+    "influenceLabel": "影響力",
+    "cardMenuViewDetails": "カード詳細を見る",
+    "cardMenuSetDisplay": "デッキ表示カードに設定",
+    "cardMenuDisplaySelected": "現在の表示カード",
+    "cardMenuUseAutomatic": "自動表示カードを使用",
+    "cardMenuSaving": "保存中...",
+    "cardMenuError": "表示カードを更新できませんでした。"
   },
   "deckFeed": {
     "heading": "コミュニティデッキ",
@@ -172,6 +204,15 @@
     "empty": "カードがありません。Supabase にカードを追加するとここに表示されます。",
     "error": "カードの読み込みに失敗しました。",
     "fields": { "type": "タイプ", "subtype": "サブタイプ", "cost": "コスト", "attack": "攻撃力", "health": "体力", "influence": "影響力" }
+  },
+  "cardDetails": {
+    "backToPreviousPage": "前のページに戻る",
+    "affinity": "アフィニティ",
+    "rarity": "レアリティ",
+    "artist": "アーティスト",
+    "cardNumber": "カード番号",
+    "rulesText": "カードテキスト",
+    "cardStory": "カードストーリー"
   },
   "auth": {
     "signUp": {
@@ -259,9 +300,12 @@
     "accountFallback": "アカウント",
     "profile": "プロフィール",
     "myDecks": "マイデッキ",
+    "myCollection": "マイコレクション",
     "builder": "ビルダー",
-    "play": "戦場",
+    "play": "プレイ",
+    "beta": "ベータ",
     "decks": "デッキ",
+    "communityDecks": "コミュニティデッキ",
     "collection": "カタログ",
     "settings": "設定",
     "signOut": "ログアウト",

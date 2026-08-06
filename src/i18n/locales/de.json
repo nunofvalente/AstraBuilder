@@ -14,8 +14,15 @@
         "unknownLabel": "Unbekannte Kombination"
       },
       "trending": {
-        "title": "Trendende Decks",
+        "title": "Top-Decks",
         "placeholder": "Trendende Decks erscheinen bald hier."
+      },
+      "topCards": {
+        "title": "Top-Karten",
+        "description": "Die Karten, die in den meisten oeffentlichen Community-Decks vorkommen.",
+        "placeholder": "Top-Karten erscheinen, sobald oeffentliche Decks geteilt werden.",
+        "usageLabel": "In {percentage}% der oeffentlichen Decks",
+        "browseAction": "Alle Karten ansehen"
       }
     },
     "actions": {
@@ -27,10 +34,27 @@
       "decks": "Community-Decks ansehen",
       "catalog": "Katalog durchsuchen"
     },
+    "showcaseIntro": {
+      "eyebrow": "Deckbau, Entdeckung und Training",
+      "title": "Baue dein Deck. Entdecke, was es kann.",
+      "description": "Entwickle dein Deck in deinem Tempo, lerne von der Community und teste deine Entscheidungen in einem Trainingsspiel.",
+      "features": {
+        "builder": { "description": "Suche und filtere Karten und stelle dein Deck zusammen, waehrend sich deine Liste sofort aktualisiert.", "action": "Deck erstellen" },
+        "catalog": { "description": "Durchsuche den Kartenkatalog und finde die richtigen Werkzeuge fuer deine Strategie.", "action": "Katalog ansehen" },
+        "play": { "title": "Schlachtfeld", "description": "Bring ein gespeichertes Deck aufs Schlachtfeld und spiele gegen einen Bot oder fordere online einen anderen Spieler heraus.", "action": "Spiel starten" },
+        "decks": { "description": "Sieh dir Decks anderer Spieler an und entdecke neue Ideen fuer dein naechstes Deck.", "action": "Decks entdecken" }
+      },
+      "community": "Werde Teil der Community",
+      "discordAction": "Auf Discord beitreten"
+    },
     "battlefieldBanner": {
       "title": "Betritt das Schlachtfeld",
       "description": "Fuehre dein gespeichertes Deck in ein Trainingsspiel und teste deine Zuege gegen einen Bot.",
       "action": "Zum Schlachtfeld"
+    },
+    "footer": {
+      "disclaimer": "AstraBuilder ist ein inoffizieller, von Fans entwickelter Deckbau-Begleiter fuer Echoes of Astra.",
+      "copyright": "(c) 2026 AstraBuilder."
     }
   },
   "affinityPage": {
@@ -172,7 +196,24 @@
     "favoriteAdd": "Zu Favoriten hinzufügen",
     "favoriteRemove": "Aus Favoriten entfernen",
     "favoriteSignIn": "Melde dich an, um Decks zu favorisieren.",
-    "favoriteError": "Deine Favoriten konnten nicht aktualisiert werden. Bitte versuche es erneut."
+    "favoriteError": "Deine Favoriten konnten nicht aktualisiert werden. Bitte versuche es erneut.",
+    "analysisHeading": "Deckanalyse",
+    "uniqueCardsLabel": "Einzelne Karten",
+    "averageCostLabel": "Durchschn. Kosten",
+    "costCurveHeading": "Kostenkurve",
+    "compositionHeading": "Zusammensetzung",
+    "costLabel": "Kosten",
+    "affinityUnitsHeading": "Einheiten nach Affinität",
+    "unitStatsHeading": "Durchschnittliche Einheitenwerte",
+    "attackLabel": "Angriff",
+    "healthLabel": "Gesundheit",
+    "influenceLabel": "Einfluss",
+    "cardMenuViewDetails": "Kartendetails anzeigen",
+    "cardMenuSetDisplay": "Als Deck-Anzeigekarte verwenden",
+    "cardMenuDisplaySelected": "Aktuelle Anzeigekarte",
+    "cardMenuUseAutomatic": "Automatische Anzeigekarte verwenden",
+    "cardMenuSaving": "Wird gespeichert...",
+    "cardMenuError": "Die Anzeigekarte konnte nicht aktualisiert werden."
   },
   "deckFeed": {
     "heading": "Community-Decks",
@@ -213,6 +254,15 @@
       "health": "Gesundheit",
       "influence": "Einfluss"
     }
+  },
+  "cardDetails": {
+    "backToPreviousPage": "Zurueck zur vorherigen Seite",
+    "affinity": "Affinitaet",
+    "rarity": "Seltenheit",
+    "artist": "Kuenstler",
+    "cardNumber": "Kartennummer",
+    "rulesText": "Kartentext",
+    "cardStory": "Kartengeschichte"
   },
   "auth": {
     "signUp": {
@@ -367,9 +417,12 @@
     "accountFallback": "Konto",
     "profile": "Profil",
     "myDecks": "Meine Decks",
+    "myCollection": "Meine Sammlung",
     "builder": "Deck-Builder",
-    "play": "Schlachtfeld",
+    "play": "Spielen",
+    "beta": "Beta",
     "decks": "Decks",
+    "communityDecks": "Community-Decks",
     "collection": "Katalog",
     "settings": "Einstellungen",
     "signOut": "Abmelden",
