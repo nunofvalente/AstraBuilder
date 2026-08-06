@@ -501,14 +501,14 @@ function getReadyBotAttackers(state: GameState): GameCardInstance[] {
   ].filter((instance) => instance.ready && isUnitCard(instance.card));
 }
 
-function getFollowUpAttackSetupBonus(
+function getCoordinatedAttackSetupBonus(
   state: GameState,
   setupAttacker: GameCardInstance,
   defender: GameCardInstance,
   targetZone: ZoneId,
   defenderDamageTaken: number
 ): number {
-  if (!defender.ready || defenderDamageTaken <= 0) {
+  if (defenderDamageTaken <= 0) {
     return 0;
   }
 
@@ -522,20 +522,29 @@ function getFollowUpAttackSetupBonus(
     return 0;
   }
 
-  const followUpAttacker = getReadyBotAttackers(state)
+  const followUpAttackers = getReadyBotAttackers(state)
     .filter((instance) => instance.instanceId !== setupAttacker.instanceId)
     .filter((instance) => !getBattlefieldAttackError(state, 'opponent', instance.instanceId, targetZone))
-    .find((instance) =>
-      damagedDefender.damage + getCurrentUnitAttack(state, instance, targetZone) >= defenderHealth
-    );
+    .map((instance) => getCurrentUnitAttack(state, instance, targetZone))
+    .filter((attack) => attack > 0)
+    .sort((left, right) => right - left);
+  const remainingDamage = defenderHealth - damagedDefender.damage;
+  let combinedDamage = 0;
+  let requiredFollowUps = 0;
 
-  if (!followUpAttacker) {
+  for (const attack of followUpAttackers) {
+    combinedDamage += attack;
+    requiredFollowUps += 1;
+    if (combinedDamage >= remainingDamage) break;
+  }
+
+  if (combinedDamage < remainingDamage) {
     return 0;
   }
 
   const defenderScoreValue = Math.max(1, getUnitScoreValue(state, defender));
 
-  return 42 + defenderScoreValue * 5 + Math.floor(getCardPlayValue(defender) / 3);
+  return 42 + defenderScoreValue * 5 + Math.floor(getCardPlayValue(defender) / 3) - (requiredFollowUps - 1) * 6;
 }
 
 function willReadyOnDefend(state: GameState, defender: GameCardInstance, targetZone: ZoneId): boolean {
@@ -604,7 +613,7 @@ function getAttackChoiceScore(state: GameState, attacker: GameCardInstance, targ
     (attackerSurvives ? 22 + attackerScoreValue * 4 : tradesUp ? -4 : -28) +
     Math.floor(getCardPlayValue(defender) / 2) -
     (attackerSurvives ? 0 : Math.floor(getCardPlayValue(attacker) / 2)) +
-    getFollowUpAttackSetupBonus(state, attacker, defender, targetZone, attackerAttack) +
+    getCoordinatedAttackSetupBonus(state, attacker, defender, targetZone, attackerAttack) +
     getVictoryPressureBonus(state, targetZone, botScoringUnitAfterAttack, playerScoringUnitAfterAttack)
   );
 }
