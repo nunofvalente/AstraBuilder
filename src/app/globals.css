@@ -1237,8 +1237,8 @@ body.simulator-route-active .app-top-bar {
     top: auto;
     align-self: center;
     width: 100%;
-    height: min(50rem, calc(100dvh - 9rem));
-    max-height: min(50rem, calc(100dvh - 9rem));
+    height: calc(100dvh - 9rem);
+    max-height: none;
   }
 
   .play-game-log {
@@ -1247,8 +1247,9 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-board {
-    min-height: 46rem;
-    grid-template-rows: minmax(11.75rem, auto) minmax(12rem, auto) minmax(11.75rem, auto);
+    height: min(50rem, calc(100dvh - 12rem));
+    min-height: min(50rem, calc(100dvh - 12rem));
+    grid-template-rows: minmax(12rem, 1fr) minmax(12.5rem, 1fr) minmax(12rem, 1fr);
     align-self: center;
   }
 
