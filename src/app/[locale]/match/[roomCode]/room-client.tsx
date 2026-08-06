@@ -401,7 +401,6 @@ export function RoomClient({ locale, roomCode }: { locale: Locale; roomCode: str
         {attackArrow ? <AttackArrowOverlay arrow={attackArrow} /> : null}
         {opponentDisconnected ? <div className="fixed left-1/2 top-3 z-[90] -translate-x-1/2 rounded-md border border-amber-400/50 bg-amber-950/95 px-4 py-2 text-sm font-bold text-amber-100 shadow-xl">{copy.opponentDisconnected}</div> : null}
         {error ? <button type="button" onClick={() => setError(null)} className="fixed left-1/2 top-14 z-[91] max-w-xl -translate-x-1/2 rounded-md border border-red-400/50 bg-red-950/95 px-4 py-2 text-sm font-bold text-red-100 shadow-xl">{error}</button> : null}
-        <OpponentHandStrip cards={gameState.opponentZones.hand} locale={locale} />
         <section className="play-match-mobile-controls mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-2 xl:hidden">
           <div className="min-w-0">
             <p className="truncate text-xs font-black text-[color:var(--text-primary)]">
@@ -533,15 +532,20 @@ export function RoomClient({ locale, roomCode }: { locale: Locale; roomCode: str
               </div>
             </div>
           ) : null}
-          <CombinedStagingSupplyPanel stagingCards={gameState.opponentZones.staging} supplyCards={gameState.opponentZones.supply} graveyardCards={gameState.opponentZones.graveyard} banishCards={gameState.opponentZones.banish} deckCards={gameState.opponentZones.deck} temporarySupplyCount={gameState.opponentTemporarySupply} mirror disabled locale={locale} />
+          <div className="play-owner-zone play-opponent-zone relative min-h-0">
+            <CombinedStagingSupplyPanel stagingCards={gameState.opponentZones.staging} supplyCards={gameState.opponentZones.supply} graveyardCards={gameState.opponentZones.graveyard} banishCards={gameState.opponentZones.banish} deckCards={gameState.opponentZones.deck} temporarySupplyCount={gameState.opponentTemporarySupply} mirror disabled locale={locale} />
+            <OpponentHandStrip cards={gameState.opponentZones.hand} locale={locale} />
+          </div>
           <div className="play-game-battlefields grid min-h-0 gap-2 md:grid-cols-3">
             <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />
             <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />
             <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />
           </div>
-          <CombinedStagingSupplyPanel stagingCards={gameState.zones.staging} supplyCards={gameState.zones.supply} graveyardCards={gameState.zones.graveyard} banishCards={gameState.zones.banish} deckCards={gameState.zones.deck} temporarySupplyCount={gameState.playerTemporarySupply} canInspectSupplyCards onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />
+          <div className="play-owner-zone play-player-zone relative min-h-0">
+            <CombinedStagingSupplyPanel stagingCards={gameState.zones.staging} supplyCards={gameState.zones.supply} graveyardCards={gameState.zones.graveyard} banishCards={gameState.zones.banish} deckCards={gameState.zones.deck} temporarySupplyCount={gameState.playerTemporarySupply} canInspectSupplyCards onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />
+            <HandStrip cards={gameState.zones.hand} gameState={gameState} onMove={canChooseSupply ? setupMove : boardMove} disabled={isSetup ? !canChooseSupply : !canTakeTurnActions} canSupplyFromHand={canChooseSupply || (canTakeTurnActions && canManuallySupplyFromHand(gameState, 'player'))} canPlayFromHand={canTakeTurnActions} friendlyUnitsInPlay={getFriendlyUnitsInPlay(gameState, 'player')} graveyardCards={gameState.zones.graveyard} readySupplyCount={getReadySupplyCount(gameState, 'player')} stagingUnits={getStagingUnitCards(gameState.zones.staging, 'player')} demonicAdvanceActive={gameState.playerDemonicAdvanceActive} battlefieldCardsByZone={battlefieldCardsByZone} locale={locale} />
+          </div>
         </div>
-        <HandStrip cards={gameState.zones.hand} gameState={gameState} onMove={canChooseSupply ? setupMove : boardMove} disabled={isSetup ? !canChooseSupply : !canTakeTurnActions} canSupplyFromHand={canChooseSupply || (canTakeTurnActions && canManuallySupplyFromHand(gameState, 'player'))} canPlayFromHand={canTakeTurnActions} friendlyUnitsInPlay={getFriendlyUnitsInPlay(gameState, 'player')} graveyardCards={gameState.zones.graveyard} readySupplyCount={getReadySupplyCount(gameState, 'player')} stagingUnits={getStagingUnitCards(gameState.zones.staging, 'player')} demonicAdvanceActive={gameState.playerDemonicAdvanceActive} battlefieldCardsByZone={battlefieldCardsByZone} locale={locale} />
         {isConcedeDialogOpen ? (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4" role="presentation">
             <div role="dialog" aria-modal="true" aria-labelledby="multiplayer-concede-title" className="w-full max-w-md rounded-lg border border-red-500/45 bg-[color:var(--surface)] p-5 shadow-2xl">

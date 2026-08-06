@@ -1218,9 +1218,15 @@ body.simulator-route-active .app-top-bar {
     min-height: auto;
   }
 
+  .play-game-content {
+    min-height: calc(100dvh - 8rem);
+    justify-content: center;
+    padding-block: 4.5rem;
+  }
+
   .play-game-layout {
     grid-template-columns: minmax(11rem, 0.34fr) minmax(0, 1fr);
-    align-items: start;
+    align-items: center;
   }
 
   .play-game-sidebar {
@@ -1229,15 +1235,47 @@ body.simulator-route-active .app-top-bar {
     flex-direction: column;
     position: sticky;
     top: 4.5rem;
+    align-self: stretch;
+    max-height: min(46rem, calc(100dvh - 9rem));
   }
 
   .play-game-log {
-    max-height: 24rem;
+    max-height: none;
+    flex: 1 1 auto;
   }
 
   .play-game-board {
     min-height: 46rem;
     grid-template-rows: minmax(11.75rem, auto) minmax(12rem, auto) minmax(11.75rem, auto);
+    align-self: center;
+  }
+
+  .play-owner-zone {
+    display: grid;
+    min-height: 0;
+  }
+
+  .play-owner-zone > .play-zone-panel {
+    min-height: 0;
+  }
+
+  .play-owner-zone > .play-opponent-hand,
+  .play-owner-zone > .play-player-hand {
+    position: absolute;
+    right: 0;
+    left: 0;
+  }
+
+  .play-owner-zone > .play-opponent-hand {
+    top: -1.25rem;
+  }
+
+  .play-owner-zone > .play-player-hand {
+    bottom: -1.25rem;
+  }
+
+  .play-match-workspace > .play-game-board {
+    margin-block: auto;
   }
 
   .play-game-battlefields {
@@ -1293,6 +1331,11 @@ body.simulator-route-active .app-top-bar {
   .play-game-layout,
   .play-game-sidebar {
     gap: 0.5rem;
+  }
+
+  .play-game-content {
+    min-height: calc(100dvh - 9rem);
+    padding-block: 3.5rem;
   }
 
   .play-game-layout {
