@@ -1242,7 +1242,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             </div>
             <div className="relative flex flex-col gap-4 p-4 sm:p-5">
               <div
-                className="relative flex flex-col gap-3 overflow-hidden border border-white/15 px-5 py-3.5 shadow-inner shadow-white/5 sm:flex-row sm:items-center sm:justify-between"
+                className="relative flex flex-col gap-3 border border-white/15 px-5 py-3.5 shadow-inner shadow-white/5 sm:flex-row sm:items-center sm:justify-between"
                 style={{ background: selectedDeckBannerBackground }}
               >
                 <span className="absolute inset-y-0 left-0 w-1 bg-[color:var(--accent)]" aria-hidden="true" />
