@@ -1225,7 +1225,7 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-game-layout {
-    grid-template-columns: minmax(10rem, 0.29fr) minmax(0, 1fr);
+    grid-template-columns: 10rem minmax(0, 1fr);
     align-items: center;
   }
 
@@ -1253,13 +1253,19 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-opponent-hand {
-    top: max(4.5rem, calc(50% - 28.75rem));
+    top: max(4.5rem, calc(50% - 31rem));
     bottom: auto;
   }
 
   .play-player-hand {
     top: auto;
-    bottom: max(7rem, calc(50% - 28.75rem));
+    bottom: max(7rem, calc(50% - 31rem));
+  }
+
+  .play-game-content .play-opponent-hand,
+  .play-game-content .play-player-hand {
+    right: 1rem;
+    left: 11.75rem;
   }
 
   .play-opponent-hand-card {
@@ -1296,6 +1302,14 @@ body.simulator-route-active .app-top-bar {
     overflow-x: hidden;
     overflow-y: auto;
     padding-bottom: 8rem;
+  }
+}
+
+@media (min-width: 1024px) and (orientation: portrait) {
+  .play-game-content .play-opponent-hand,
+  .play-game-content .play-player-hand {
+    right: 1.5rem;
+    left: 12.25rem;
   }
 }
 
@@ -1484,6 +1498,8 @@ body.simulator-route-active .app-top-bar {
 
   .play-player-hand,
   .play-opponent-hand {
+    right: 0.5rem;
+    left: 0.5rem;
     padding-inline: 0.25rem;
   }
 
