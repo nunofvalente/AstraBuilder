@@ -397,11 +397,35 @@ export function RoomClient({ locale, roomCode }: { locale: Locale; roomCode: str
     const opponentDisconnected = !isFinished && Boolean(opponentLastSeen && Date.now() - new Date(opponentLastSeen).getTime() > 20_000);
 
     return (
-      <main className="relative flex h-dvh min-h-[42rem] flex-1 overflow-hidden bg-[color:var(--background)] px-3 py-3 xl:pl-[14rem] xl:pr-4">
+      <main className="play-match-workspace relative flex h-dvh min-h-[42rem] flex-1 flex-col overflow-hidden bg-[color:var(--background)] px-3 py-3 xl:flex-row xl:pl-[14rem] xl:pr-4">
         {attackArrow ? <AttackArrowOverlay arrow={attackArrow} /> : null}
         {opponentDisconnected ? <div className="fixed left-1/2 top-3 z-[90] -translate-x-1/2 rounded-md border border-amber-400/50 bg-amber-950/95 px-4 py-2 text-sm font-bold text-amber-100 shadow-xl">{copy.opponentDisconnected}</div> : null}
         {error ? <button type="button" onClick={() => setError(null)} className="fixed left-1/2 top-14 z-[91] max-w-xl -translate-x-1/2 rounded-md border border-red-400/50 bg-red-950/95 px-4 py-2 text-sm font-bold text-red-100 shadow-xl">{error}</button> : null}
         <OpponentHandStrip cards={gameState.opponentZones.hand} locale={locale} />
+        <section className="play-match-mobile-controls mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-2 xl:hidden">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-black text-[color:var(--text-primary)]">
+              {isYourTurn ? controlsCopy.yourTurn : controlsCopy.botTurn}
+            </p>
+            <p className="mt-0.5 text-[0.65rem] font-bold text-[color:var(--text-secondary)]">
+              {controlsCopy.you} {gameState.playerVictoryPoints} · {controlsCopy.bot} {gameState.opponentVictoryPoints}
+            </p>
+          </div>
+          {!isSetup && !isFinished ? (
+            <>
+              <button type="button" disabled={isMatchActionPending} onClick={() => setIsConcedeDialogOpen(true)} className="rounded-md border border-red-500/45 bg-red-500/10 px-2.5 py-2 text-xs font-bold text-red-200 disabled:opacity-45">
+                {controlsCopy.concede}
+              </button>
+              <button type="button" disabled={!isYourTurn || isMatchActionPending} onClick={() => void submitMatchAction('passTurn')} className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2.5 py-2 text-xs font-bold disabled:opacity-45">
+                {controlsCopy.passTurn}
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setIsConcedeDialogOpen(true)} className="col-span-2 rounded-md border border-[color:var(--border)] px-2.5 py-2 text-xs font-bold">
+              {controlsCopy.backToLobby}
+            </button>
+          )}
+        </section>
         <aside className="fixed bottom-0 left-0 top-0 z-30 hidden w-[13.5rem] flex-col gap-3 border-r border-[color:var(--border)] bg-[color:var(--surface)] p-3 xl:flex">
           <section className="rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2">
             <p className="truncate text-xs font-bold uppercase tracking-wide text-red-200">{match.players.opponent}</p>
@@ -433,7 +457,7 @@ export function RoomClient({ locale, roomCode }: { locale: Locale; roomCode: str
             <button type="button" onClick={() => setIsConcedeDialogOpen(true)} className="rounded-md border border-[color:var(--border)] px-3 py-2 text-center text-sm font-bold">{controlsCopy.backToLobby}</button>
           ) : null}
         </aside>
-        <div className="grid min-h-[42rem] w-full grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
+        <div className="play-game-board grid min-h-[42rem] w-full grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0">
           {isSetup ? (
             <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center px-4">
               <div className="pointer-events-auto w-full max-w-xl rounded-xl border border-[color:var(--accent)]/55 bg-[color:var(--surface)]/95 p-5 text-center shadow-2xl backdrop-blur">
@@ -510,7 +534,7 @@ export function RoomClient({ locale, roomCode }: { locale: Locale; roomCode: str
             </div>
           ) : null}
           <CombinedStagingSupplyPanel stagingCards={gameState.opponentZones.staging} supplyCards={gameState.opponentZones.supply} graveyardCards={gameState.opponentZones.graveyard} banishCards={gameState.opponentZones.banish} deckCards={gameState.opponentZones.deck} temporarySupplyCount={gameState.opponentTemporarySupply} mirror disabled locale={locale} />
-          <div className="grid min-h-0 gap-2 md:grid-cols-3">
+          <div className="play-game-battlefields grid min-h-0 gap-2 md:grid-cols-3">
             <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />
             <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />
             <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={boardMove} onAttack={attackBattlefield} onActivate={requestAbility} battlefieldCardsByZone={battlefieldCardsByZone} disabled={!canTakeTurnActions} locale={locale} />

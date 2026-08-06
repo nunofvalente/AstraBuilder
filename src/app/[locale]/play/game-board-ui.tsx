@@ -628,7 +628,7 @@ export function BattlefieldPanel({
   }
 
   return (
-    <section className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]" data-battlefield-zone={zone}>
+    <section className="play-battlefield-panel relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]" data-battlefield-zone={zone}>
       <CardZoomPreview
         cards={previewCards}
         interactive
@@ -651,7 +651,7 @@ export function BattlefieldPanel({
           </>
         ) : null}
       </p>
-      <div className="grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
+      <div className="play-battlefield-lane grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
         {renderTerritoryColumn(copy.yourTerritory, playerTerritory)}
         <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
         <div className="flex min-h-0 items-center justify-center overflow-visible">
@@ -866,7 +866,7 @@ export function CombinedStagingSupplyPanel({
   }
 
   return (
-    <section className={`relative grid min-h-0 overflow-hidden rounded-lg border bg-[color:var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${panelToneClassName}`}>
+    <section className={`play-zone-panel relative grid min-h-0 overflow-hidden rounded-lg border bg-[color:var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${panelToneClassName}`}>
       <CardZoomPreview
         cards={previewCards}
         interactive
@@ -877,7 +877,7 @@ export function CombinedStagingSupplyPanel({
           setPreviewCards(null);
         }}
       />
-      <div className={`grid min-h-0 ${rowsClassName} gap-3`}>
+      <div className={`play-zone-panel-rows grid min-h-0 ${rowsClassName} gap-3`}>
         <div className={`grid min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] rounded-md border ${stagingToneClassName} ${mirror ? 'order-2' : 'order-1'}`}>
           <div className="deck-builder-scroll flex min-h-0 items-center gap-3 overflow-x-auto overflow-y-hidden px-3 py-1.5">
             {visibleStagingCards.length === 0 ? (
@@ -1397,7 +1397,7 @@ export function HandStrip({
   }
 
   return (
-    <section className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pt-2 xl:left-[13.5rem] xl:right-4">
+    <section className="play-player-hand pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pt-2 xl:left-[13.5rem] xl:right-4">
       {activeInstance ? (
         <div ref={handMenuRef} className="pointer-events-auto absolute bottom-[5.75rem] left-1/2 z-50 w-[min(94vw,32rem)] -translate-x-1/2 overflow-hidden rounded-xl border-2 border-[color:var(--accent)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
           <button
@@ -1454,7 +1454,7 @@ export function HandStrip({
           {copy.emptyHand}
         </p>
       ) : (
-        <div ref={openingDeal.containerRef} className="mx-auto flex h-28 max-w-4xl items-end justify-center overflow-visible px-2 pb-0">
+        <div ref={openingDeal.containerRef} className="play-player-hand-cards mx-auto flex h-28 max-w-4xl items-end justify-center overflow-visible px-2 pb-0">
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
@@ -1484,7 +1484,7 @@ export function HandStrip({
                 onFocus={() => setPreviewCard(instance.card)}
                 onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
                 onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-                className="pointer-events-auto group flex w-28 origin-bottom translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] transform-gpu rounded-md transition-transform duration-200 hover:translate-y-6 hover:rotate-0 hover:scale-110 focus:outline-none focus-visible:translate-y-6 focus-visible:rotate-0 focus-visible:scale-110"
+                className="play-player-hand-card pointer-events-auto group flex w-28 origin-bottom translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] transform-gpu rounded-md transition-transform duration-200 hover:translate-y-6 hover:rotate-0 hover:scale-110 focus:outline-none focus-visible:translate-y-6 focus-visible:rotate-0 focus-visible:scale-110"
                 style={handCardStyle}
                 aria-expanded={activeCardId === instance.instanceId}
                 aria-haspopup={disabled ? undefined : 'menu'}

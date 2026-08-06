@@ -68,7 +68,8 @@ describe('HandStrip', () => {
       />,
     );
 
-    expect(container.querySelector('section')).toHaveClass('pointer-events-none');
+    expect(container.querySelector('section')).toHaveClass('pointer-events-none', 'play-player-hand');
+    expect(container.querySelector('[data-card-instance-id="hand-card"]')).toHaveClass('play-player-hand-card');
     expect(container.querySelector('button')).toHaveClass('pointer-events-auto');
     expect(container.querySelector('[data-card-instance-id="hand-card"]')).toHaveAttribute('data-card-zone', 'hand');
   });
@@ -138,6 +139,8 @@ describe('CombinedStagingSupplyPanel', () => {
       />,
     );
 
+    expect(container.querySelector('section')).toHaveClass('play-zone-panel');
+    expect(container.querySelector('.play-zone-panel-rows')).toBeInTheDocument();
     expect(container.querySelector('[data-card-instance-id="staging-card"]')).toHaveAttribute('data-card-zone', 'staging');
     expect(container.querySelector('[data-card-instance-id="staging-card"]')).toHaveAttribute('data-card-owner', 'player');
     expect(container.querySelector('[data-card-instance-id="supply-card"]')).toHaveAttribute('data-card-zone', 'supply');
@@ -193,7 +196,7 @@ describe('CombinedStagingSupplyPanel', () => {
       temporaryInfluenceBonus: 1,
     };
 
-    render(
+    const { container } = render(
       <CombinedStagingSupplyPanel
         stagingCards={[buffedUnit]}
         supplyCards={[]}
@@ -634,7 +637,7 @@ describe('BattlefieldPanel', () => {
       ready: true,
       card: createTestCard({ id: 'flanker', name: 'Flanker', type: 'Unit', rulesText: 'Flanking' }),
     };
-    render(
+    const { container } = render(
       <BattlefieldPanel
         zone="battlefieldLeft"
         cards={[flanker]}
@@ -648,6 +651,8 @@ describe('BattlefieldPanel', () => {
       />,
     );
 
+    expect(container.querySelector('section')).toHaveClass('play-battlefield-panel');
+    expect(container.querySelector('.play-battlefield-lane')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /open flanker actions/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /flank battlefield 2/i }));
     expect(onAttack).toHaveBeenCalledWith(flanker.instanceId, 'battlefieldCenter');

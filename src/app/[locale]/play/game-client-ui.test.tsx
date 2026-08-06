@@ -57,6 +57,8 @@ describe('OpponentHandStrip', () => {
     const { container } = render(<OpponentHandStrip cards={[makeInstance()]} />);
     const image = container.querySelector('img');
 
+    expect(container.querySelector('section')).toHaveClass('play-opponent-hand');
+    expect(container.querySelector('[data-card-owner="opponent"]')).toHaveClass('play-opponent-hand-card');
     expect(image).toHaveAttribute('src', expect.stringContaining(encodeURIComponent(CARD_BACK_IMAGE_SRC)));
     expect(image).not.toHaveAttribute('src', expect.stringContaining('opponent-card.webp'));
   });

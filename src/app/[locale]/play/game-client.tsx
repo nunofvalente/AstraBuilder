@@ -1717,12 +1717,12 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     };
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="play-game-content flex min-h-0 flex-1 flex-col gap-4">
         {attackArrow ? <AttackArrowOverlay arrow={attackArrow} /> : null}
         <CardZoomPreview cards={hoveredCounterPreviewCards} />
-        <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
-          <div className="flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
-            <section className="rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <div className="play-game-layout grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
+          <div className="play-game-sidebar flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
+            <section className="play-game-controls rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <button type="button" onClick={returnToLobby} className="mb-2 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
                 {controlsCopy.backToLobby}
               </button>
@@ -1753,7 +1753,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </button>
               </div>
             </section>
-            <aside className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            <aside className="play-game-log flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <header className="border-b border-[color:var(--border)] px-4 py-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide">{playCopy.actionLog}</h2>
               </header>
@@ -1762,7 +1762,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               </ol>
             </aside>
           </div>
-          <div className="relative grid min-h-[42rem] grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0 min-[2560px]:grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)]">
+          <div className="play-game-board relative grid min-h-[42rem] grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0 min-[2560px]:grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)]">
             {pendingCombat && !pendingCounterTargetSource ? (
               <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/45 px-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">
@@ -1889,7 +1889,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               }}
               locale={locale}
             />
-            <div className="grid min-h-0 gap-2 md:grid-cols-3">
+            <div className="play-game-battlefields grid min-h-0 gap-2 md:grid-cols-3">
               <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
               <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
               <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
@@ -2432,12 +2432,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
   return (
     <main className="play-simulator-workspace flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 text-[color:var(--text-primary)] lg:px-6">
-      <section className="flex min-h-[60vh] flex-1 items-center justify-center lg:landscape:hidden">
-        <p className="max-w-md text-center text-base font-semibold text-[color:var(--text-secondary)]">
-          {lobbyCopy.simulatorUnavailable}
-        </p>
-      </section>
-      <div className="hidden min-h-0 flex-1 flex-col lg:landscape:flex">
+      <div className="flex min-h-0 flex-1 flex-col">
         {content}
       </div>
     </main>

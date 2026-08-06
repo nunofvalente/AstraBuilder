@@ -260,13 +260,13 @@ export function OpponentHandStrip({
   });
 
   return (
-    <section className="pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pb-2 xl:left-[13.5rem] xl:right-4">
+    <section className="play-opponent-hand pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pb-2 xl:left-[13.5rem] xl:right-4">
       {cards.length === 0 ? (
         <p className="mx-auto max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
           {copy.opponentHand}
         </p>
       ) : (
-        <div ref={openingDeal.containerRef} className="mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
+        <div ref={openingDeal.containerRef} className="play-opponent-hand-cards mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
@@ -290,7 +290,7 @@ export function OpponentHandStrip({
                   data-card-instance-id={instance.instanceId}
                   data-card-zone="hand"
                   data-card-owner="opponent"
-                  className="relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] transform-gpu overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
+                  className="play-opponent-hand-card relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] transform-gpu overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
                   style={handCardStyle}
                 >
                   <Image
@@ -363,7 +363,7 @@ export function RequiredActionToast({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[24rem] z-50 flex justify-center px-4 xl:left-[13.5rem] xl:right-4">
+    <div className="play-required-action pointer-events-none fixed inset-x-0 bottom-[24rem] z-50 flex justify-center px-4 xl:left-[13.5rem] xl:right-4">
       <div className="max-w-lg rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)]/95 px-4 py-3 text-center text-sm font-bold text-[color:var(--text-primary)] shadow-2xl shadow-black/35 backdrop-blur">
         {message}
         {actions ? <div className="mt-3 flex justify-center gap-2">{actions}</div> : null}
