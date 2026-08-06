@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Bot, Check, ChevronDown, ChevronsRight, Flag, Play, RotateCcw, Sparkles, Swords, Users } from 'lucide-react';
+import { Bot, Check, ChevronDown, Flag, Play, RotateCcw, Sparkles, Swords, Users } from 'lucide-react';
 
 import type { Locale } from '@/i18n/config';
 import { supabase } from '@/lib/supabase/supabaseClient';
@@ -1764,12 +1764,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 <VictoryPointScoreControl label={controlsCopy.enemyVictoryPoints} value={gameState.opponentVictoryPoints} tone="opponent" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => setIsConcedeDialogOpen(true)} className="inline-flex items-center justify-center gap-1 rounded-md border border-red-500/45 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:border-red-300 focus:outline-none focus-visible:ring focus-visible:ring-red-400">
+                <button type="button" onClick={() => setIsConcedeDialogOpen(true)} aria-label={controlsCopy.concede} className="inline-flex items-center justify-center rounded-md border border-red-500/45 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:border-red-300 focus:outline-none focus-visible:ring focus-visible:ring-red-400">
                   <Flag className="h-3.5 w-3.5" aria-hidden="true" />
-                  {controlsCopy.concede}
                 </button>
                 <button type="button" onClick={requestPassTurn} disabled={!canPassTurn} className="inline-flex items-center justify-center gap-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50">
-                  <ChevronsRight className="h-3.5 w-3.5" aria-hidden="true" />
                   {controlsCopy.passTurn}
                 </button>
               </div>
