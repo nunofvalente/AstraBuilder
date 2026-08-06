@@ -284,7 +284,7 @@ export function CompactZoneStack({
   const stackContent = (
     <>
       <div
-        className={`relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
+        className={`play-compact-zone-card relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
           compact ? 'h-16 min-[2560px]:h-20' : 'h-20'
         }`}
         title={label}
@@ -317,7 +317,7 @@ export function CompactZoneStack({
           </span>
         )}
       </div>
-      <span className="mt-1 text-center text-[9px] font-bold uppercase leading-none tracking-wide text-[color:var(--text-secondary)]">{label}</span>
+      <span className="play-compact-zone-label mt-1 text-center text-[9px] font-bold uppercase leading-none tracking-wide text-[color:var(--text-secondary)]">{label}</span>
     </>
   );
 
@@ -326,7 +326,7 @@ export function CompactZoneStack({
       <button
         type="button"
         onClick={onClick}
-        className={`grid min-h-0 w-full place-items-center transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+        className={`play-compact-zone-stack grid min-h-0 w-full place-items-center transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
           compact ? 'grid-rows-[auto_auto] px-1 py-1 min-[2560px]:grid-rows-[1fr_auto] min-[2560px]:px-2 min-[2560px]:py-1.5' : 'grid-rows-[1fr_auto] px-2 py-1.5'
         }`}
       >
@@ -336,7 +336,7 @@ export function CompactZoneStack({
   }
 
   return (
-    <div className={`grid min-h-0 w-full place-items-center ${
+    <div className={`play-compact-zone-stack grid min-h-0 w-full place-items-center ${
       compact ? 'grid-rows-[auto_auto] px-1 py-1 min-[2560px]:grid-rows-[1fr_auto] min-[2560px]:px-2 min-[2560px]:py-1.5' : 'grid-rows-[1fr_auto] px-2 py-1.5'
     }`}>
       {stackContent}
