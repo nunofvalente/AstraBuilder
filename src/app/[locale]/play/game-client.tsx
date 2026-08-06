@@ -1895,7 +1895,6 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 </div>
               </div>
             ) : null}
-            <div className="play-owner-zone play-opponent-zone relative min-h-0">
             <CombinedStagingSupplyPanel
               stagingCards={gameState.opponentZones.staging}
               supplyCards={gameState.opponentZones.supply}
@@ -1911,18 +1910,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               }}
               locale={locale}
             />
-            <OpponentHandStrip
-              cards={gameState.opponentZones.hand}
-              dealOpeningHand={gameState.phase === 'setup' && !gameState.playerOpeningHandConfirmed}
-              locale={locale}
-            />
-            </div>
             <div className="play-game-battlefields grid min-h-0 gap-2 md:grid-cols-3">
               <BattlefieldPanel zone="battlefieldLeft" cards={gameState.zones.battlefieldLeft} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
               <BattlefieldPanel zone="battlefieldCenter" cards={gameState.zones.battlefieldCenter} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
               <BattlefieldPanel zone="battlefieldRight" cards={gameState.zones.battlefieldRight} onMove={moveCard} onAttack={attackBattlefield} battlefieldCardsByZone={battlefieldCardsByZone} onActivate={requestAbilityActivation} disabled={!canUseBoardActions} canFlipFaceUp={canFlipFaceUp} currentTurn={gameState.turn} readySupplyCount={readySupplyCount} currentCombatStatsByInstanceId={currentCombatStatsByInstanceId} cardsDrawnThisTurnByOwner={{ player: gameState.playerCardsDrawnThisTurn, opponent: gameState.opponentCardsDrawnThisTurn }} locale={locale} />
             </div>
-            <div className="play-owner-zone play-player-zone relative min-h-0">
             <CombinedStagingSupplyPanel
               stagingCards={gameState.zones.staging}
               supplyCards={gameState.zones.supply}
@@ -1947,26 +1939,6 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               }}
               locale={locale}
             />
-            <HandStrip
-              cards={gameState.zones.hand}
-              gameState={gameState}
-              onMove={moveCard}
-              disabled={!canUseBoardActions}
-              canSupplyFromHand={canSupplyFromHand}
-              canPlayFromHand={canPlayFromHand}
-              friendlyUnitsInPlay={friendlyUnitsInPlay}
-              graveyardCards={gameState.zones.graveyard}
-              readySupplyCount={readySupplyCount}
-              stagingUnits={playerStagingUnits}
-              demonicAdvanceActive={gameState.playerDemonicAdvanceActive}
-              battlefieldCardsByZone={{
-                battlefieldLeft: gameState.zones.battlefieldLeft,
-                battlefieldCenter: gameState.zones.battlefieldCenter,
-                battlefieldRight: gameState.zones.battlefieldRight,
-              }}
-              locale={locale}
-            />
-            </div>
           </div>
         </div>
         {pendingChoice ? (
@@ -2450,6 +2422,30 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               </>
             ) : null
           }
+        />
+        <OpponentHandStrip
+          cards={gameState.opponentZones.hand}
+          dealOpeningHand={gameState.phase === 'setup' && !gameState.playerOpeningHandConfirmed}
+          locale={locale}
+        />
+        <HandStrip
+          cards={gameState.zones.hand}
+          gameState={gameState}
+          onMove={moveCard}
+          disabled={!canUseBoardActions}
+          canSupplyFromHand={canSupplyFromHand}
+          canPlayFromHand={canPlayFromHand}
+          friendlyUnitsInPlay={friendlyUnitsInPlay}
+          graveyardCards={gameState.zones.graveyard}
+          readySupplyCount={readySupplyCount}
+          stagingUnits={playerStagingUnits}
+          demonicAdvanceActive={gameState.playerDemonicAdvanceActive}
+          battlefieldCardsByZone={{
+            battlefieldLeft: gameState.zones.battlefieldLeft,
+            battlefieldCenter: gameState.zones.battlefieldCenter,
+            battlefieldRight: gameState.zones.battlefieldRight,
+          }}
+          locale={locale}
         />
       </div>
     );

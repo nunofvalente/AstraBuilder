@@ -1250,28 +1250,22 @@ body.simulator-route-active .app-top-bar {
     align-self: center;
   }
 
-  .play-owner-zone {
-    display: grid;
-    min-height: 0;
+  .play-opponent-hand {
+    top: max(4.5rem, calc(50% - 28.75rem));
+    bottom: auto;
   }
 
-  .play-owner-zone > .play-zone-panel {
-    min-height: 0;
+  .play-player-hand {
+    top: auto;
+    bottom: max(7rem, calc(50% - 28.75rem));
   }
 
-  .play-owner-zone > .play-opponent-hand,
-  .play-owner-zone > .play-player-hand {
-    position: absolute;
-    right: 0;
-    left: 0;
+  .play-opponent-hand-card {
+    --play-opponent-hand-card-y: 0px;
   }
 
-  .play-owner-zone > .play-opponent-hand {
-    top: -1.25rem;
-  }
-
-  .play-owner-zone > .play-player-hand {
-    bottom: -1.25rem;
+  .play-player-hand-card {
+    --play-player-hand-card-y: 0px;
   }
 
   .play-match-workspace > .play-game-board {
@@ -1347,11 +1341,12 @@ body.simulator-route-active .app-top-bar {
     display: flex;
     flex-direction: column;
     position: fixed;
-    top: 4.5rem;
-    bottom: 7rem;
+    top: 50%;
+    bottom: auto;
     left: 0;
     z-index: 70;
     width: min(11.5rem, 75vw);
+    height: min(46rem, calc(100dvh - 9rem));
     min-height: 0;
     padding: 0.35rem;
     border: 1px solid var(--border);
@@ -1359,12 +1354,12 @@ body.simulator-route-active .app-top-bar {
     border-radius: 0 0.75rem 0.75rem 0;
     background: var(--background);
     box-shadow: 0.65rem 0 1.5rem rgba(0, 0, 0, 0.35);
-    transform: translateX(-100%);
+    transform: translate(-100%, -50%);
     transition: transform 180ms ease;
   }
 
   .play-game-sidebar.is-open {
-    transform: translateX(0);
+    transform: translate(0, -50%);
   }
 
   .play-mobile-sidebar-toggle {

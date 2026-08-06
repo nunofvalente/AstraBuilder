@@ -273,7 +273,7 @@ export function OpponentHandStrip({
             const rotation = Math.max(-10, Math.min(10, offsetFromCenter * 2.8));
             const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
             const handCardStyle = {
-              '--opponent-hand-card-y': `${-36 - verticalOffset}px`,
+              '--opponent-hand-card-y': `var(--play-opponent-hand-card-y, ${-36 - verticalOffset}px)`,
               '--opponent-hand-card-rotation': `${rotation}deg`,
               transformOrigin: '50% -15%',
             } as CSSProperties;

@@ -1461,7 +1461,7 @@ export function HandStrip({
             const rotation = Math.max(-10, Math.min(10, offsetFromCenter * 2.8));
             const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
             const handCardStyle = {
-              '--hand-card-y': `${62 + verticalOffset}px`,
+              '--hand-card-y': `var(--play-player-hand-card-y, ${62 + verticalOffset}px)`,
               '--hand-card-rotation': `${rotation}deg`,
               transformOrigin: '50% 115%',
             } as CSSProperties;
