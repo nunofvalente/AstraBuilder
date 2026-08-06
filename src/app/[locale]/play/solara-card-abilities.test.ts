@@ -17,6 +17,7 @@ import {
   resolveBattlefieldAttack,
   resolvePendingChoice,
   resolveUnitTakesControlOfZone,
+  runTurnStart,
   scoreBattlefieldVictoryPoints,
   triggerCardAbilities,
   type GameCardInstance,
@@ -414,6 +415,62 @@ describe('Solara card abilities', () => {
       targetZone: 'battlefieldCenter',
       defenderInstanceId: enemy.instanceId,
     });
+  });
+
+  it('does not trigger Voracious Wyvern when Lockdown Enforcer prevents it from readying', () => {
+    const wyvern = makeCard('IMP112', 'player', {
+      ready: false,
+      skipNextReady: true,
+      card: createTestCard({
+        id: 'IMP112',
+        name: 'Voracious Wyvern',
+        type: 'Unit',
+        rulesText: "Flanking. On Ready: If it's your turn, attack an enemy-controlled combat zone.",
+        affinity: 'Solara',
+      }),
+    });
+    const enemy = makeCard('enemy', 'opponent');
+    const base = makeState();
+
+    const readied = readyCardsForOwner({
+      ...base,
+      zones: { ...base.zones, battlefieldLeft: [wyvern], battlefieldCenter: [enemy] },
+    }, 'player');
+
+    expect(readied.pendingChoice).toBeNull();
+    expect(readied.zones.battlefieldLeft[0]).toMatchObject({ ready: false, skipNextReady: false });
+  });
+
+  it('resumes the turn-start draw after choosing Voracious Wyvern attack with an empty hand', () => {
+    const wyvern = makeCard('IMP112', 'player', {
+      ready: false,
+      card: createTestCard({
+        id: 'IMP112',
+        name: 'Voracious Wyvern',
+        type: 'Unit',
+        rulesText: "Flanking. On Ready: If it's your turn, attack an enemy-controlled combat zone.",
+        affinity: 'Solara',
+      }),
+    });
+    const enemy = makeCard('enemy', 'opponent');
+    const draw = makeCard('draw');
+    const base = makeState();
+    const pending = runTurnStart(readyCardsForOwner({
+      ...base,
+      hasFirstPlayerSkippedDraw: true,
+      zones: {
+        ...base.zones,
+        deck: [draw],
+        hand: [],
+        battlefieldLeft: [wyvern],
+        battlefieldCenter: [enemy],
+      },
+    }, 'player'));
+
+    expect(pending.pendingChoice).toMatchObject({ effect: 'wyvernAttack', resumeTurnStart: true });
+    const resolved = resolvePendingChoice(pending, [enemy.instanceId]);
+    expect('error' in resolved ? [] : resolved.zones.hand.map((card) => card.instanceId)).toEqual([draw.instanceId]);
+    expect('error' in resolved ? null : resolved.pendingCombat).toMatchObject({ attackerInstanceId: wyvern.instanceId });
   });
 
   it('applies Emberfang immunity, printed and equipment Glory, and Rally Point base stats in combat', () => {
