@@ -7,6 +7,7 @@ import {
   buildInitialGameState,
   passCounterPriority,
   type GameCardInstance,
+  type GameState,
   type SavedDeck,
 } from './game-rules';
 
@@ -536,6 +537,67 @@ describe('bot policy', () => {
       attackerInstanceId: followUpAttacker.instanceId,
       targetZone: 'battlefieldLeft',
     });
+  });
+
+  it('starts a coordinated attack when several weaker units can combine to clear a defender', () => {
+    const attackers = Array.from({ length: 4 }, (_, index) => makeInstance({
+      instanceId: `attacker-${index + 1}`,
+      ready: true,
+      card: createTestCard({
+        id: `attacker-${index + 1}`,
+        name: `Attacker ${index + 1}`,
+        type: 'Unit',
+        attack: 1,
+        health: 1,
+        influence: 1,
+      }),
+    }));
+    const defender = makeInstance({
+      instanceId: 'defender',
+      owner: 'player',
+      ready: true,
+      card: createTestCard({
+        id: 'defender',
+        name: 'Defender',
+        type: 'Unit',
+        attack: 4,
+        health: 4,
+        influence: 1,
+      }),
+    });
+    const baseState = buildInitialGameState(makeDeck(12), makeDeck(12));
+    const state = {
+      ...baseState,
+      phase: 'main' as const,
+      activePlayer: 'opponent' as const,
+      opponentZones: {
+        ...baseState.opponentZones,
+        staging: attackers,
+      },
+      zones: {
+        ...baseState.zones,
+        battlefieldLeft: [defender],
+        battlefieldCenter: [],
+        battlefieldRight: [],
+      },
+    };
+
+    expect(getBotBattlefieldAttackChoice(state)).toEqual({
+      attackerInstanceId: attackers[0]!.instanceId,
+      targetZone: 'battlefieldLeft',
+    });
+
+    let resolvedState: GameState = state;
+    for (const _attacker of attackers) {
+      const declaredState = applyBotTurnStep(resolvedState, 'attackBattlefield');
+      const passed = passCounterPriority(declaredState, 'player');
+      expect(passed).not.toHaveProperty('error');
+      if ('error' in passed) return;
+      resolvedState = passed.state;
+    }
+
+    expect(resolvedState.zones.battlefieldLeft.some((card) => card.instanceId === defender.instanceId)).toBe(false);
+    expect(resolvedState.zones.battlefieldLeft.some((card) => card.owner === 'opponent')).toBe(true);
   });
 
   it('avoids ready Bladewolf Templar when its defend trigger would trade with the attacker', () => {

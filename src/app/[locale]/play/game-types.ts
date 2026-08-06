@@ -318,6 +318,7 @@ export type PendingChoice = (
   scoreTriggerOwner?: Owner;
   scoreTriggerZone?: ZoneId;
   resumeTurnAdvance?: boolean;
+  resumeTurnStart?: boolean;
 };
 
 export type GameState = {

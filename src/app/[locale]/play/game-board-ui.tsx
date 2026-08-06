@@ -34,6 +34,7 @@ import {
   CompactZoneStack,
   getReadyStateClassName,
   useCloseOnOutsidePointerDown,
+  useLongPressPreview,
 } from './game-client-ui';
 import { getBanishOnDeathLabel, getLocalizedCardDisplay, getPlayBoardCopy } from './play-localization';
 
@@ -64,6 +65,24 @@ function useIsFourKViewport(): boolean {
   }, []);
 
   return isFourKViewport;
+}
+
+function useIsPortraitViewport(): boolean {
+  const [isPortraitViewport, setIsPortraitViewport] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const query = window.matchMedia('(orientation: portrait)');
+    const update = () => setIsPortraitViewport(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  return isPortraitViewport;
 }
 
 const READY_ACTIVATED_ABILITY_CARD_IDS = new Set(['IMP016', 'IMP066', 'IMP073', 'IMP079', 'IMP139', 'IMP160']);
@@ -121,16 +140,16 @@ export function CombatStatsBadge({
 
   return (
     <span
-      className={`absolute bottom-1 right-1 z-20 inline-flex h-5 min-w-[2.8rem] items-center justify-center gap-1 rounded border bg-black/80 px-1 text-[0.58rem] font-black leading-none shadow-md ${
+      className={`play-combat-stats-badge absolute bottom-1 right-1 z-20 inline-flex h-5 min-w-[2.8rem] items-center justify-center gap-1 rounded border bg-black/80 px-1 text-[0.58rem] font-black leading-none shadow-md ${
         modified ? 'border-amber-300/90' : 'border-white/35'
       }`}
       title={`Current stats: ${attack} attack, ${health} health${modified ? ` (printed ${instance.card.attack}/${instance.card.health})` : ''}`}
       aria-label={`${instance.card.name} has ${attack} attack and ${health} health${modified ? ', modified' : ''}`}
       data-combat-stats-modified={modified ? 'true' : 'false'}
     >
-      <span className="text-red-300">{attack}</span>
-      <span className="text-white/60">/</span>
-      <span className="text-emerald-300">{health}</span>
+      <span className="play-combat-stat-attack text-red-300">{attack}</span>
+      <span className="play-combat-stat-separator text-white/60">/</span>
+      <span className="play-combat-stat-health text-emerald-300">{health}</span>
     </span>
   );
 }
@@ -478,10 +497,22 @@ export function BattlefieldPanel({
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
   const activeInstance = cards.find((instance) => instance.instanceId === activeInstanceId) ?? null;
   const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const [isTouchPreviewActive, setIsTouchPreviewActive] = useState(false);
   const previewClearTimeoutRef = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const isFourKViewport = useIsFourKViewport();
+  const getLongPressPreviewProps = useLongPressPreview<GameCardInstance>(
+    (instance) => {
+      setIsTouchPreviewActive(true);
+      openPreview(instance);
+    },
+    () => {
+      setIsTouchPreviewActive(false);
+      cancelPreviewClear();
+      setPreviewCards(null);
+    },
+  );
   const actions = activeInstance
     ? getBattlefieldActions(zone, activeInstance, {
         canFlipFaceUp:
@@ -570,7 +601,7 @@ export function BattlefieldPanel({
         : 'border-[color:var(--border)]/75 bg-[color:var(--background)]/35';
     if (!instance) {
       return (
-        <div className={`flex aspect-[5/7] ${sizeClassName} ${slotClassName} items-center justify-center rounded-md border border-dashed px-1 text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]`}>
+        <div data-battlefield-slot-size={size} className={`play-battlefield-card-slot flex aspect-[5/7] ${sizeClassName} ${slotClassName} items-center justify-center rounded-md border border-dashed px-1 text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]`}>
           {label}
         </div>
       );
@@ -580,15 +611,17 @@ export function BattlefieldPanel({
       <button
         ref={isActive ? triggerRef : undefined}
         type="button"
+        {...getLongPressPreviewProps(instance)}
         data-card-instance-id={instance.instanceId}
         data-card-zone={zone}
         data-card-owner={getCardController(instance)}
+        data-battlefield-slot-size={size}
         onClick={() => !disabled && setActiveInstanceId((current) => (current === instance.instanceId ? null : instance.instanceId))}
         onMouseEnter={() => openPreview(instance)}
         onFocus={() => openPreview(instance)}
         onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
         onBlur={() => schedulePreviewClear(instance.instanceId)}
-        className={`relative z-10 aspect-[5/7] ${sizeClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
+        className={`play-battlefield-card-slot relative z-10 aspect-[5/7] ${sizeClassName} ${getReadyStateClassName(instance)} overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-md transition hover:border-[color:var(--accent)] hover:shadow-[0_0_1rem_rgba(241,143,59,0.35)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]`}
         aria-expanded={isActive}
         aria-haspopup={disabled ? undefined : 'menu'}
         aria-disabled={disabled}
@@ -618,8 +651,8 @@ export function BattlefieldPanel({
 
   function renderTerritoryColumn(label: string, instance: GameCardInstance | null) {
     return (
-      <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] place-items-center gap-0.5">
-        <p className="truncate text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
+      <div aria-label={label} className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] place-items-center gap-0.5">
+        <p className="play-battlefield-territory-label w-full truncate text-center text-[0.58rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
           {label}
         </p>
         {renderSlot(instance, null, 'territory')}
@@ -628,10 +661,11 @@ export function BattlefieldPanel({
   }
 
   return (
-    <section className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]" data-battlefield-zone={zone}>
+    <section className="play-battlefield-panel relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]" data-battlefield-zone={zone}>
       <CardZoomPreview
         cards={previewCards}
         interactive
+        mobileVisible={isTouchPreviewActive}
         side={zone === 'battlefieldRight' ? 'center' : 'right'}
         onMouseEnter={cancelPreviewClear}
         onMouseLeave={() => {
@@ -651,13 +685,13 @@ export function BattlefieldPanel({
           </>
         ) : null}
       </p>
-      <div className="grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
+      <div className="play-battlefield-lane grid min-h-0 grid-cols-[minmax(7.25rem,0.86fr)_1px_minmax(0,1fr)_1px_minmax(7.25rem,0.86fr)] items-stretch gap-2 rounded-md border border-[color:var(--border)]/70 bg-[linear-gradient(180deg,rgba(20,18,17,0.38),rgba(0,0,0,0.18))] p-2 shadow-inner">
         {renderTerritoryColumn(copy.yourTerritory, playerTerritory)}
         <div className="my-1 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.25),transparent)]" aria-hidden="true" />
         <div className="flex min-h-0 items-center justify-center overflow-visible">
           <div className="relative flex h-full items-center justify-center overflow-visible">
             {unit ? (
-              <div className="absolute left-1/2 top-[5.35rem] z-0 -translate-x-1/2">
+              <div className="play-battlefield-attachments absolute left-1/2 top-[5.35rem] z-0 -translate-x-1/2">
                 <AttachedEquipmentCards
                   cards={getAttachedCards(cards, unit.instanceId)}
                   cardHeight={isFourKViewport ? 166 : 72}
@@ -666,6 +700,15 @@ export function BattlefieldPanel({
                   interactive
                   onCardMouseEnter={openEquipmentPreview}
                   onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
+                  onCardLongPress={(instance) => {
+                    setIsTouchPreviewActive(true);
+                    openEquipmentPreview(instance);
+                  }}
+                  onCardLongPressEnd={() => {
+                    setIsTouchPreviewActive(false);
+                    cancelPreviewClear();
+                    setPreviewCards(null);
+                  }}
                 />
               </div>
             ) : null}
@@ -774,12 +817,26 @@ export function CombinedStagingSupplyPanel({
     placement: 'above' | 'below';
   } | null>(null);
   const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const [isTouchPreviewActive, setIsTouchPreviewActive] = useState(false);
   const [isGraveyardOpen, setIsGraveyardOpen] = useState(false);
   const [isBanishOpen, setIsBanishOpen] = useState(false);
   const previewClearTimeoutRef = useRef<number | null>(null);
   const activeStagingTriggerRef = useRef<HTMLButtonElement | null>(null);
   const stagingMenuRef = useRef<HTMLDivElement | null>(null);
   const isFourKViewport = useIsFourKViewport();
+  const isPortraitViewport = useIsPortraitViewport();
+  const getLongPressPreviewProps = useLongPressPreview<GameCardInstance[]>(
+    (instances) => {
+      cancelPreviewClear();
+      setIsTouchPreviewActive(true);
+      setPreviewCards(instances);
+    },
+    () => {
+      setIsTouchPreviewActive(false);
+      cancelPreviewClear();
+      setPreviewCards(null);
+    },
+  );
   const activeStagingCard = visibleStagingCards.find((instance) => instance.instanceId === activeStagingCardId) ?? null;
   const stagingTargets: BattlefieldZoneId[] = activeStagingCard?.ready && isUnitCard(activeStagingCard.card) && onAttack
     ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']
@@ -796,7 +853,11 @@ export function CombinedStagingSupplyPanel({
   const exhaustedStagingWidthClassName = compact ? 'w-[5.6rem] min-[2560px]:w-[8rem]' : 'w-[7.5rem] min-[2560px]:w-[10.75rem]';
   const stagingAttachmentPaddingClassName = compact ? 'pb-10 min-[2560px]:pb-16' : 'pb-9 min-[2560px]:pb-24';
   const stagingAttachmentTopClassName = compact ? 'top-[2.1rem] min-[2560px]:top-[2.8rem]' : 'top-[5.35rem] min-[2560px]:top-[3.9rem]';
-  const stagingAttachmentSizes = isFourKViewport
+  const stagingAttachmentSizes = isPortraitViewport
+    ? compact
+      ? { cardHeight: 52, offset: 17, exposedHeight: 19 }
+      : { cardHeight: 60, offset: 19, exposedHeight: 21 }
+    : isFourKViewport
     ? compact
       ? { cardHeight: 112, offset: 24, exposedHeight: 28 }
       : { cardHeight: 146, offset: 30, exposedHeight: 40 }
@@ -866,10 +927,11 @@ export function CombinedStagingSupplyPanel({
   }
 
   return (
-    <section className={`relative grid min-h-0 overflow-hidden rounded-lg border bg-[color:var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${panelToneClassName}`}>
+    <section className={`play-zone-panel relative grid min-h-0 overflow-hidden rounded-lg border bg-[color:var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${panelToneClassName}`}>
       <CardZoomPreview
         cards={previewCards}
         interactive
+        mobileVisible={isTouchPreviewActive}
         zIndexClassName={isGraveyardOpen || isBanishOpen ? 'z-[100]' : 'z-50'}
         onMouseEnter={cancelPreviewClear}
         onMouseLeave={() => {
@@ -877,7 +939,7 @@ export function CombinedStagingSupplyPanel({
           setPreviewCards(null);
         }}
       />
-      <div className={`grid min-h-0 ${rowsClassName} gap-3`}>
+      <div className={`play-zone-panel-rows grid min-h-0 ${rowsClassName} gap-3`}>
         <div className={`grid min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] rounded-md border ${stagingToneClassName} ${mirror ? 'order-2' : 'order-1'}`}>
           <div className="deck-builder-scroll flex min-h-0 items-center gap-3 overflow-x-auto overflow-y-hidden px-3 py-1.5">
             {visibleStagingCards.length === 0 ? (
@@ -891,10 +953,12 @@ export function CombinedStagingSupplyPanel({
                 return (
                 <div
                   key={instance.instanceId}
-                  className={`relative flex h-full flex-none items-center justify-center ${attachedItems.length > 0 ? stagingAttachmentPaddingClassName : ''} ${instance.ready ? '' : exhaustedStagingWidthClassName}`}
+                  data-staging-ready={instance.ready}
+                  data-has-attachments={attachedItems.length > 0}
+                  className={`play-staging-card-stack relative flex h-full flex-none items-center justify-center ${attachedItems.length > 0 ? stagingAttachmentPaddingClassName : ''} ${instance.ready ? '' : exhaustedStagingWidthClassName}`}
                 >
                   {attachedItems.length > 0 ? (
-                    <div className={`absolute left-1/2 z-0 -translate-x-1/2 ${stagingAttachmentTopClassName}`}>
+                    <div className={`play-staging-attachments absolute left-1/2 z-0 -translate-x-1/2 ${stagingAttachmentTopClassName}`}>
                       <AttachedEquipmentCards
                         cards={attachedItems}
                         cardHeight={stagingAttachmentSizes.cardHeight}
@@ -903,12 +967,22 @@ export function CombinedStagingSupplyPanel({
                         interactive
                         onCardMouseEnter={openEquipmentPreview}
                         onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
+                        onCardLongPress={(instance) => {
+                          setIsTouchPreviewActive(true);
+                          openEquipmentPreview(instance);
+                        }}
+                        onCardLongPressEnd={() => {
+                          setIsTouchPreviewActive(false);
+                          cancelPreviewClear();
+                          setPreviewCards(null);
+                        }}
                       />
                     </div>
                   ) : null}
                   <button
                     ref={activeStagingCardId === instance.instanceId ? activeStagingTriggerRef : undefined}
                     type="button"
+                    {...getLongPressPreviewProps([instance, ...attachedItems])}
                     data-card-instance-id={instance.instanceId}
                     data-card-zone="staging"
                     data-card-owner={mirror ? 'opponent' : 'player'}
@@ -984,9 +1058,9 @@ export function CombinedStagingSupplyPanel({
             )}
           </div>
           <div className="min-h-0 bg-[color:var(--border)]/70" aria-hidden="true" />
-          <div className="grid min-h-0 w-[4.5rem] grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center min-[2560px]:w-20">
+          <div className="play-deck-banish-column grid min-h-0 w-[4.5rem] grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] place-items-center min-[2560px]:w-20">
             <div
-              className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
+              className="play-deck-banish-cell flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
               data-opponent-deck={mirror ? true : undefined}
             >
               <CompactZoneStack
@@ -1001,7 +1075,7 @@ export function CombinedStagingSupplyPanel({
             </div>
             <div className="mx-2 h-px bg-[color:var(--border)]/70" aria-hidden="true" />
             <div
-              className="flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
+              className="play-deck-banish-cell flex min-h-0 w-[4.5rem] items-center justify-center min-[2560px]:w-20"
               data-player-deck={!mirror ? true : undefined}
             >
               <CompactZoneStack
@@ -1057,6 +1131,7 @@ export function CombinedStagingSupplyPanel({
                       {canInspectSupplyCards ? (
                         <button
                           type="button"
+                          {...getLongPressPreviewProps([{ ...instance, faceDown: false }])}
                           data-card-instance-id={instance.instanceId}
                           data-card-zone="supply"
                           data-card-owner={mirror ? 'opponent' : 'player'}
@@ -1353,6 +1428,7 @@ export function HandStrip({
   const copy = getPlayBoardCopy(locale);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
+  const [isTouchPreviewActive, setIsTouchPreviewActive] = useState(false);
   const activeHandTriggerRef = useRef<HTMLButtonElement | null>(null);
   const handMenuRef = useRef<HTMLDivElement | null>(null);
   const activeInstance = cards.find((instance) => instance.instanceId === activeCardId) ?? null;
@@ -1378,6 +1454,16 @@ export function HandStrip({
     deckSelector: '[data-player-deck]',
     fallbackDeckY: typeof window === 'undefined' ? 0 : window.innerHeight - 240,
   });
+  const getLongPressPreviewProps = useLongPressPreview<Card>(
+    (card) => {
+      setIsTouchPreviewActive(true);
+      setPreviewCard(card);
+    },
+    () => {
+      setIsTouchPreviewActive(false);
+      setPreviewCard(null);
+    },
+  );
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [activeHandTriggerRef, handMenuRef], closeHandMenu);
 
@@ -1397,7 +1483,7 @@ export function HandStrip({
   }
 
   return (
-    <section className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pt-2 xl:left-[13.5rem] xl:right-4">
+    <section className="play-player-hand pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pt-2 xl:left-[13.5rem] xl:right-4">
       {activeInstance ? (
         <div ref={handMenuRef} className="pointer-events-auto absolute bottom-[5.75rem] left-1/2 z-50 w-[min(94vw,32rem)] -translate-x-1/2 overflow-hidden rounded-xl border-2 border-[color:var(--accent)] bg-[color:var(--surface)] shadow-2xl shadow-black/40">
           <button
@@ -1448,20 +1534,20 @@ export function HandStrip({
           </div>
         </div>
       ) : null}
-      <CardZoomPreview card={previewCard} />
+      <CardZoomPreview card={previewCard} mobileVisible={isTouchPreviewActive} />
       {cards.length === 0 ? (
         <p className="mx-auto translate-y-4 max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-4 text-center text-sm text-[color:var(--text-secondary)]">
           {copy.emptyHand}
         </p>
       ) : (
-        <div ref={openingDeal.containerRef} className="mx-auto flex h-28 max-w-4xl items-end justify-center overflow-visible px-2 pb-0">
+        <div ref={openingDeal.containerRef} className="play-player-hand-cards mx-auto flex h-28 max-w-4xl items-end justify-center overflow-visible px-2 pb-0">
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
             const rotation = Math.max(-10, Math.min(10, offsetFromCenter * 2.8));
             const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
             const handCardStyle = {
-              '--hand-card-y': `${62 + verticalOffset}px`,
+              '--hand-card-y': `var(--play-player-hand-card-y, ${62 + verticalOffset}px)`,
               '--hand-card-rotation': `${rotation}deg`,
               transformOrigin: '50% 115%',
             } as CSSProperties;
@@ -1476,6 +1562,7 @@ export function HandStrip({
               <button
                 ref={activeCardId === instance.instanceId ? activeHandTriggerRef : undefined}
                 type="button"
+                {...getLongPressPreviewProps(instance.card)}
                 data-card-instance-id={instance.instanceId}
                 data-card-zone="hand"
                 data-card-owner="player"
@@ -1484,7 +1571,7 @@ export function HandStrip({
                 onFocus={() => setPreviewCard(instance.card)}
                 onMouseLeave={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
                 onBlur={() => setPreviewCard((current) => (current?.id === instance.card.id ? null : current))}
-                className="pointer-events-auto group flex w-28 origin-bottom translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] transform-gpu rounded-md transition-transform duration-200 hover:translate-y-6 hover:rotate-0 hover:scale-110 focus:outline-none focus-visible:translate-y-6 focus-visible:rotate-0 focus-visible:scale-110"
+                className="play-player-hand-card pointer-events-auto group flex w-28 origin-bottom translate-y-[var(--hand-card-y)] rotate-[var(--hand-card-rotation)] transform-gpu rounded-md transition-transform duration-200 hover:translate-y-6 hover:rotate-0 hover:scale-110 focus:outline-none focus-visible:translate-y-6 focus-visible:rotate-0 focus-visible:scale-110"
                 style={handCardStyle}
                 aria-expanded={activeCardId === instance.instanceId}
                 aria-haspopup={disabled ? undefined : 'menu'}

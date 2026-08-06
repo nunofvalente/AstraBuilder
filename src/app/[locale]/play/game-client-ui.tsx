@@ -2,7 +2,16 @@
 
 import Image from 'next/image';
 import type { Locale } from '@/i18n/config';
-import { useEffect, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type MouseEventHandler,
+  type PointerEventHandler,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 
 import type { Card } from '../create/deck-builder/types';
 import { type GameCardInstance, type GameState, type Owner } from './game-rules';
@@ -39,10 +48,91 @@ export function useCloseOnOutsidePointerDown(
   }, [isOpen, refs, onClose]);
 }
 
+type LongPressPreviewHandlers = {
+  onClickCapture: MouseEventHandler<HTMLElement>;
+  onContextMenu: MouseEventHandler<HTMLElement>;
+  onPointerCancel: PointerEventHandler<HTMLElement>;
+  onPointerDown: PointerEventHandler<HTMLElement>;
+  onPointerMove: PointerEventHandler<HTMLElement>;
+  onPointerUp: PointerEventHandler<HTMLElement>;
+};
+
+export function useLongPressPreview<T>(
+  onPreview: (value: T) => void,
+  onPreviewEnd: () => void,
+  delayMs = 450,
+): (value: T) => LongPressPreviewHandlers {
+  const timerRef = useRef<number | null>(null);
+  const originRef = useRef<{ x: number; y: number } | null>(null);
+  const previewActiveRef = useRef(false);
+  const suppressClickRef = useRef(false);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const finishPress = useCallback((keepClickSuppressed: boolean) => {
+    clearTimer();
+    originRef.current = null;
+    if (previewActiveRef.current) {
+      previewActiveRef.current = false;
+      suppressClickRef.current = keepClickSuppressed;
+      onPreviewEnd();
+    }
+  }, [clearTimer, onPreviewEnd]);
+
+  useEffect(() => () => clearTimer(), [clearTimer]);
+
+  return useCallback((value: T): LongPressPreviewHandlers => ({
+    onClickCapture: (event) => {
+      if (!suppressClickRef.current) {
+        return;
+      }
+      suppressClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    onContextMenu: (event) => {
+      if (previewActiveRef.current || window.matchMedia('(pointer: coarse)').matches) {
+        event.preventDefault();
+      }
+    },
+    onPointerCancel: () => finishPress(false),
+    onPointerDown: (event) => {
+      if (event.pointerType === 'mouse' || (event.button ?? 0) !== 0) {
+        return;
+      }
+      clearTimer();
+      suppressClickRef.current = false;
+      previewActiveRef.current = false;
+      originRef.current = { x: event.clientX, y: event.clientY };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      timerRef.current = window.setTimeout(() => {
+        timerRef.current = null;
+        previewActiveRef.current = true;
+        suppressClickRef.current = true;
+        onPreview(value);
+      }, delayMs);
+    },
+    onPointerMove: (event) => {
+      const origin = originRef.current;
+      if (!origin || Math.hypot(event.clientX - origin.x, event.clientY - origin.y) <= 10) {
+        return;
+      }
+      finishPress(previewActiveRef.current);
+    },
+    onPointerUp: () => finishPress(true),
+  }), [clearTimer, delayMs, finishPress, onPreview]);
+}
+
 export function CardZoomPreview({
   card = null,
   cards = null,
   interactive = false,
+  mobileVisible = false,
   side = 'right',
   zIndexClassName = 'z-50',
   onMouseEnter,
@@ -51,6 +141,7 @@ export function CardZoomPreview({
   card?: Card | null;
   cards?: GameCardInstance[] | null;
   interactive?: boolean;
+  mobileVisible?: boolean;
   side?: 'left' | 'center' | 'right';
   zIndexClassName?: string;
   onMouseEnter?: () => void;
@@ -73,7 +164,7 @@ export function CardZoomPreview({
   return (
     <div
       data-card-zoom-preview
-      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} fixed ${side === 'left' ? 'left-5' : side === 'center' ? 'left-[55%] -translate-x-1/2' : 'right-5'} top-8 ${zIndexClassName} hidden w-80 lg:block`}
+      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} play-card-zoom-preview fixed left-1/2 top-1/2 ${zIndexClassName} w-[min(78vw,20rem)] -translate-x-1/2 -translate-y-1/2 ${mobileVisible ? 'block' : 'hidden'} lg:top-8 lg:block lg:w-80 lg:translate-y-0 ${side === 'left' ? 'lg:left-5 lg:translate-x-0' : side === 'center' ? 'lg:left-[55%] lg:-translate-x-1/2' : 'lg:left-auto lg:right-5 lg:translate-x-0'}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -124,6 +215,8 @@ export function AttachedEquipmentCards({
   interactive = false,
   onCardMouseEnter,
   onCardMouseLeave,
+  onCardLongPress,
+  onCardLongPressEnd,
 }: {
   cards: GameCardInstance[];
   cardHeight: number;
@@ -132,7 +225,14 @@ export function AttachedEquipmentCards({
   interactive?: boolean;
   onCardMouseEnter?: (instance: GameCardInstance) => void;
   onCardMouseLeave?: (instance: GameCardInstance) => void;
+  onCardLongPress?: (instance: GameCardInstance) => void;
+  onCardLongPressEnd?: () => void;
 }) {
+  const getLongPressPreviewProps = useLongPressPreview<GameCardInstance>(
+    (instance) => onCardLongPress?.(instance),
+    () => onCardLongPressEnd?.(),
+  );
+
   if (cards.length === 0) {
     return null;
   }
@@ -144,6 +244,7 @@ export function AttachedEquipmentCards({
       {cards.map((instance, index) => (
         <div
           key={instance.instanceId}
+          {...(onCardLongPress ? getLongPressPreviewProps(instance) : {})}
           className="absolute top-0 aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md"
           style={{
             height: `${cardHeight}px`,
@@ -183,7 +284,7 @@ export function CompactZoneStack({
   const stackContent = (
     <>
       <div
-        className={`relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
+        className={`play-compact-zone-card relative aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md ${
           compact ? 'h-16 min-[2560px]:h-20' : 'h-20'
         }`}
         title={label}
@@ -216,7 +317,7 @@ export function CompactZoneStack({
           </span>
         )}
       </div>
-      <span className="mt-1 text-center text-[9px] font-bold uppercase leading-none tracking-wide text-[color:var(--text-secondary)]">{label}</span>
+      <span className="play-compact-zone-label mt-1 text-center text-[9px] font-bold uppercase leading-none tracking-wide text-[color:var(--text-secondary)]">{label}</span>
     </>
   );
 
@@ -225,7 +326,7 @@ export function CompactZoneStack({
       <button
         type="button"
         onClick={onClick}
-        className={`grid min-h-0 w-full place-items-center transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
+        className={`play-compact-zone-stack grid min-h-0 w-full place-items-center transition hover:opacity-90 focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)] ${
           compact ? 'grid-rows-[auto_auto] px-1 py-1 min-[2560px]:grid-rows-[1fr_auto] min-[2560px]:px-2 min-[2560px]:py-1.5' : 'grid-rows-[1fr_auto] px-2 py-1.5'
         }`}
       >
@@ -235,7 +336,7 @@ export function CompactZoneStack({
   }
 
   return (
-    <div className={`grid min-h-0 w-full place-items-center ${
+    <div className={`play-compact-zone-stack grid min-h-0 w-full place-items-center ${
       compact ? 'grid-rows-[auto_auto] px-1 py-1 min-[2560px]:grid-rows-[1fr_auto] min-[2560px]:px-2 min-[2560px]:py-1.5' : 'grid-rows-[1fr_auto] px-2 py-1.5'
     }`}>
       {stackContent}
@@ -260,20 +361,20 @@ export function OpponentHandStrip({
   });
 
   return (
-    <section className="pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pb-2 xl:left-[13.5rem] xl:right-4">
+    <section className="play-opponent-hand pointer-events-none fixed inset-x-0 top-0 z-40 px-3 pb-2 xl:left-[13.5rem] xl:right-4">
       {cards.length === 0 ? (
         <p className="mx-auto max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
           {copy.opponentHand}
         </p>
       ) : (
-        <div ref={openingDeal.containerRef} className="mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
+        <div ref={openingDeal.containerRef} className="play-opponent-hand-cards mx-auto flex h-28 max-w-4xl items-start justify-center overflow-visible px-2 pt-0">
           {cards.map((instance, index) => {
             const midpoint = (cards.length - 1) / 2;
             const offsetFromCenter = index - midpoint;
             const rotation = Math.max(-10, Math.min(10, offsetFromCenter * 2.8));
             const verticalOffset = Math.min(10, Math.abs(offsetFromCenter) * 1.4);
             const handCardStyle = {
-              '--opponent-hand-card-y': `${-36 - verticalOffset}px`,
+              '--opponent-hand-card-y': `var(--play-opponent-hand-card-y, ${-36 - verticalOffset}px)`,
               '--opponent-hand-card-rotation': `${rotation}deg`,
               transformOrigin: '50% -15%',
             } as CSSProperties;
@@ -290,7 +391,7 @@ export function OpponentHandStrip({
                   data-card-instance-id={instance.instanceId}
                   data-card-zone="hand"
                   data-card-owner="opponent"
-                  className="relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] transform-gpu overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
+                  className="play-opponent-hand-card relative aspect-[5/7] w-28 translate-y-[var(--opponent-hand-card-y)] rotate-[var(--opponent-hand-card-rotation)] transform-gpu overflow-hidden rounded-md border-2 border-black/25 bg-[color:var(--surface-muted)] shadow-xl shadow-black/30"
                   style={handCardStyle}
                 >
                   <Image
@@ -363,7 +464,7 @@ export function RequiredActionToast({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[24rem] z-50 flex justify-center px-4 xl:left-[13.5rem] xl:right-4">
+    <div className="play-required-action pointer-events-none fixed inset-x-0 bottom-[24rem] z-50 flex justify-center px-4 xl:left-[13.5rem] xl:right-4">
       <div className="max-w-lg rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)]/95 px-4 py-3 text-center text-sm font-bold text-[color:var(--text-primary)] shadow-2xl shadow-black/35 backdrop-blur">
         {message}
         {actions ? <div className="mt-3 flex justify-center gap-2">{actions}</div> : null}

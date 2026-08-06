@@ -68,7 +68,8 @@ describe('HandStrip', () => {
       />,
     );
 
-    expect(container.querySelector('section')).toHaveClass('pointer-events-none');
+    expect(container.querySelector('section')).toHaveClass('pointer-events-none', 'play-player-hand');
+    expect(container.querySelector('[data-card-instance-id="hand-card"]')).toHaveClass('play-player-hand-card');
     expect(container.querySelector('button')).toHaveClass('pointer-events-auto');
     expect(container.querySelector('[data-card-instance-id="hand-card"]')).toHaveAttribute('data-card-zone', 'hand');
   });
@@ -138,6 +139,8 @@ describe('CombinedStagingSupplyPanel', () => {
       />,
     );
 
+    expect(container.querySelector('section')).toHaveClass('play-zone-panel');
+    expect(container.querySelector('.play-zone-panel-rows')).toBeInTheDocument();
     expect(container.querySelector('[data-card-instance-id="staging-card"]')).toHaveAttribute('data-card-zone', 'staging');
     expect(container.querySelector('[data-card-instance-id="staging-card"]')).toHaveAttribute('data-card-owner', 'player');
     expect(container.querySelector('[data-card-instance-id="supply-card"]')).toHaveAttribute('data-card-zone', 'supply');
@@ -193,7 +196,7 @@ describe('CombinedStagingSupplyPanel', () => {
       temporaryInfluenceBonus: 1,
     };
 
-    render(
+    const { container } = render(
       <CombinedStagingSupplyPanel
         stagingCards={[buffedUnit]}
         supplyCards={[]}
@@ -634,7 +637,7 @@ describe('BattlefieldPanel', () => {
       ready: true,
       card: createTestCard({ id: 'flanker', name: 'Flanker', type: 'Unit', rulesText: 'Flanking' }),
     };
-    render(
+    const { container } = render(
       <BattlefieldPanel
         zone="battlefieldLeft"
         cards={[flanker]}
@@ -648,6 +651,8 @@ describe('BattlefieldPanel', () => {
       />,
     );
 
+    expect(container.querySelector('section')).toHaveClass('play-battlefield-panel');
+    expect(container.querySelector('.play-battlefield-lane')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /open flanker actions/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /flank battlefield 2/i }));
     expect(onAttack).toHaveBeenCalledWith(flanker.instanceId, 'battlefieldCenter');
@@ -700,9 +705,17 @@ describe('BattlefieldPanel', () => {
 
     fireEvent.mouseEnter(screen.getByRole('button', { name: /open right battlefield unit actions/i }));
 
-    expect(container.querySelector('[data-card-zoom-preview]')).toHaveClass('left-[55%]', '-translate-x-1/2', 'top-8');
-    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('left-5');
-    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('right-5');
+    expect(container.querySelector('[data-card-zoom-preview]')).toHaveClass(
+      'left-1/2',
+      'top-1/2',
+      '-translate-x-1/2',
+      '-translate-y-1/2',
+      'lg:left-[55%]',
+      'lg:-translate-x-1/2',
+      'lg:top-8',
+    );
+    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('lg:left-5');
+    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('lg:right-5');
   });
 
   it('zooms face-down opponent territories as card backs', () => {

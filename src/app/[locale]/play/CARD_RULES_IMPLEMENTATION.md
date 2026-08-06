@@ -33,7 +33,7 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Solara simulator representations:
   - `IMP102` Hongzhen and `IMP109` Ruins Looter move the revealed top card into its controller's hand with a turn marker. It remains public while marked, can be played or supplied through normal actions, and returns to the top of the deck at end of turn if unused.
   - `IMP105` Lingyi marks the chosen banished unit with one-time play permission. Playing it from banish pays its normal cost, grants Blitz for that play, and consumes both markers.
-  - `IMP112` Voracious Wyvern uses a visible target choice for the player and the first legal enemy-controlled zone for the bot, then enters the normal counter and combat flow.
+  - `IMP112` Voracious Wyvern uses a visible target choice for the player and the first legal enemy-controlled zone for the bot, then enters the normal counter and combat flow. A skipped ready does not trigger its attack, and resolving its upkeep choice resumes the normal turn-start draw.
 - Terra cards `IMP127` through `IMP158` plus balance extra `IMP163` are registered.
 - Terra integration includes Fortify, Provoke, Impede from units/equipment/territories, Akeno combat healing, Gaia free plays and death return, top-three unit selection, mass exhaust, Flanking, score-triggered retreat, targeted damage, Sylvan Rallier activation, Verdant Protector scoring locks, forced Yako attacks, multi-step tactic costs and damage, turn-duration counter buffs, combat retreat counters, Lifecycle Katana recovery, Elorhain defend/death effects, Entangling Wilds end-turn exhaustion, Escape Route upkeep, Overgrown Factory draw choices, and Shadowveil Hunter Swift/on-enter damage.
 - Terra simulator representations and limitations:

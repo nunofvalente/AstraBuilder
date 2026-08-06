@@ -301,7 +301,8 @@ const wyrmscarDragon: AbilityHandler = ({ state, event }) => {
 const zhufeng: AbilityHandler = ({ state, event }) => ({ state: readyUnitInPlay(state, event.source.instanceId), resolved: true });
 
 const voraciousWyvern: AbilityHandler = ({ state, event }) => {
-  if (state.activePlayer !== event.controller) return { state, resolved: false };
+  const source = getCardInstanceById(state, event.source.instanceId);
+  if (state.activePlayer !== event.controller || !source?.ready) return { state, resolved: false };
   const targets = BATTLEFIELD_ZONE_IDS.flatMap((zone) =>
     state.zones[zone]
       .filter((unit) => isUnitCard(unit.card) && getCardController(unit) !== event.controller)
