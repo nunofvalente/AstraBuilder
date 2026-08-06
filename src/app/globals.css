@@ -1276,6 +1276,22 @@ body.simulator-route-active .app-top-bar {
     --play-player-hand-card-y: 0px;
   }
 
+  .play-zone-panel [data-card-zone='staging'] {
+    height: 6.5rem;
+  }
+
+  .play-staging-card-stack[data-staging-ready='false'] {
+    width: 6.5rem;
+  }
+
+  .play-staging-card-stack[data-has-attachments='true'] {
+    padding-bottom: 2rem;
+  }
+
+  .play-staging-attachments {
+    top: 4.3rem;
+  }
+
   .play-match-workspace > .play-game-board {
     margin-block: auto;
   }
@@ -1517,7 +1533,19 @@ body.simulator-route-active .app-top-bar {
   }
 
   .play-zone-panel [data-card-zone='staging'] {
-    height: 5.6rem;
+    height: 5.4rem;
+  }
+
+  .play-staging-card-stack[data-staging-ready='false'] {
+    width: 5.4rem;
+  }
+
+  .play-staging-card-stack[data-has-attachments='true'] {
+    padding-bottom: 1.65rem;
+  }
+
+  .play-staging-attachments {
+    top: 3.45rem;
   }
 
   .play-player-hand,

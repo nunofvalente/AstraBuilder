@@ -66,6 +66,24 @@ function useIsFourKViewport(): boolean {
   return isFourKViewport;
 }
 
+function useIsPortraitViewport(): boolean {
+  const [isPortraitViewport, setIsPortraitViewport] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const query = window.matchMedia('(orientation: portrait)');
+    const update = () => setIsPortraitViewport(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  return isPortraitViewport;
+}
+
 const READY_ACTIVATED_ABILITY_CARD_IDS = new Set(['IMP016', 'IMP066', 'IMP073', 'IMP079', 'IMP139', 'IMP160']);
 const BATTLEFIELD_ZONE_ORDER: BattlefieldZoneId[] = ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'];
 
@@ -781,6 +799,7 @@ export function CombinedStagingSupplyPanel({
   const activeStagingTriggerRef = useRef<HTMLButtonElement | null>(null);
   const stagingMenuRef = useRef<HTMLDivElement | null>(null);
   const isFourKViewport = useIsFourKViewport();
+  const isPortraitViewport = useIsPortraitViewport();
   const activeStagingCard = visibleStagingCards.find((instance) => instance.instanceId === activeStagingCardId) ?? null;
   const stagingTargets: BattlefieldZoneId[] = activeStagingCard?.ready && isUnitCard(activeStagingCard.card) && onAttack
     ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']
@@ -797,7 +816,11 @@ export function CombinedStagingSupplyPanel({
   const exhaustedStagingWidthClassName = compact ? 'w-[5.6rem] min-[2560px]:w-[8rem]' : 'w-[7.5rem] min-[2560px]:w-[10.75rem]';
   const stagingAttachmentPaddingClassName = compact ? 'pb-10 min-[2560px]:pb-16' : 'pb-9 min-[2560px]:pb-24';
   const stagingAttachmentTopClassName = compact ? 'top-[2.1rem] min-[2560px]:top-[2.8rem]' : 'top-[5.35rem] min-[2560px]:top-[3.9rem]';
-  const stagingAttachmentSizes = isFourKViewport
+  const stagingAttachmentSizes = isPortraitViewport
+    ? compact
+      ? { cardHeight: 52, offset: 17, exposedHeight: 19 }
+      : { cardHeight: 60, offset: 19, exposedHeight: 21 }
+    : isFourKViewport
     ? compact
       ? { cardHeight: 112, offset: 24, exposedHeight: 28 }
       : { cardHeight: 146, offset: 30, exposedHeight: 40 }
@@ -892,10 +915,12 @@ export function CombinedStagingSupplyPanel({
                 return (
                 <div
                   key={instance.instanceId}
-                  className={`relative flex h-full flex-none items-center justify-center ${attachedItems.length > 0 ? stagingAttachmentPaddingClassName : ''} ${instance.ready ? '' : exhaustedStagingWidthClassName}`}
+                  data-staging-ready={instance.ready}
+                  data-has-attachments={attachedItems.length > 0}
+                  className={`play-staging-card-stack relative flex h-full flex-none items-center justify-center ${attachedItems.length > 0 ? stagingAttachmentPaddingClassName : ''} ${instance.ready ? '' : exhaustedStagingWidthClassName}`}
                 >
                   {attachedItems.length > 0 ? (
-                    <div className={`absolute left-1/2 z-0 -translate-x-1/2 ${stagingAttachmentTopClassName}`}>
+                    <div className={`play-staging-attachments absolute left-1/2 z-0 -translate-x-1/2 ${stagingAttachmentTopClassName}`}>
                       <AttachedEquipmentCards
                         cards={attachedItems}
                         cardHeight={stagingAttachmentSizes.cardHeight}
