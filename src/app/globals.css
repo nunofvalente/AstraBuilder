@@ -1233,8 +1233,8 @@ body.simulator-route-active .app-top-bar {
     display: flex;
     min-height: 0;
     flex-direction: column;
-    position: sticky;
-    top: max(4.5rem, calc(50dvh - 25rem));
+    position: relative;
+    top: auto;
     align-self: center;
     width: 100%;
     height: min(50rem, calc(100dvh - 9rem));
