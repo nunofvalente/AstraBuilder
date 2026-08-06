@@ -20,6 +20,13 @@ type HomeDictionary = {
         title: string;
         placeholder: string;
       };
+      topCards: {
+        title: string;
+        description: string;
+        placeholder: string;
+        usageLabel: string;
+        browseAction: string;
+      };
     };
     actions: {
       browse: string;
@@ -30,10 +37,27 @@ type HomeDictionary = {
       decks: string;
       catalog: string;
     };
+    showcaseIntro: {
+      eyebrow: string;
+      title: string;
+      description: string;
+      features: {
+        builder: { description: string; action: string };
+        catalog: { description: string; action: string };
+        play: { title: string; description: string; action: string };
+        decks: { description: string; action: string };
+      };
+      community: string;
+      discordAction: string;
+    };
     battlefieldBanner: {
       title: string;
       description: string;
       action: string;
+    };
+    footer: {
+      disclaimer: string;
+      copyright: string;
     };
   };
 };
@@ -356,6 +380,32 @@ type DeckDetailsDictionary = {
     favoriteRemove: string;
     favoriteSignIn: string;
     favoriteError: string;
+    analysisHeading: string;
+    uniqueCardsLabel: string;
+    averageCostLabel: string;
+    costCurveHeading: string;
+    compositionHeading: string;
+    costLabel: string;
+    affinityUnitsHeading: string;
+    unitStatsHeading: string;
+    attackLabel: string;
+    healthLabel: string;
+    influenceLabel: string;
+    cardMenuViewDetails: string;
+    cardMenuSetDisplay: string;
+    cardMenuDisplaySelected: string;
+    cardMenuUseAutomatic: string;
+    cardMenuSaving: string;
+    cardMenuError: string;
+  };
+  cardDetails: {
+    backToPreviousPage: string;
+    affinity: string;
+    rarity: string;
+    artist: string;
+    cardNumber: string;
+    rulesText: string;
+    cardStory: string;
   };
 };
 
@@ -403,9 +453,12 @@ type TopBarDictionary = {
     accountFallback: string;
     profile: string;
     myDecks: string;
+    myCollection: string;
     builder: string;
     play: string;
+    beta: string;
     decks: string;
+    communityDecks: string;
     collection: string;
     settings: string;
     signOut: string;

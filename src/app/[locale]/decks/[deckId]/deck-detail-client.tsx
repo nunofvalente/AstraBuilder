@@ -1,6 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -13,8 +21,12 @@ import { ZoomOverlay } from '@/app/[locale]/create/deck-builder/components/zoom-
 import type { ZoomAnchor } from '@/app/[locale]/create/deck-builder/components/zoom-overlay';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import type { DeckDetailData } from '@/lib/supabase/decks';
-import { buildAffinityGradient, getAffinityIconPath, normalizeAffinity } from '@/lib/cards/affinity';
-import { getAffinityColorScheme } from '@/app/[locale]/create/deck-builder/constants';
+import {
+  buildAffinityGradient,
+  getAffinityBaseColor,
+  getAffinityIconPath,
+  normalizeAffinity,
+} from '@/lib/cards/affinity';
 
 const CARD_TYPE_ORDER = ['Unit', 'Renowned Unit', 'Tactic', 'Territory'];
 const FALLBACK_SECTION_LABEL = 'Other';
@@ -46,6 +58,23 @@ type DeckDetailsClientProps = {
       favoriteRemove: string;
       favoriteSignIn: string;
       favoriteError: string;
+      analysisHeading: string;
+      uniqueCardsLabel: string;
+      averageCostLabel: string;
+      costCurveHeading: string;
+      compositionHeading: string;
+      costLabel: string;
+      affinityUnitsHeading: string;
+      unitStatsHeading: string;
+      attackLabel: string;
+      healthLabel: string;
+      influenceLabel: string;
+      cardMenuViewDetails: string;
+      cardMenuSetDisplay: string;
+      cardMenuDisplaySelected: string;
+      cardMenuUseAutomatic: string;
+      cardMenuSaving: string;
+      cardMenuError: string;
     };
     myDecks: {
       publicTag: string;
@@ -104,6 +133,12 @@ type DeckStatsOverride = {
 
 type PreviewEvent = ReactMouseEvent<HTMLButtonElement> | FocusEvent<HTMLButtonElement>;
 
+type CardContextMenuState = {
+  card: Card;
+  x: number;
+  y: number;
+};
+
 type DeckMetaState = {
   id: string;
   title: string | null;
@@ -116,6 +151,7 @@ type DeckMetaState = {
   authorId: string | null;
   authorXLink: string | null;
   authorYoutubeLink: string | null;
+  displayCardId: string | null;
 };
 
 function readDeckStatsOverride(deckId: string): DeckStatsOverride | null {
@@ -176,6 +212,7 @@ function buildDeckMetaState(deck: DeckDetailData): DeckMetaState {
     authorId: deck.authorId,
     authorXLink: deck.authorXLink,
     authorYoutubeLink: deck.authorYoutubeLink,
+    displayCardId: deck.displayCardId,
   };
 }
 
@@ -218,7 +255,13 @@ export function DeckDetailClient({
   const [favoriteErrorMessage, setFavoriteErrorMessage] = useState<string | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [cardContextMenu, setCardContextMenu] = useState<CardContextMenuState | null>(null);
+  const [isSavingDisplayCard, setIsSavingDisplayCard] = useState(false);
+  const [displayCardError, setDisplayCardError] = useState<string | null>(null);
   const hasLoggedViewRef = useRef(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressCardClickRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
   const fallbackPath = `/${locale}/decks/${encodeURIComponent(deckId)}`;
@@ -493,7 +536,81 @@ export function DeckDetailClient({
     void recordView();
   }, [currentUserId, deckMeta?.id, deckMeta?.viewsTotal]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setCardContextMenu(null);
+        setDisplayCardError(null);
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
   const totalCards = useMemo(() => deckEntries.reduce((sum, entry) => sum + entry.count, 0), [deckEntries]);
+
+  const deckAnalysis = useMemo(() => {
+    const costBuckets = Array.from({ length: 7 }, (_, cost) => ({ cost, count: 0 }));
+    const unitAffinityTotals = new Map<string, number>();
+    const unitStatTotals = {
+      attack: { total: 0, count: 0 },
+      health: { total: 0, count: 0 },
+      influence: { total: 0, count: 0 },
+    };
+    let totalCost = 0;
+    let cardsWithCost = 0;
+
+    for (const entry of deckEntries) {
+      const cost = Number(entry.card.cost);
+      if (Number.isFinite(cost) && cost >= 0) {
+        const bucket = Math.min(6, Math.floor(cost));
+        costBuckets[bucket].count += entry.count;
+        totalCost += cost * entry.count;
+        cardsWithCost += entry.count;
+      }
+
+      if (!entry.card.type.toLowerCase().includes('unit')) {
+        continue;
+      }
+
+      const affinity = normalizeAffinity(entry.card.affinity) || 'Neutral';
+      unitAffinityTotals.set(affinity, (unitAffinityTotals.get(affinity) ?? 0) + entry.count);
+
+      for (const key of ['attack', 'health', 'influence'] as const) {
+        const value = entry.card[key];
+        if (value == null || !Number.isFinite(value)) {
+          continue;
+        }
+        unitStatTotals[key].total += value * entry.count;
+        unitStatTotals[key].count += entry.count;
+      }
+    }
+
+    const unitAffinityCounts = Array.from(unitAffinityTotals.entries())
+      .map(([affinity, count]) => ({ affinity, count }))
+      .sort((a, b) => b.count - a.count || a.affinity.localeCompare(b.affinity));
+    const unitStats = (['attack', 'health', 'influence'] as const).map((key) => ({
+      key,
+      value: unitStatTotals[key].count > 0 ? unitStatTotals[key].total / unitStatTotals[key].count : null,
+    }));
+
+    return {
+      uniqueCards: deckEntries.length,
+      averageCost: cardsWithCost > 0 ? totalCost / cardsWithCost : 0,
+      costBuckets,
+      largestCostBucket: Math.max(1, ...costBuckets.map((bucket) => bucket.count)),
+      unitAffinityCounts,
+      largestUnitAffinityCount: Math.max(1, ...unitAffinityCounts.map((entry) => entry.count)),
+      unitStats,
+      largestUnitStat: Math.max(1, ...unitStats.map((stat) => stat.value ?? 0)),
+    };
+  }, [deckEntries]);
 
   const sections = useMemo<Section[]>(() => {
     if (deckEntries.length === 0) {
@@ -644,6 +761,106 @@ export function DeckDetailClient({
     });
   }
 
+  function openCardContextMenu(card: Card, clientX: number, clientY: number) {
+    const menuWidth = 250;
+    const menuHeight = 230;
+    const viewportWidth = typeof window === 'undefined' ? clientX + menuWidth : window.innerWidth;
+    const viewportHeight = typeof window === 'undefined' ? clientY + menuHeight : window.innerHeight;
+    const x = Math.max(12, Math.min(clientX, viewportWidth - menuWidth - 12));
+    const y = Math.max(12, Math.min(clientY, viewportHeight - menuHeight - 12));
+
+    handleZoom(null);
+    setDisplayCardError(null);
+    setCardContextMenu({ card, x, y });
+  }
+
+  function handleCardContextMenu(card: Card, event: ReactMouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    openCardContextMenu(card, event.clientX, event.clientY);
+  }
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressOriginRef.current = null;
+  }
+
+  function handleCardPointerDown(card: Card, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.pointerType !== 'touch') {
+      return;
+    }
+
+    clearLongPressTimer();
+    longPressOriginRef.current = { x: event.clientX, y: event.clientY };
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    longPressTimerRef.current = setTimeout(() => {
+      suppressCardClickRef.current = true;
+      openCardContextMenu(card, clientX, clientY);
+      longPressTimerRef.current = null;
+      setTimeout(() => {
+        suppressCardClickRef.current = false;
+      }, 800);
+    }, 550);
+  }
+
+  function handleCardPointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    const origin = longPressOriginRef.current;
+    if (!origin || event.pointerType !== 'touch') {
+      return;
+    }
+
+    if (Math.abs(event.clientX - origin.x) > 10 || Math.abs(event.clientY - origin.y) > 10) {
+      clearLongPressTimer();
+    }
+  }
+
+  async function handleSetDisplayCard(card: Card | null) {
+    if (!deckMeta || !currentUserId || currentUserId !== deckMeta.authorId || isSavingDisplayCard) {
+      return;
+    }
+
+    setIsSavingDisplayCard(true);
+    setDisplayCardError(null);
+
+    try {
+      const { data: sessionResult } = await supabase.auth.getSession();
+      const accessToken = sessionResult.session?.access_token;
+      if (!accessToken) {
+        throw new Error(labels.deckDetails.cardMenuError);
+      }
+
+      const response = await fetch(`/api/decks/${encodeURIComponent(deckMeta.id)}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: deckMeta.title ?? '',
+          description: deckMeta.description ?? '',
+          is_public: deckMeta.isPublic,
+          display_card_id: card?.id ?? null,
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as { message?: string } | null;
+      if (!response.ok) {
+        throw new Error(result?.message ?? labels.deckDetails.cardMenuError);
+      }
+
+      setDeckMeta((previous) => (previous ? { ...previous, displayCardId: card?.id ?? null } : previous));
+      setCardContextMenu(null);
+    } catch (error) {
+      console.error('Failed to update deck display card', error);
+      setDisplayCardError(labels.deckDetails.cardMenuError);
+    } finally {
+      setIsSavingDisplayCard(false);
+    }
+  }
+
   async function handleFavoriteToggle() {
     if (!deckMeta) {
       return;
@@ -791,68 +1008,84 @@ export function DeckDetailClient({
   ]
     .filter(Boolean)
     .join(' ');
-  const favoriteSupportMessage =
-    favoriteErrorMessage ?? (currentUserId === null ? labels.deckDetails.favoriteSignIn : null);
+  const favoriteSupportMessage = favoriteErrorMessage;
   const favoriteSupportClassName = favoriteErrorMessage
     ? 'text-xs text-red-400'
     : 'text-xs text-[color:var(--text-secondary)]';
+  const unitStatLabels = {
+    attack: labels.deckDetails.attackLabel,
+    health: labels.deckDetails.healthLabel,
+    influence: labels.deckDetails.influenceLabel,
+  };
+  const canSetDisplayCard = Boolean(currentUserId && currentUserId === deckMeta.authorId);
 
-  const chips = sections.length === 0 ? (
+  const deckManifest = sections.length === 0 ? (
     <p className="text-sm text-[color:var(--text-secondary)]">{emptyDeckLabel}</p>
   ) : (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {sections.map((section) => (
-        <section key={section.label} className="flex flex-col gap-3">
-          <header className="flex items-center justify-between border-b border-[color:var(--border)] pb-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+        <section key={section.label} className="flex flex-col gap-2.5">
+          <header className="flex items-center gap-3 border-b border-[color:var(--border)] pb-2">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-primary)]">
               {section.label}
             </h3>
-            <span className="text-xs text-[color:var(--text-secondary)]">x{section.total}</span>
+            <span className="h-px flex-1 bg-gradient-to-r from-[color:var(--accent)]/50 to-transparent" />
+            <span className="text-xs font-semibold text-[color:var(--accent)]">{section.total}</span>
           </header>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <ul className="grid gap-2 md:grid-cols-2">
             {section.entries.map(({ card, count }) => {
-              const scheme = getAffinityColorScheme(card.affinity);
+              const normalizedAffinity = normalizeAffinity(card.affinity);
+              const affinityIcon = normalizedAffinity ? getAffinityIconPath(normalizedAffinity) : null;
 
               return (
                 <li key={card.id}>
                   <button
                     type="button"
-                    onClick={() => handleZoom(card)}
+                    onClick={() => {
+                      if (suppressCardClickRef.current) {
+                        suppressCardClickRef.current = false;
+                        return;
+                      }
+                      handleZoom(card);
+                    }}
+                    onContextMenu={(event) => handleCardContextMenu(card, event)}
+                    onPointerDown={(event) => handleCardPointerDown(card, event)}
+                    onPointerMove={handleCardPointerMove}
+                    onPointerUp={clearLongPressTimer}
+                    onPointerCancel={clearLongPressTimer}
                     onMouseEnter={(event) => handleCardPreview(card, event)}
                     onFocus={(event) => handleCardPreview(card, event)}
                     onMouseLeave={() => handleZoom(null)}
                     onBlur={() => handleZoom(null)}
-                    className="group relative block w-full overflow-hidden rounded-[18px] border shadow-[0_10px_20px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(0,0,0,0.28)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
-                    style={{
-                      borderColor: scheme.borderColor,
-                      background: 'linear-gradient(180deg, rgba(15,23,42,0.65) 0%, rgba(15,23,42,0.9) 100%)',
-                    }}
+                    className="group relative flex min-h-[4.5rem] w-full touch-manipulation items-center overflow-hidden border border-l-0 border-[color:var(--border)] bg-black/15 text-left shadow-[0_8px_20px_rgba(0,0,0,0.12)] transition hover:-translate-y-px hover:border-[color:var(--accent)]/60 hover:border-l-0 hover:bg-white/[0.035] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                     aria-label={`View details for ${card.name}`}
                   >
-                    <div className="relative aspect-[3/4] w-full">
+                    <div className="relative aspect-[5/7] h-[4.5rem] shrink-0 overflow-hidden">
                       {card.imageSrc ? (
                         <img
                           src={card.imageSrc}
                           alt={card.name}
-                          className="block h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]"
+                          className="block h-full w-full object-contain transition duration-200 group-hover:scale-[1.03]"
                           loading="lazy"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[color:var(--surface-muted)] text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
-                          No Art
-                        </div>
+                        <div className="h-full w-full bg-[color:var(--surface-muted)]" />
                       )}
-                      <span
-                        className="pointer-events-none absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center justify-center rounded-full px-2 py-[2px] text-[10px] font-semibold uppercase tracking-[0.16em] shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
-                        style={{
-                          backgroundColor: 'var(--accent)',
-                          color: 'var(--text-on-accent)',
-                          border: '1px solid rgba(0,0,0,0.25)',
-                        }}
-                      >
-                        x{count}
-                      </span>
                     </div>
+                    <span className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2">
+                      <span className="truncate text-sm font-semibold text-[color:var(--text-primary)]">{card.name}</span>
+                      <span className="flex items-center gap-2 truncate text-[11px] text-[color:var(--text-secondary)]">
+                        {affinityIcon ? (
+                          <Image src={affinityIcon} alt="" width={15} height={15} className="h-[15px] w-[15px]" />
+                        ) : null}
+                        <span className="truncate">{card.type || FALLBACK_SECTION_LABEL}</span>
+                        <span aria-hidden="true">/</span>
+                        <span>{labels.deckDetails.costLabel} {card.cost}</span>
+                      </span>
+                    </span>
+                    <span className="mr-4 text-base font-semibold text-[color:var(--accent)] transition group-hover:text-[color:var(--text-primary)]">
+                      x{count}
+                    </span>
                   </button>
                 </li>
               );
@@ -864,7 +1097,7 @@ export function DeckDetailClient({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 text-[color:var(--text-primary)]">
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 px-4 py-6 text-[color:var(--text-primary)] sm:px-6 xl:px-8">
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <Link
@@ -997,134 +1230,329 @@ export function DeckDetailClient({
         ) : null}
       </div>
 
-      {authorDisplayName ? (
-        <div className="flex flex-col items-center gap-3 text-center">
-          {effectiveAuthorId ? (
-            <Link
-              href={`/${locale}/players/${encodeURIComponent(effectiveAuthorId)}`}
-              className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)] transition hover:text-[color:var(--accent)]"
-            >
-              {authorDisplayName}
-            </Link>
-          ) : (
-            <span className="text-xl font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] underline decoration-[color:var(--text-secondary)]">
-              {authorDisplayName}
-            </span>
-          )}
-          {authorSocials.length > 0 ? (
-            <div className="flex flex-col items-center gap-2 text-xs text-[color:var(--text-secondary)]">
-              <span className="font-semibold uppercase tracking-wide">{labels.publicProfile.socialsHeading}</span>
-              <div className="flex flex-wrap justify-center gap-3">
-                {authorSocials.map((social) => (
-                  <Link
-                    key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-sm font-medium text-[color:var(--accent)] hover:underline"
-                  >
-                    {social.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div
-        className="relative space-y-3 rounded-2xl border border-[color:var(--border)] p-6 shadow-sm text-white"
+      <section
+        className="relative overflow-hidden border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[0_18px_50px_rgba(0,0,0,0.2)]"
         style={{
-          backgroundImage: `linear-gradient(rgba(12, 15, 21, 0.35), rgba(12, 15, 21, 0.35)), ${buildAffinityGradient(
+          backgroundImage: `linear-gradient(105deg, rgba(17, 18, 18, 0.96) 0%, rgba(23, 22, 20, 0.91) 58%, rgba(17, 18, 18, 0.78) 100%), ${buildAffinityGradient(
             bannerAffinities
           )}`,
         }}
       >
-        <div className="absolute right-6 top-6 flex flex-wrap justify-end gap-3 text-xs font-semibold uppercase tracking-wide text-white md:flex-nowrap">
-          <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
-            <span className="sr-only">{labels.myDecks.viewsLabel}</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="h-4 w-4"
-            >
-              <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            {deckMeta?.viewsTotal ?? 0}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-md border border-white/40 bg-white/10 px-2.5 py-1">
-            <span className="sr-only">{labels.myDecks.favoritesLabel}</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-4 w-4 text-[color:var(--accent)]"
-            >
-              <path d="M12 21.35 10.55 20C5.4 15.36 2 12.27 2 8.5 2 6.5 3.5 5 5.5 5c1.54 0 2.85.99 3.57 2.36h1.87C13.75 5.99 15.06 5 16.6 5 18.6 5 20 6.5 20 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35z" />
-            </svg>
-            {deckMeta?.favoritesTotal ?? 0}
-          </span>
-        </div>
-        {formattedCreatedAt ? (
-          <div className="absolute bottom-6 right-6 text-sm font-semibold text-white">{formattedCreatedAt}</div>
-        ) : null}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-3 pr-20 md:pr-0 md:max-w-[80%]">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="w-full break-words text-3xl font-semibold text-white">{title}</h1>
-              {bannerAffinities.length > 0 ? (
-                <span className="flex items-center gap-1">
-                  {bannerAffinities.map((affinity) => {
-                    const iconSrc = getAffinityIconPath(affinity);
-                    if (!iconSrc) {
-                      return null;
-                    }
-                    return (
-                      <Image
-                        key={affinity}
-                        src={iconSrc}
-                        alt={`${affinity} affinity`}
-                        width={20}
-                        height={20}
-                        className="h-5 w-5"
-                      />
-                    );
-                  })}
-                </span>
-              ) : null}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[color:var(--accent)]" />
+        <div className="pointer-events-none absolute -right-20 -top-32 h-72 w-72 rotate-12 border border-white/[0.07]" />
+        <div className="relative grid gap-6 px-5 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-stretch lg:gap-10">
+          <div className="flex min-w-0 flex-col justify-center">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span
+                className="border border-white/15 bg-black/25 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70"
+                title={deckMeta.isPublic ? labels.deckDetails.publicNotice : labels.deckDetails.privateNotice}
+              >
+                {deckMeta.isPublic ? labels.myDecks.publicTag : labels.myDecks.privateTag}
+              </span>
+              {bannerAffinities.map((affinity) => {
+                const iconSrc = getAffinityIconPath(affinity);
+                return iconSrc ? (
+                  <Image key={affinity} src={iconSrc} alt={`${affinity} affinity`} width={22} height={22} />
+                ) : null;
+              })}
             </div>
-            {description ? (
-              <div className="space-y-2">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-white/80">
-                  {labels.deckDetails.notesHeading}
-                </h2>
-                <p className="break-words text-sm leading-6 text-white/80 whitespace-pre-line">{description}</p>
-              </div>
-            ) : null}
-          </div>
-        </div>
 
-        <dl className="mt-6 grid grid-cols-1 gap-4 text-sm text-white/80">
-          <div>
-            <dt className="mb-1 text-xs uppercase tracking-wide">{labels.myDecks.cardsLabel}</dt>
-            <dd className="text-base font-semibold text-white">{totalCards}</dd>
+            <h1 className="break-words font-serif text-3xl font-semibold leading-tight text-white sm:text-4xl">{title}</h1>
+            <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-6 text-white/65">
+              {description || labels.deckDetails.description}
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-white/55">
+              <span>{labels.myDecks.createdLabel}: {formattedCreatedAt ?? '-'}</span>
+              <span aria-hidden="true" className="text-[color:var(--accent)]">/</span>
+              {effectiveAuthorId ? (
+                <Link
+                  href={`/${locale}/players/${encodeURIComponent(effectiveAuthorId)}`}
+                  className="relative z-10 font-semibold text-white/80 transition hover:text-[color:var(--accent)] hover:underline"
+                >
+                  {authorDisplayName}
+                </Link>
+              ) : (
+                <span className="font-semibold text-white/80">{authorDisplayName}</span>
+              )}
+              {authorSocials.map((social) => (
+                <Link
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="relative z-10 text-[color:var(--accent)] hover:underline"
+                >
+                  {social.label}
+                </Link>
+              ))}
+            </div>
           </div>
-        </dl>
+
+          <dl className="grid grid-cols-2 border border-white/10 bg-black/20">
+            {[
+              [labels.myDecks.cardsLabel, totalCards],
+              [labels.deckDetails.uniqueCardsLabel, deckAnalysis.uniqueCards],
+              [labels.myDecks.viewsLabel, deckMeta.viewsTotal],
+              [labels.myDecks.favoritesLabel, deckMeta.favoritesTotal],
+            ].map(([label, value], index) => (
+              <div
+                key={String(label)}
+                className={`flex min-h-20 flex-col justify-center px-4 py-3 ${index % 2 === 0 ? 'border-r border-white/10' : ''} ${index < 2 ? 'border-b border-white/10' : ''}`}
+              >
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">{label}</dt>
+                <dd className="mt-1 text-2xl font-semibold text-white">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+        <section className="border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm sm:p-5">
+          <header className="mb-5 flex items-center justify-between border-b border-[color:var(--border)] pb-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent)]">
+                {labels.deckDetails.heading}
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-[color:var(--text-primary)]">
+                {labels.deckDetails.sectionsHeading}
+              </h2>
+            </div>
+            <span className="border border-[color:var(--border)] bg-black/10 px-3 py-1.5 text-sm font-semibold text-[color:var(--text-primary)]">
+              {totalCards}
+            </span>
+          </header>
+          {deckManifest}
+        </section>
+
+        <aside className="flex flex-col gap-4 xl:sticky xl:top-24">
+          <section className="border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent)]">
+              {labels.deckDetails.analysisHeading}
+            </p>
+            <div className="mt-3 grid grid-cols-3 divide-x divide-[color:var(--border)] border-y border-[color:var(--border)] py-3 text-center">
+              <div>
+                <div className="text-xl font-semibold text-[color:var(--text-primary)]">{totalCards}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  {labels.myDecks.cardsLabel}
+                </div>
+              </div>
+              <div>
+                <div className="text-xl font-semibold text-[color:var(--text-primary)]">{deckAnalysis.uniqueCards}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  {labels.deckDetails.uniqueCardsLabel}
+                </div>
+              </div>
+              <div>
+                <div className="text-xl font-semibold text-[color:var(--text-primary)]">
+                  {deckAnalysis.averageCost.toFixed(1)}
+                </div>
+                <div className="mt-1 text-[10px] uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  {labels.deckDetails.averageCostLabel}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-primary)]">
+              {labels.deckDetails.costCurveHeading}
+            </h3>
+            <div className="mt-4 flex h-32 items-end gap-2 border-b border-[color:var(--border)] px-1">
+              {deckAnalysis.costBuckets.map((bucket) => (
+                <div key={bucket.cost} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                  <span className="text-[10px] font-semibold text-[color:var(--text-secondary)]">{bucket.count}</span>
+                  <span
+                    className="w-full min-w-3 bg-gradient-to-t from-[color:var(--accent)]/55 to-[color:var(--accent)] transition-[height]"
+                    style={{ height: `${Math.max(3, (bucket.count / deckAnalysis.largestCostBucket) * 86)}px` }}
+                  />
+                  <span className="text-[10px] text-[color:var(--text-secondary)]">
+                    {bucket.cost === 6 ? '6+' : bucket.cost}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-primary)]">
+              {labels.deckDetails.compositionHeading}
+            </h3>
+            <div className="mt-4 space-y-3">
+              {sections.map((section) => {
+                const percentage = totalCards > 0 ? (section.total / totalCards) * 100 : 0;
+                return (
+                  <div key={section.label}>
+                    <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                      <span className="truncate font-medium text-[color:var(--text-primary)]">{section.label}</span>
+                      <span className="text-[color:var(--text-secondary)]">{section.total}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden bg-black/25">
+                      <div
+                        className="h-full bg-[color:var(--accent)]"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-primary)]">
+              {labels.deckDetails.affinityUnitsHeading}
+            </h3>
+            {deckAnalysis.unitAffinityCounts.length === 0 ? (
+              <p className="mt-4 text-xs text-[color:var(--text-secondary)]">{emptyDeckLabel}</p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {deckAnalysis.unitAffinityCounts.map(({ affinity, count }) => {
+                  const iconSrc = getAffinityIconPath(affinity);
+                  const percentage = (count / deckAnalysis.largestUnitAffinityCount) * 100;
+                  return (
+                    <div key={affinity}>
+                      <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                        <span className="flex min-w-0 items-center gap-2 font-medium text-[color:var(--text-primary)]">
+                          {iconSrc ? <Image src={iconSrc} alt="" width={17} height={17} /> : null}
+                          <span className="truncate">{affinity}</span>
+                        </span>
+                        <span className="font-semibold text-[color:var(--text-primary)]">{count}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden bg-black/25">
+                        <div
+                          className="h-full"
+                          style={{ width: `${percentage}%`, backgroundColor: getAffinityBaseColor(affinity) }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-primary)]">
+              {labels.deckDetails.unitStatsHeading}
+            </h3>
+            <div className="mt-4 space-y-3">
+              {deckAnalysis.unitStats.map((stat) => {
+                const percentage = stat.value == null ? 0 : (stat.value / deckAnalysis.largestUnitStat) * 100;
+                return (
+                  <div key={stat.key} className="grid grid-cols-[5rem_1fr_2.5rem] items-center gap-3">
+                    <span className="truncate text-xs font-medium text-[color:var(--text-secondary)]">
+                      {unitStatLabels[stat.key]}
+                    </span>
+                    <div className="h-2 overflow-hidden bg-black/25">
+                      <div
+                        className="h-full bg-gradient-to-r from-[color:var(--accent)]/55 to-[color:var(--accent)]"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-right text-sm font-semibold text-[color:var(--text-primary)]">
+                      {stat.value == null ? '-' : stat.value % 1 === 0 ? stat.value : stat.value.toFixed(1)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </aside>
       </div>
 
-      <section className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm">
-        <header className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{labels.deckDetails.sectionsHeading}</h2>
-          <span className="text-sm text-[color:var(--text-secondary)]">
-            {labels.myDecks.cardsLabel}: {totalCards}
-          </span>
-        </header>
-        {chips}
-      </section>
+      {cardContextMenu ? (
+        <div
+          className="fixed inset-0 z-40"
+          onPointerDown={() => {
+            setCardContextMenu(null);
+            setDisplayCardError(null);
+          }}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <div
+            role="menu"
+            aria-label={cardContextMenu.card.name}
+            className="fixed z-50 w-[238px] overflow-hidden border border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl"
+            style={{ left: cardContextMenu.x, top: cardContextMenu.y }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 border-b border-[color:var(--border)] bg-black/15 p-3">
+              <div className="relative aspect-[5/7] h-12 shrink-0 overflow-hidden">
+                <img
+                  src={cardContextMenu.card.imageSrc}
+                  alt=""
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <span className="line-clamp-2 text-sm font-semibold text-[color:var(--text-primary)]">
+                {cardContextMenu.card.name}
+              </span>
+            </div>
+            <div className="p-1.5">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const card = cardContextMenu.card;
+                  setCardContextMenu(null);
+                  const returnPath = `/${locale}/decks/${encodeURIComponent(deckId)}`;
+                  router.push(
+                    `/${locale}/cards/${encodeURIComponent(card.id)}?from=${encodeURIComponent(returnPath)}`
+                  );
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 text-[color:var(--accent)]">
+                  <path d="M1.5 12C3.5 7 7.5 4 12 4s8.5 3 10.5 8c-2 5-6 8-10.5 8s-8.5-3-10.5-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                {labels.deckDetails.cardMenuViewDetails}
+              </button>
+              {canSetDisplayCard ? (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleSetDisplayCard(cardContextMenu.card)}
+                    disabled={isSavingDisplayCard || deckMeta.displayCardId === cardContextMenu.card.id}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-muted)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)] disabled:cursor-default disabled:text-[color:var(--text-secondary)]"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 text-[color:var(--accent)]">
+                      <path d="M5 4h14v16H5z" />
+                      <path d="m8 15 3-3 2 2 3-4 2 3" />
+                    </svg>
+                    {isSavingDisplayCard
+                      ? labels.deckDetails.cardMenuSaving
+                      : deckMeta.displayCardId === cardContextMenu.card.id
+                        ? labels.deckDetails.cardMenuDisplaySelected
+                        : labels.deckDetails.cardMenuSetDisplay}
+                  </button>
+                  {deckMeta.displayCardId ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => void handleSetDisplayCard(null)}
+                      disabled={isSavingDisplayCard}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text-primary)] focus:outline-none focus-visible:bg-[color:var(--surface-muted)]"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                        <path d="M4 12a8 8 0 1 0 2.34-5.66L4 8.68" />
+                        <path d="M4 4v4.68h4.68" />
+                      </svg>
+                      {labels.deckDetails.cardMenuUseAutomatic}
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+              {displayCardError ? (
+                <p className="px-3 py-2 text-xs text-red-400">{displayCardError}</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ZoomOverlay card={zoomCard} variant={zoomVariant} anchor={zoomAnchor} onClose={() => handleZoom(null)} />
     </div>

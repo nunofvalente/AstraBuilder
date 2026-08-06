@@ -403,7 +403,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
     }
 
     return (
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {currentDecks.map((deck) => {
           const trimmedName = deck.authorName?.trim() ?? '';
           const authorLabel = trimmedName.length > 0 ? trimmedName : null;
@@ -423,6 +423,7 @@ export function MyDecksClient({ locale, labels }: MyDecksClientProps) {
                 publicTag: labels.publicTag,
                 privateTag: labels.privateTag,
               }}
+              variant="compactDetailed"
               showPrivacyTag={!isFavoritesView}
               author={author}
               onEdit={

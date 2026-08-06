@@ -315,6 +315,8 @@ export function getPlayControlsCopy(locale: Locale): PlayControlsCopy & ExtraCon
 }
 
 export type PlayLobbyCopy = {
+  battlefield: string;
+  setupDescription: string;
   botDeck: string;
   botDifficulty: string;
   botOpponent: string;
@@ -369,6 +371,7 @@ export type PlayLobbyCopy = {
 
 const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
   en: {
+    battlefield: 'Battlefield', setupDescription: 'Choose your deck, select a way to play, and prepare for the next match.',
     botDeck: 'Bot deck', botDifficulty: 'Bot difficulty', botOpponent: 'Bot opponent', buildDeck: 'Build a deck',
     cardCount: (count) => `${count} ${count === 1 ? 'card' : 'cards'}`,
     cardCountSelected: (count) => `${count} ${count === 1 ? 'card' : 'cards'} selected`,
@@ -383,6 +386,7 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     unableToLoadDecks: 'Unable to load decks.', untitledDeck: 'Untitled deck', usesDefaultBotStrategy: 'Uses the default balanced bot strategy.', yourDeck: 'Your deck',
   },
   fr: {
+    battlefield: 'Champ de bataille', setupDescription: 'Choisissez votre deck, votre mode de jeu et preparez la prochaine partie.',
     botDeck: 'Deck du bot', botDifficulty: 'Difficulté du bot', botOpponent: 'Adversaire bot', buildDeck: 'Construire un deck',
     cardCount: (count) => `${count} carte${count === 1 ? '' : 's'}`,
     cardCountSelected: (count) => `${count} carte${count === 1 ? '' : 's'} sélectionnée${count === 1 ? '' : 's'}`,
@@ -397,6 +401,7 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     unableToLoadDecks: 'Impossible de charger les decks.', untitledDeck: 'Deck sans titre', usesDefaultBotStrategy: 'Utilise la stratégie équilibrée par défaut du bot.', yourDeck: 'Votre deck',
   },
   de: {
+    battlefield: 'Schlachtfeld', setupDescription: 'Waehle dein Deck und deine Spielart und bereite das naechste Match vor.',
     botDeck: 'Bot-Deck', botDifficulty: 'Bot-Schwierigkeit', botOpponent: 'Bot-Gegner', buildDeck: 'Deck bauen',
     cardCount: (count) => `${count} ${count === 1 ? 'Karte' : 'Karten'}`,
     cardCountSelected: (count) => `${count} ${count === 1 ? 'Karte' : 'Karten'} ausgewählt`,
@@ -411,6 +416,7 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     unableToLoadDecks: 'Decks konnten nicht geladen werden.', untitledDeck: 'Unbenanntes Deck', usesDefaultBotStrategy: 'Verwendet die ausgewogene Standardstrategie des Bots.', yourDeck: 'Dein Deck',
   },
   ms: {
+    battlefield: 'Medan Tempur', setupDescription: 'Pilih dek dan cara bermain, kemudian bersedia untuk perlawanan seterusnya.',
     botDeck: 'Dek bot', botDifficulty: 'Kesukaran bot', botOpponent: 'Lawan bot', buildDeck: 'Bina dek',
     cardCount: (count) => `${count} kad`,
     cardCountSelected: (count) => `${count} kad dipilih`,
@@ -425,6 +431,7 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     unableToLoadDecks: 'Tidak dapat memuatkan dek.', untitledDeck: 'Dek tanpa tajuk', usesDefaultBotStrategy: 'Menggunakan strategi bot seimbang lalai.', yourDeck: 'Dek anda',
   },
   'zh-CN': {
+    battlefield: '战场', setupDescription: '选择你的牌组和游戏方式，为下一场对局做好准备。',
     botDeck: '机器人牌组', botDifficulty: '机器人难度', botOpponent: '机器人对手', buildDeck: '构筑牌组',
     cardCount: (count) => `${count} 张卡`,
     cardCountSelected: (count) => `已选择 ${count} 张卡`,
@@ -439,6 +446,7 @@ const LOBBY_COPY: Record<Locale, PlayLobbyCopy> = {
     unableToLoadDecks: '无法加载牌组。', untitledDeck: '未命名牌组', usesDefaultBotStrategy: '使用默认的均衡机器人策略。', yourDeck: '你的牌组',
   },
   ja: {
+    battlefield: 'バトルフィールド', setupDescription: 'デッキとプレイ方法を選び、次の対戦に備えましょう。',
     botDeck: 'ボットデッキ', botDifficulty: 'ボット難易度', botOpponent: 'ボット対戦相手', buildDeck: 'デッキを作成',
     cardCount: (count) => `${count}枚`,
     cardCountSelected: (count) => `${count}枚選択中`,
