@@ -1293,6 +1293,27 @@ body.simulator-route-active .app-top-bar {
     top: 4.3rem;
   }
 
+  .play-combat-stats-badge {
+    height: auto;
+    min-width: 1.35rem;
+    flex-direction: column;
+    gap: 0;
+    padding: 0.15rem 0.2rem;
+    line-height: 0.65rem;
+  }
+
+  .play-combat-stat-separator {
+    display: none;
+  }
+
+  .play-combat-stat-health {
+    width: 100%;
+    margin-top: 0.08rem;
+    padding-top: 0.08rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.28);
+    text-align: center;
+  }
+
   .play-match-workspace > .play-game-board {
     margin-block: auto;
   }

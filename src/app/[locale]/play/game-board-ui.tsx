@@ -139,16 +139,16 @@ export function CombatStatsBadge({
 
   return (
     <span
-      className={`absolute bottom-1 right-1 z-20 inline-flex h-5 min-w-[2.8rem] items-center justify-center gap-1 rounded border bg-black/80 px-1 text-[0.58rem] font-black leading-none shadow-md ${
+      className={`play-combat-stats-badge absolute bottom-1 right-1 z-20 inline-flex h-5 min-w-[2.8rem] items-center justify-center gap-1 rounded border bg-black/80 px-1 text-[0.58rem] font-black leading-none shadow-md ${
         modified ? 'border-amber-300/90' : 'border-white/35'
       }`}
       title={`Current stats: ${attack} attack, ${health} health${modified ? ` (printed ${instance.card.attack}/${instance.card.health})` : ''}`}
       aria-label={`${instance.card.name} has ${attack} attack and ${health} health${modified ? ', modified' : ''}`}
       data-combat-stats-modified={modified ? 'true' : 'false'}
     >
-      <span className="text-red-300">{attack}</span>
-      <span className="text-white/60">/</span>
-      <span className="text-emerald-300">{health}</span>
+      <span className="play-combat-stat-attack text-red-300">{attack}</span>
+      <span className="play-combat-stat-separator text-white/60">/</span>
+      <span className="play-combat-stat-health text-emerald-300">{health}</span>
     </span>
   );
 }
