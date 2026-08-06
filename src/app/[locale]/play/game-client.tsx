@@ -236,6 +236,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
   const [pendingLucilleSacrificeIds, setPendingLucilleSacrificeIds] = useState<string[]>([]);
   const [isConcedeDialogOpen, setIsConcedeDialogOpen] = useState(false);
   const [isPassTurnDialogOpen, setIsPassTurnDialogOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [attackArrow, setAttackArrow] = useState<AttackArrowState | null>(null);
   const [hoveredCounterPreviewCards, setHoveredCounterPreviewCards] = useState<GameCardInstance[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
@@ -1721,12 +1722,32 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
         {attackArrow ? <AttackArrowOverlay arrow={attackArrow} /> : null}
         <CardZoomPreview cards={hoveredCounterPreviewCards} />
         <div className="play-game-layout grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(12rem,0.48fr)_minmax(0,2.63fr)]">
-          <div className="play-game-sidebar flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0">
+          {isMobileSidebarOpen ? (
+            <button
+              type="button"
+              className="play-mobile-sidebar-backdrop"
+              aria-label={playCopy.actionLog}
+              onClick={() => setIsMobileSidebarOpen(false)}
+            />
+          ) : null}
+          <div className={`play-game-sidebar flex min-h-[18rem] min-w-0 flex-col gap-3 xl:min-h-0${isMobileSidebarOpen ? ' is-open' : ''}`}>
+            <button
+              type="button"
+              className="play-mobile-sidebar-toggle"
+              aria-label={playCopy.actionLog}
+              aria-expanded={isMobileSidebarOpen}
+              onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
+            >
+              <span aria-hidden="true">{isMobileSidebarOpen ? '<' : '>'}</span>
+              <span className="play-mobile-sidebar-score" aria-hidden="true">
+                {gameState.playerVictoryPoints}-{gameState.opponentVictoryPoints}
+              </span>
+            </button>
             <section className="play-game-controls rounded-lg border border-[color:var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.06)),var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-              <button type="button" onClick={returnToLobby} className="play-controls-lobby mb-2 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
+              <button type="button" onClick={returnToLobby} className="mb-2 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-xs font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]">
                 {controlsCopy.backToLobby}
               </button>
-              <div className="play-controls-turn mb-3 rounded-md border border-[color:var(--border)] bg-black/15 px-3 py-2 text-center">
+              <div className="mb-3 rounded-md border border-[color:var(--border)] bg-black/15 px-3 py-2 text-center">
                 <p className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">
                   {gameState.phase === 'setup' ? `${playCopy.turn} 0 · ${controlsCopy.setup}` : `${playCopy.turn} ${gameState.turn}`}
                 </p>
@@ -1738,11 +1759,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                       : controlsCopy.botTurn}
                 </p>
               </div>
-              <div className="play-controls-scores mb-3 grid gap-2">
+              <div className="mb-3 grid gap-2">
                 <VictoryPointScoreControl label={controlsCopy.yourVictoryPoints} value={gameState.playerVictoryPoints} tone="player" />
                 <VictoryPointScoreControl label={controlsCopy.enemyVictoryPoints} value={gameState.opponentVictoryPoints} tone="opponent" />
               </div>
-              <div className="play-controls-actions grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setIsConcedeDialogOpen(true)} className="inline-flex items-center justify-center gap-1 rounded-md border border-red-500/45 bg-red-500/10 px-2 py-2 text-xs font-semibold text-red-100 transition hover:border-red-300 focus:outline-none focus-visible:ring focus-visible:ring-red-400">
                   <Flag className="h-3.5 w-3.5" aria-hidden="true" />
                   {controlsCopy.concede}
