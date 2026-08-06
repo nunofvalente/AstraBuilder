@@ -2,7 +2,16 @@
 
 import Image from 'next/image';
 import type { Locale } from '@/i18n/config';
-import { useEffect, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type MouseEventHandler,
+  type PointerEventHandler,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 
 import type { Card } from '../create/deck-builder/types';
 import { type GameCardInstance, type GameState, type Owner } from './game-rules';
@@ -39,10 +48,91 @@ export function useCloseOnOutsidePointerDown(
   }, [isOpen, refs, onClose]);
 }
 
+type LongPressPreviewHandlers = {
+  onClickCapture: MouseEventHandler<HTMLElement>;
+  onContextMenu: MouseEventHandler<HTMLElement>;
+  onPointerCancel: PointerEventHandler<HTMLElement>;
+  onPointerDown: PointerEventHandler<HTMLElement>;
+  onPointerMove: PointerEventHandler<HTMLElement>;
+  onPointerUp: PointerEventHandler<HTMLElement>;
+};
+
+export function useLongPressPreview<T>(
+  onPreview: (value: T) => void,
+  onPreviewEnd: () => void,
+  delayMs = 450,
+): (value: T) => LongPressPreviewHandlers {
+  const timerRef = useRef<number | null>(null);
+  const originRef = useRef<{ x: number; y: number } | null>(null);
+  const previewActiveRef = useRef(false);
+  const suppressClickRef = useRef(false);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const finishPress = useCallback((keepClickSuppressed: boolean) => {
+    clearTimer();
+    originRef.current = null;
+    if (previewActiveRef.current) {
+      previewActiveRef.current = false;
+      suppressClickRef.current = keepClickSuppressed;
+      onPreviewEnd();
+    }
+  }, [clearTimer, onPreviewEnd]);
+
+  useEffect(() => () => clearTimer(), [clearTimer]);
+
+  return useCallback((value: T): LongPressPreviewHandlers => ({
+    onClickCapture: (event) => {
+      if (!suppressClickRef.current) {
+        return;
+      }
+      suppressClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    onContextMenu: (event) => {
+      if (previewActiveRef.current || window.matchMedia('(pointer: coarse)').matches) {
+        event.preventDefault();
+      }
+    },
+    onPointerCancel: () => finishPress(false),
+    onPointerDown: (event) => {
+      if (event.pointerType === 'mouse' || (event.button ?? 0) !== 0) {
+        return;
+      }
+      clearTimer();
+      suppressClickRef.current = false;
+      previewActiveRef.current = false;
+      originRef.current = { x: event.clientX, y: event.clientY };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      timerRef.current = window.setTimeout(() => {
+        timerRef.current = null;
+        previewActiveRef.current = true;
+        suppressClickRef.current = true;
+        onPreview(value);
+      }, delayMs);
+    },
+    onPointerMove: (event) => {
+      const origin = originRef.current;
+      if (!origin || Math.hypot(event.clientX - origin.x, event.clientY - origin.y) <= 10) {
+        return;
+      }
+      finishPress(previewActiveRef.current);
+    },
+    onPointerUp: () => finishPress(true),
+  }), [clearTimer, delayMs, finishPress, onPreview]);
+}
+
 export function CardZoomPreview({
   card = null,
   cards = null,
   interactive = false,
+  mobileVisible = false,
   side = 'right',
   zIndexClassName = 'z-50',
   onMouseEnter,
@@ -51,6 +141,7 @@ export function CardZoomPreview({
   card?: Card | null;
   cards?: GameCardInstance[] | null;
   interactive?: boolean;
+  mobileVisible?: boolean;
   side?: 'left' | 'center' | 'right';
   zIndexClassName?: string;
   onMouseEnter?: () => void;
@@ -73,7 +164,7 @@ export function CardZoomPreview({
   return (
     <div
       data-card-zoom-preview
-      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} fixed ${side === 'left' ? 'left-5' : side === 'center' ? 'left-[55%] -translate-x-1/2' : 'right-5'} top-8 ${zIndexClassName} hidden w-80 lg:block`}
+      className={`${interactive ? 'pointer-events-auto' : 'pointer-events-none'} play-card-zoom-preview fixed left-1/2 top-1/2 ${zIndexClassName} w-[min(78vw,20rem)] -translate-x-1/2 -translate-y-1/2 ${mobileVisible ? 'block' : 'hidden'} lg:top-8 lg:block lg:w-80 lg:translate-y-0 ${side === 'left' ? 'lg:left-5 lg:translate-x-0' : side === 'center' ? 'lg:left-[55%] lg:-translate-x-1/2' : 'lg:left-auto lg:right-5 lg:translate-x-0'}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -124,6 +215,8 @@ export function AttachedEquipmentCards({
   interactive = false,
   onCardMouseEnter,
   onCardMouseLeave,
+  onCardLongPress,
+  onCardLongPressEnd,
 }: {
   cards: GameCardInstance[];
   cardHeight: number;
@@ -132,7 +225,14 @@ export function AttachedEquipmentCards({
   interactive?: boolean;
   onCardMouseEnter?: (instance: GameCardInstance) => void;
   onCardMouseLeave?: (instance: GameCardInstance) => void;
+  onCardLongPress?: (instance: GameCardInstance) => void;
+  onCardLongPressEnd?: () => void;
 }) {
+  const getLongPressPreviewProps = useLongPressPreview<GameCardInstance>(
+    (instance) => onCardLongPress?.(instance),
+    () => onCardLongPressEnd?.(),
+  );
+
   if (cards.length === 0) {
     return null;
   }
@@ -144,6 +244,7 @@ export function AttachedEquipmentCards({
       {cards.map((instance, index) => (
         <div
           key={instance.instanceId}
+          {...(onCardLongPress ? getLongPressPreviewProps(instance) : {})}
           className="absolute top-0 aspect-[5/7] overflow-hidden rounded-md border border-black/30 bg-[color:var(--surface)] shadow-md"
           style={{
             height: `${cardHeight}px`,

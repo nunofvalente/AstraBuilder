@@ -705,9 +705,17 @@ describe('BattlefieldPanel', () => {
 
     fireEvent.mouseEnter(screen.getByRole('button', { name: /open right battlefield unit actions/i }));
 
-    expect(container.querySelector('[data-card-zoom-preview]')).toHaveClass('left-[55%]', '-translate-x-1/2', 'top-8');
-    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('left-5');
-    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('right-5');
+    expect(container.querySelector('[data-card-zoom-preview]')).toHaveClass(
+      'left-1/2',
+      'top-1/2',
+      '-translate-x-1/2',
+      '-translate-y-1/2',
+      'lg:left-[55%]',
+      'lg:-translate-x-1/2',
+      'lg:top-8',
+    );
+    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('lg:left-5');
+    expect(container.querySelector('[data-card-zoom-preview]')).not.toHaveClass('lg:right-5');
   });
 
   it('zooms face-down opponent territories as card backs', () => {

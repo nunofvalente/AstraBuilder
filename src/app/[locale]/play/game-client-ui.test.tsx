@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { render, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createTestCard } from '../create/deck-builder/test-utils';
 import { CARD_BACK_IMAGE_SRC } from './game-client-support';
-import { ActionLogList, OpponentHandStrip } from './game-client-ui';
+import { ActionLogList, CardZoomPreview, OpponentHandStrip, useLongPressPreview } from './game-client-ui';
 import type { GameCardInstance, LogEntry } from './game-rules';
 
 function makeInstance(overrides: Partial<GameCardInstance> = {}): GameCardInstance {
@@ -25,6 +26,68 @@ function makeInstance(overrides: Partial<GameCardInstance> = {}): GameCardInstan
     ...overrides,
   };
 }
+
+function LongPressPreviewHarness() {
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const getLongPressProps = useLongPressPreview(
+    () => setIsPreviewVisible(true),
+    () => setIsPreviewVisible(false),
+    100,
+  );
+
+  return (
+    <>
+      <button type="button" {...getLongPressProps('card')} onClick={() => setTapCount((count) => count + 1)}>
+        Card
+      </button>
+      <span>Tap count: {tapCount}</span>
+      {isPreviewVisible ? <span>Zoomed card</span> : null}
+    </>
+  );
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('mobile card zoom', () => {
+  it('shows a preview after a touch hold and suppresses the resulting tap', () => {
+    vi.useFakeTimers();
+    render(<LongPressPreviewHarness />);
+    const card = screen.getByRole('button', { name: 'Card' });
+
+    fireEvent.pointerDown(card, { pointerType: 'touch', pointerId: 1, button: 0, clientX: 10, clientY: 10 });
+    act(() => vi.advanceTimersByTime(100));
+    expect(screen.getByText('Zoomed card')).toBeInTheDocument();
+
+    fireEvent.pointerUp(card, { pointerType: 'touch', pointerId: 1, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.click(card);
+    expect(screen.queryByText('Zoomed card')).not.toBeInTheDocument();
+    expect(screen.getByText('Tap count: 0')).toBeInTheDocument();
+  });
+
+  it('keeps a short touch as a normal tap', () => {
+    vi.useFakeTimers();
+    render(<LongPressPreviewHarness />);
+    const card = screen.getByRole('button', { name: 'Card' });
+
+    fireEvent.pointerDown(card, { pointerType: 'touch', pointerId: 2, button: 0, clientX: 10, clientY: 10 });
+    act(() => vi.advanceTimersByTime(50));
+    fireEvent.pointerUp(card, { pointerType: 'touch', pointerId: 2, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.click(card);
+
+    expect(screen.queryByText('Zoomed card')).not.toBeInTheDocument();
+    expect(screen.getByText('Tap count: 1')).toBeInTheDocument();
+  });
+
+  it('makes the existing zoom preview visible below the desktop breakpoint when requested', () => {
+    const card = createTestCard({ id: 'zoom-card', name: 'Zoom Card', imageSrc: '/zoom-card.webp' });
+    const { container } = render(<CardZoomPreview card={card} mobileVisible />);
+
+    expect(container.querySelector('[data-card-zoom-preview]')).toHaveClass('block');
+  });
+});
 
 describe('ActionLogList', () => {
   it('bolds every occurrence of every card name in a log message', () => {

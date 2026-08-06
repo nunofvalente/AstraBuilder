@@ -34,6 +34,7 @@ import {
   CompactZoneStack,
   getReadyStateClassName,
   useCloseOnOutsidePointerDown,
+  useLongPressPreview,
 } from './game-client-ui';
 import { getBanishOnDeathLabel, getLocalizedCardDisplay, getPlayBoardCopy } from './play-localization';
 
@@ -496,10 +497,22 @@ export function BattlefieldPanel({
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
   const activeInstance = cards.find((instance) => instance.instanceId === activeInstanceId) ?? null;
   const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const [isTouchPreviewActive, setIsTouchPreviewActive] = useState(false);
   const previewClearTimeoutRef = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const isFourKViewport = useIsFourKViewport();
+  const getLongPressPreviewProps = useLongPressPreview<GameCardInstance>(
+    (instance) => {
+      setIsTouchPreviewActive(true);
+      openPreview(instance);
+    },
+    () => {
+      setIsTouchPreviewActive(false);
+      cancelPreviewClear();
+      setPreviewCards(null);
+    },
+  );
   const actions = activeInstance
     ? getBattlefieldActions(zone, activeInstance, {
         canFlipFaceUp:
@@ -598,6 +611,7 @@ export function BattlefieldPanel({
       <button
         ref={isActive ? triggerRef : undefined}
         type="button"
+        {...getLongPressPreviewProps(instance)}
         data-card-instance-id={instance.instanceId}
         data-card-zone={zone}
         data-card-owner={getCardController(instance)}
@@ -651,6 +665,7 @@ export function BattlefieldPanel({
       <CardZoomPreview
         cards={previewCards}
         interactive
+        mobileVisible={isTouchPreviewActive}
         side={zone === 'battlefieldRight' ? 'center' : 'right'}
         onMouseEnter={cancelPreviewClear}
         onMouseLeave={() => {
@@ -685,6 +700,15 @@ export function BattlefieldPanel({
                   interactive
                   onCardMouseEnter={openEquipmentPreview}
                   onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
+                  onCardLongPress={(instance) => {
+                    setIsTouchPreviewActive(true);
+                    openEquipmentPreview(instance);
+                  }}
+                  onCardLongPressEnd={() => {
+                    setIsTouchPreviewActive(false);
+                    cancelPreviewClear();
+                    setPreviewCards(null);
+                  }}
                 />
               </div>
             ) : null}
@@ -793,6 +817,7 @@ export function CombinedStagingSupplyPanel({
     placement: 'above' | 'below';
   } | null>(null);
   const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
+  const [isTouchPreviewActive, setIsTouchPreviewActive] = useState(false);
   const [isGraveyardOpen, setIsGraveyardOpen] = useState(false);
   const [isBanishOpen, setIsBanishOpen] = useState(false);
   const previewClearTimeoutRef = useRef<number | null>(null);
@@ -800,6 +825,18 @@ export function CombinedStagingSupplyPanel({
   const stagingMenuRef = useRef<HTMLDivElement | null>(null);
   const isFourKViewport = useIsFourKViewport();
   const isPortraitViewport = useIsPortraitViewport();
+  const getLongPressPreviewProps = useLongPressPreview<GameCardInstance[]>(
+    (instances) => {
+      cancelPreviewClear();
+      setIsTouchPreviewActive(true);
+      setPreviewCards(instances);
+    },
+    () => {
+      setIsTouchPreviewActive(false);
+      cancelPreviewClear();
+      setPreviewCards(null);
+    },
+  );
   const activeStagingCard = visibleStagingCards.find((instance) => instance.instanceId === activeStagingCardId) ?? null;
   const stagingTargets: BattlefieldZoneId[] = activeStagingCard?.ready && isUnitCard(activeStagingCard.card) && onAttack
     ? ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight']
@@ -894,6 +931,7 @@ export function CombinedStagingSupplyPanel({
       <CardZoomPreview
         cards={previewCards}
         interactive
+        mobileVisible={isTouchPreviewActive}
         zIndexClassName={isGraveyardOpen || isBanishOpen ? 'z-[100]' : 'z-50'}
         onMouseEnter={cancelPreviewClear}
         onMouseLeave={() => {
@@ -929,12 +967,22 @@ export function CombinedStagingSupplyPanel({
                         interactive
                         onCardMouseEnter={openEquipmentPreview}
                         onCardMouseLeave={(instance) => schedulePreviewClear(instance.instanceId)}
+                        onCardLongPress={(instance) => {
+                          setIsTouchPreviewActive(true);
+                          openEquipmentPreview(instance);
+                        }}
+                        onCardLongPressEnd={() => {
+                          setIsTouchPreviewActive(false);
+                          cancelPreviewClear();
+                          setPreviewCards(null);
+                        }}
                       />
                     </div>
                   ) : null}
                   <button
                     ref={activeStagingCardId === instance.instanceId ? activeStagingTriggerRef : undefined}
                     type="button"
+                    {...getLongPressPreviewProps([instance, ...attachedItems])}
                     data-card-instance-id={instance.instanceId}
                     data-card-zone="staging"
                     data-card-owner={mirror ? 'opponent' : 'player'}
@@ -1083,6 +1131,7 @@ export function CombinedStagingSupplyPanel({
                       {canInspectSupplyCards ? (
                         <button
                           type="button"
+                          {...getLongPressPreviewProps([{ ...instance, faceDown: false }])}
                           data-card-instance-id={instance.instanceId}
                           data-card-zone="supply"
                           data-card-owner={mirror ? 'opponent' : 'player'}
@@ -1379,6 +1428,7 @@ export function HandStrip({
   const copy = getPlayBoardCopy(locale);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
+  const [isTouchPreviewActive, setIsTouchPreviewActive] = useState(false);
   const activeHandTriggerRef = useRef<HTMLButtonElement | null>(null);
   const handMenuRef = useRef<HTMLDivElement | null>(null);
   const activeInstance = cards.find((instance) => instance.instanceId === activeCardId) ?? null;
@@ -1404,6 +1454,16 @@ export function HandStrip({
     deckSelector: '[data-player-deck]',
     fallbackDeckY: typeof window === 'undefined' ? 0 : window.innerHeight - 240,
   });
+  const getLongPressPreviewProps = useLongPressPreview<Card>(
+    (card) => {
+      setIsTouchPreviewActive(true);
+      setPreviewCard(card);
+    },
+    () => {
+      setIsTouchPreviewActive(false);
+      setPreviewCard(null);
+    },
+  );
 
   useCloseOnOutsidePointerDown(activeInstance !== null, [activeHandTriggerRef, handMenuRef], closeHandMenu);
 
@@ -1474,7 +1534,7 @@ export function HandStrip({
           </div>
         </div>
       ) : null}
-      <CardZoomPreview card={previewCard} />
+      <CardZoomPreview card={previewCard} mobileVisible={isTouchPreviewActive} />
       {cards.length === 0 ? (
         <p className="mx-auto translate-y-4 max-w-4xl rounded-md border border-dashed border-[color:var(--border)] px-3 py-4 text-center text-sm text-[color:var(--text-secondary)]">
           {copy.emptyHand}
@@ -1502,6 +1562,7 @@ export function HandStrip({
               <button
                 ref={activeCardId === instance.instanceId ? activeHandTriggerRef : undefined}
                 type="button"
+                {...getLongPressPreviewProps(instance.card)}
                 data-card-instance-id={instance.instanceId}
                 data-card-zone="hand"
                 data-card-owner="player"

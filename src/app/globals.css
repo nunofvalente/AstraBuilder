@@ -1207,6 +1207,16 @@ body.simulator-route-active .app-top-bar {
   display: none;
 }
 
+@media (max-width: 1023px) {
+  .play-card-zoom-preview {
+    width: min(78vw, 20rem, calc(71.4286dvh - 1.4286rem));
+  }
+
+  .play-card-zoom-preview > div {
+    max-height: calc(100dvh - 2rem);
+  }
+}
+
 @media (orientation: portrait) {
   .play-simulator-workspace {
     overflow-x: hidden;
