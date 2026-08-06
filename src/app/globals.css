@@ -1202,6 +1202,532 @@ body.simulator-route-active .app-top-bar {
   z-index: 1;
 }
 
+.play-mobile-sidebar-toggle,
+.play-mobile-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .play-card-zoom-preview {
+    width: min(78vw, 20rem, calc(71.4286dvh - 1.4286rem));
+  }
+
+  .play-card-zoom-preview > div {
+    max-height: calc(100dvh - 2rem);
+  }
+}
+
+@media (orientation: portrait) {
+  .play-simulator-workspace {
+    overflow-x: hidden;
+    padding-bottom: 8rem;
+  }
+
+  .play-game-content,
+  .play-game-layout {
+    min-height: auto;
+  }
+
+  .play-game-content {
+    min-height: calc(100dvh - 8rem);
+    justify-content: center;
+    padding-block: 4.5rem;
+  }
+
+  .play-game-layout {
+    grid-template-columns: 10rem minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .play-game-sidebar {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    position: relative;
+    top: auto;
+    align-self: center;
+    width: 100%;
+    height: calc(100dvh - 9rem);
+    max-height: none;
+  }
+
+  .play-game-log {
+    max-height: none;
+    flex: 1 1 auto;
+  }
+
+  .play-game-board {
+    height: min(50rem, calc(100dvh - 12rem));
+    min-height: min(50rem, calc(100dvh - 12rem));
+    grid-template-rows: minmax(12rem, 1fr) 14.875rem minmax(12rem, 1fr);
+    align-self: center;
+  }
+
+  .play-opponent-hand {
+    top: max(3.5rem, calc(50% - 32rem));
+    bottom: auto;
+  }
+
+  .play-player-hand {
+    top: auto;
+    bottom: max(7rem, calc(50% - 31rem));
+  }
+
+  .play-game-content .play-opponent-hand,
+  .play-game-content .play-player-hand {
+    right: 1rem;
+    left: 11.75rem;
+  }
+
+  .play-opponent-hand-card {
+    --play-opponent-hand-card-y: 0px;
+  }
+
+  .play-player-hand-card {
+    --play-player-hand-card-y: 0px;
+  }
+
+  .play-zone-panel [data-card-zone='staging'] {
+    height: 6.5rem;
+  }
+
+  .play-staging-card-stack[data-staging-ready='false'] {
+    width: 6.5rem;
+  }
+
+  .play-staging-card-stack[data-has-attachments='true'] {
+    padding-bottom: 2rem;
+  }
+
+  .play-staging-attachments {
+    top: 4.3rem;
+  }
+
+  .play-combat-stats-badge {
+    height: auto;
+    min-width: 1.35rem;
+    flex-direction: column;
+    gap: 0;
+    padding: 0.15rem 0.2rem;
+    line-height: 0.65rem;
+  }
+
+  .play-combat-stat-separator {
+    display: none;
+  }
+
+  .play-combat-stat-health {
+    width: 100%;
+    margin-top: 0.08rem;
+    padding-top: 0.08rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.28);
+    text-align: center;
+  }
+
+  .play-match-workspace > .play-game-board {
+    margin-block: auto;
+  }
+
+  .play-game-battlefields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .play-game-battlefields > .play-battlefield-panel {
+    min-width: 0;
+  }
+
+  .play-battlefield-lane {
+    grid-template-columns: minmax(2.8rem, 0.82fr) 1px minmax(3rem, 1fr) 1px minmax(2.8rem, 0.82fr);
+    gap: 0.35rem;
+    padding: 0.35rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='unit'] {
+    height: 4.8rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='territory'] {
+    height: 4.35rem;
+  }
+
+  .play-battlefield-attachments {
+    top: 3.35rem;
+  }
+
+  .play-match-workspace {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: 8rem;
+  }
+}
+
+@media (min-width: 1024px) and (orientation: portrait) {
+  .play-game-content .play-opponent-hand,
+  .play-game-content .play-player-hand {
+    right: 1.5rem;
+    left: 12.25rem;
+  }
+}
+
+@media (max-width: 767px), (orientation: landscape) and (max-height: 600px) and (max-width: 1023px) {
+  .play-simulator-workspace {
+    gap: 0.5rem;
+    padding: 4.5rem 0.5rem 7rem;
+    background: color-mix(in srgb, var(--background) 82%, black);
+  }
+
+  .play-match-workspace {
+    height: auto;
+    min-height: 100dvh;
+    gap: 0.5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 4.5rem 0.5rem 7rem;
+    background: color-mix(in srgb, var(--background) 82%, black);
+  }
+
+  .play-match-mobile-controls {
+    position: sticky;
+    top: 0.25rem;
+    z-index: 55;
+    box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.22);
+  }
+
+  .play-game-content,
+  .play-game-layout,
+  .play-game-sidebar {
+    gap: 0.5rem;
+  }
+
+  .play-game-content {
+    min-height: calc(100dvh - 9rem);
+    padding-block: 3.5rem;
+  }
+
+  .play-game-layout {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .play-game-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 50%;
+    bottom: auto;
+    left: 0;
+    z-index: 70;
+    width: min(10.5rem, 70vw);
+    height: min(50rem, calc(100dvh - 9rem));
+    min-height: 0;
+    padding: 0.35rem;
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 0.75rem 0.75rem 0;
+    background: var(--background);
+    box-shadow: 0.65rem 0 1.5rem rgba(0, 0, 0, 0.35);
+    transform: translate(-100%, -50%);
+    transition: transform 180ms ease;
+  }
+
+  .play-game-sidebar.is-open {
+    transform: translate(0, -50%);
+  }
+
+  .play-mobile-sidebar-toggle {
+    position: absolute;
+    top: 0.75rem;
+    right: -2.5rem;
+    display: flex;
+    width: 2.5rem;
+    min-height: 4.5rem;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.2rem;
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 0.65rem 0.65rem 0;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 800;
+    box-shadow: 0.35rem 0.3rem 0.8rem rgba(0, 0, 0, 0.25);
+  }
+
+  .play-mobile-sidebar-score {
+    font-size: 0.62rem;
+    color: var(--text-secondary);
+  }
+
+  .play-mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 69;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.42);
+  }
+
+  .play-game-controls,
+  .play-zone-panel,
+  .play-battlefield-panel {
+    padding: 0.5rem;
+    box-shadow: none;
+  }
+
+  .play-game-controls {
+    background: var(--surface);
+    padding: 0.4rem;
+    font-size: 0.7rem;
+  }
+
+  .play-game-controls button {
+    padding: 0.45rem 0.3rem;
+    font-size: 0.68rem;
+    line-height: 1rem;
+  }
+
+  .play-game-controls p {
+    line-height: 1rem;
+  }
+
+  .play-game-log {
+    max-height: none;
+    min-height: 8rem;
+    flex: 1 1 auto;
+    box-shadow: none;
+  }
+
+  .play-game-log header {
+    padding: 0.4rem;
+  }
+
+  .play-game-log h2 {
+    font-size: 0.65rem;
+  }
+
+  .play-game-log ol {
+    gap: 0.25rem;
+    padding: 0.4rem;
+    font-size: 0.65rem;
+    line-height: 0.9rem;
+  }
+
+  .play-game-board {
+    min-height: 0;
+    grid-template-rows: auto auto auto;
+    gap: 0.5rem;
+    padding: 0.35rem;
+    background: color-mix(in srgb, var(--surface) 88%, black);
+    box-shadow: none;
+  }
+
+  .play-game-battlefields {
+    gap: 0.5rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .play-battlefield-panel {
+    min-height: 7.5rem;
+    padding: 0.3rem;
+    background: color-mix(in srgb, var(--surface) 84%, var(--surface-muted));
+  }
+
+  .play-battlefield-lane {
+    grid-template-columns: minmax(1.7rem, 0.82fr) 1px minmax(1.85rem, 1fr) 1px minmax(1.7rem, 0.82fr);
+    gap: 0.2rem;
+    padding: 0.2rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='unit'] {
+    height: 2.9rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='territory'] {
+    height: 2.7rem;
+  }
+
+  .play-battlefield-attachments {
+    top: 2.15rem;
+  }
+
+  .play-zone-panel {
+    background: var(--surface);
+  }
+
+  .play-zone-panel-rows {
+    grid-template-rows: minmax(4.6rem, auto) minmax(7rem, auto) !important;
+    gap: 0.5rem;
+  }
+
+  .play-zone-panel [data-card-zone='staging'] {
+    height: 5.4rem;
+  }
+
+  .play-staging-card-stack[data-staging-ready='false'] {
+    width: 5.4rem;
+  }
+
+  .play-staging-card-stack[data-has-attachments='true'] {
+    padding-bottom: 1.65rem;
+  }
+
+  .play-staging-attachments {
+    top: 3.45rem;
+  }
+
+  .play-player-hand,
+  .play-opponent-hand {
+    right: 0.5rem;
+    left: 0.5rem;
+    padding-inline: 0.25rem;
+  }
+
+  .play-player-hand-cards,
+  .play-opponent-hand-cards {
+    height: 5.5rem;
+  }
+
+  .play-player-hand-card,
+  .play-player-hand-card > span,
+  .play-opponent-hand-card {
+    width: 5rem;
+  }
+
+  .play-required-action {
+    bottom: 7rem;
+    padding-inline: 0.5rem;
+  }
+
+  .play-simulator-workspace [role='dialog'] {
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) and (max-width: 1023px) {
+  .play-simulator-workspace {
+    min-height: 100dvh;
+    gap: 0.35rem;
+    padding: 0.5rem;
+  }
+
+  .play-game-content {
+    min-height: auto;
+    padding-block: 4.75rem 5.25rem;
+  }
+
+  .play-match-workspace {
+    min-height: 100dvh;
+    padding: 5rem 0.5rem 5.25rem;
+  }
+
+  .play-game-sidebar {
+    height: calc(100dvh - 1rem);
+  }
+
+  .play-mobile-sidebar-toggle {
+    top: 0.35rem;
+    min-height: 3.5rem;
+  }
+
+  .play-game-board {
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto auto auto;
+  }
+
+  .play-game-battlefields {
+    gap: 0.35rem;
+  }
+
+  .play-battlefield-panel {
+    min-height: 8.25rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='unit'] {
+    height: 3.5rem;
+  }
+
+  .play-battlefield-card-slot[data-battlefield-slot-size='territory'] {
+    height: 3.2rem;
+  }
+
+  .play-battlefield-attachments {
+    top: 2.5rem;
+  }
+
+  .play-opponent-hand {
+    top: 0;
+    bottom: auto;
+  }
+
+  .play-player-hand {
+    top: auto;
+    bottom: 0;
+  }
+
+  .play-player-hand-cards,
+  .play-opponent-hand-cards {
+    height: 4.75rem;
+  }
+
+  .play-player-hand-card,
+  .play-player-hand-card > span,
+  .play-opponent-hand-card {
+    width: 4.25rem;
+  }
+
+  .play-opponent-hand-card {
+    --play-opponent-hand-card-y: 0px;
+  }
+
+  .play-player-hand-card {
+    --play-player-hand-card-y: 0px;
+  }
+
+  .play-combat-stats-badge {
+    height: auto;
+    min-width: 1.35rem;
+    flex-direction: column;
+    gap: 0;
+    padding: 0.15rem 0.2rem;
+    line-height: 0.65rem;
+  }
+
+  .play-combat-stat-separator {
+    display: none;
+  }
+
+  .play-combat-stat-health {
+    width: 100%;
+    margin-top: 0.08rem;
+    padding-top: 0.08rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.28);
+    text-align: center;
+  }
+
+  .play-required-action {
+    bottom: 5.25rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .play-battlefield-lane {
+    grid-template-columns: minmax(1.55rem, 0.82fr) 1px minmax(1.65rem, 1fr) 1px minmax(1.55rem, 0.82fr);
+  }
+
+  .play-player-hand-card,
+  .play-player-hand-card > span,
+  .play-opponent-hand-card {
+    width: 4.5rem;
+  }
+}
+
 .deck-builder-pane {
   border-color: color-mix(in srgb, var(--border) 72%, var(--accent));
   box-shadow:

@@ -1698,6 +1698,9 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'luxTarget') {
     const resolved = resolveLuxTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (!('error' in resolved) && pendingChoice.resumeTurnStart && !resolved.pendingChoice) {
+      return runTurnStart(resolved);
+    }
     if (
       !('error' in resolved) &&
       pendingChoice.resumeTurnAdvance &&
@@ -1712,6 +1715,9 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'solaraTarget') {
     const resolved = resolveSolaraTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (!('error' in resolved) && pendingChoice.resumeTurnStart && !resolved.pendingChoice) {
+      return runTurnStart(resolved);
+    }
     if (!('error' in resolved) && pendingChoice.resumeTurnAdvance && !resolved.pendingChoice) {
       return advanceToNextTurn(resolved);
     }
@@ -3941,6 +3947,16 @@ export function runTurnStart(state: GameState): GameState {
     return state;
   }
 
+  if (state.pendingChoice) {
+    return {
+      ...state,
+      pendingChoice: {
+        ...state.pendingChoice,
+        resumeTurnStart: true,
+      },
+    };
+  }
+
   let turnStartState: GameState = {
     ...state,
     scoreLocks: (state.scoreLocks ?? []).filter((lock) => lock.expiresAtStartOfOwner !== activePlayer),
@@ -4035,7 +4051,9 @@ export function readyCardsForOwner(state: GameState, owner: Owner): GameState {
       staging: clearLastStand(state.opponentZones.staging),
     },
   };
-  const readyTriggerSources = getFriendlyUnitsInPlay(state, owner).filter((unit) => !unit.ready);
+  const readyTriggerSources = getFriendlyUnitsInPlay(state, owner).filter(
+    (unit) => !unit.ready && !unit.skipNextReady
+  );
   const readyBattlefields = Object.fromEntries(
     BATTLEFIELD_ZONE_IDS.map((zone) => [
       zone,
@@ -4081,7 +4099,7 @@ export function readyCardsForOwner(state: GameState, owner: Owner): GameState {
 
   for (const source of readyTriggerSources) {
     const readiedSource = getCardInstanceById(nextState, source.instanceId);
-    if (!readiedSource) continue;
+    if (!readiedSource?.ready) continue;
     nextState = triggerCardAbilities(nextState, 'onReady', {
       source: readiedSource,
       controller: owner,
