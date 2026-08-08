@@ -51,13 +51,13 @@ const MANUAL_CARD_ROWS = [
   },
 ];
 
-const EXTRA_BALANCE_CARD_ROWS = [
+const API_PENDING_SET_CARD_ROWS = [
   {
     id: 'IMP161',
     name: 'Fortified Pillbox',
     affinity: 'Lux',
     artist: 'EliasArt',
-    rarity: 'Promo',
+    rarity: 'Common',
     number: 161,
     type: 'Territory',
     subtype: null,
@@ -69,7 +69,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     description: null,
     image_url: '/images/cards/imperion-extras/IMP161_FortifiedPillbox.png',
     raw_payload: {
-      source: 'manual-balance-extra',
+      source: 'manual-api-pending-set-card',
       printedId: 'IMP 161',
     },
   },
@@ -78,7 +78,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     name: 'Landbreaker',
     affinity: 'Solara',
     artist: 'Hachii',
-    rarity: 'Promo',
+    rarity: 'Rare',
     number: 162,
     type: 'Unit',
     subtype: 'Beast',
@@ -90,7 +90,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     description: null,
     image_url: '/images/cards/imperion-extras/IMP162_Landbreaker.png',
     raw_payload: {
-      source: 'manual-balance-extra',
+      source: 'manual-api-pending-set-card',
       printedId: 'IMP 162',
     },
   },
@@ -99,7 +99,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     name: 'Shadowveil Hunter',
     affinity: 'Terra',
     artist: 'SuL',
-    rarity: 'Promo',
+    rarity: 'Common',
     number: 163,
     type: 'Unit',
     subtype: 'Sylvan',
@@ -111,7 +111,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     description: null,
     image_url: '/images/cards/imperion-extras/IMP163_ShadowveilHunter.png',
     raw_payload: {
-      source: 'manual-balance-extra',
+      source: 'manual-api-pending-set-card',
       printedId: 'IMP 163',
     },
   },
@@ -120,7 +120,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     name: 'War Banner',
     affinity: 'Neutral',
     artist: 'EliasArt',
-    rarity: 'Promo',
+    rarity: 'Uncommon',
     number: 164,
     type: 'Item',
     subtype: 'Equipment',
@@ -132,7 +132,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     description: null,
     image_url: '/images/cards/imperion-extras/IMP164_WarBanner.png',
     raw_payload: {
-      source: 'manual-balance-extra',
+      source: 'manual-api-pending-set-card',
       printedId: 'IMP 164',
     },
   },
@@ -141,7 +141,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     name: 'Minefield',
     affinity: 'Neutral',
     artist: 'Parhelion Studio',
-    rarity: 'Promo',
+    rarity: 'Common',
     number: 165,
     type: 'Territory',
     subtype: null,
@@ -153,7 +153,7 @@ const EXTRA_BALANCE_CARD_ROWS = [
     description: null,
     image_url: '/images/cards/imperion-extras/IMP165_Minefield.png',
     raw_payload: {
-      source: 'manual-balance-extra',
+      source: 'manual-api-pending-set-card',
       printedId: 'IMP 165',
     },
   },
@@ -272,15 +272,19 @@ async function main() {
     source_updated_at: syncedAt,
     updated_at: syncedAt,
   }));
-  const extraBalanceRows = EXTRA_BALANCE_CARD_ROWS.map((row) => ({
-    ...row,
-    source_updated_at: syncedAt,
-    updated_at: syncedAt,
-  }));
+  const astraRows = astraCards.map(mapAstraCardToSupabaseRow);
+  const astraCardIds = new Set(astraRows.map((row) => row.id));
+  const pendingSetRows = API_PENDING_SET_CARD_ROWS
+    .filter((row) => !astraCardIds.has(row.id))
+    .map((row) => ({
+      ...row,
+      source_updated_at: syncedAt,
+      updated_at: syncedAt,
+    }));
   const rows = [
-    ...astraCards.map(mapAstraCardToSupabaseRow),
+    ...astraRows,
     ...manualRows,
-    ...extraBalanceRows,
+    ...pendingSetRows,
   ].filter((row) => row.id);
 
   for (let index = 0; index < rows.length; index += BATCH_SIZE) {
