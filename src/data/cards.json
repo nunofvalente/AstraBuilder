@@ -1113,14 +1113,14 @@
       "attack": 0,
       "health": 0,
       "subtype": "",
-      "rarity": "Promo",
+      "rarity": "Common",
       "artist": "EliasArt",
       "influence": null,
       "rulesText": "Friendly units occupying this zone get +0/+2.",
       "description": "",
       "imageSrc": "/images/cards/imperion-extras/IMP161_FortifiedPillbox.png",
-      "searchContent": "fortified pillbox territory  lux promo eliasart friendly units occupying this zone get +0/+2.  161  3  ",
-      "detailLabel": "Fortified Pillbox Territory Cost 3 Affinity Lux Rarity Promo"
+      "searchContent": "fortified pillbox territory  lux common eliasart friendly units occupying this zone get +0/+2.  161  3  ",
+      "detailLabel": "Fortified Pillbox Territory Cost 3 Affinity Lux Rarity Common"
     },
     {
       "id": "IMP061",
@@ -1531,14 +1531,14 @@
       "attack": 5,
       "health": 6,
       "subtype": "Beast",
-      "rarity": "Promo",
+      "rarity": "Rare",
       "artist": "Hachii",
       "influence": 2,
       "rulesText": "Flanking (This unit can attack from a combat zone once per turn)\n\nOn Attack: You may destroy a territory in the same combat zone as this unit. If you do, this gets +2/+2 until end of turn.",
       "description": "",
       "imageSrc": "/images/cards/imperion-extras/IMP162_Landbreaker.png",
-      "searchContent": "landbreaker unit beast solara promo hachii flanking (this unit can attack from a combat zone once per turn)\n\non attack: you may destroy a territory in the same combat zone as this unit. if you do, this gets +2/+2 until end of turn.  162 2 7 5 6",
-      "detailLabel": "Landbreaker Unit (Beast) Cost 7 Affinity Solara Rarity Promo"
+      "searchContent": "landbreaker unit beast solara rare hachii flanking (this unit can attack from a combat zone once per turn)\n\non attack: you may destroy a territory in the same combat zone as this unit. if you do, this gets +2/+2 until end of turn.  162 2 7 5 6",
+      "detailLabel": "Landbreaker Unit (Beast) Cost 7 Affinity Solara Rarity Rare"
     },
     {
       "id": "IMP150",
@@ -1759,14 +1759,14 @@
       "attack": 0,
       "health": 0,
       "subtype": "",
-      "rarity": "Promo",
+      "rarity": "Common",
       "artist": "Parhelion Studio",
       "influence": null,
       "rulesText": "On Flip: Deal 3 damage to all units in this zone.\nSacrifice this territory.",
       "description": "",
       "imageSrc": "/images/cards/imperion-extras/IMP165_Minefield.png",
-      "searchContent": "minefield territory  neutral promo parhelion studio on flip: deal 3 damage to all units in this zone.\nsacrifice this territory.  165  2  ",
-      "detailLabel": "Minefield Territory Cost 2 Affinity Neutral Rarity Promo"
+      "searchContent": "minefield territory  neutral common parhelion studio on flip: deal 3 damage to all units in this zone.\nsacrifice this territory.  165  2  ",
+      "detailLabel": "Minefield Territory Cost 2 Affinity Neutral Rarity Common"
     },
     {
       "id": "IMP154",
@@ -2367,14 +2367,14 @@
       "attack": 1,
       "health": 3,
       "subtype": "Sylvan",
-      "rarity": "Promo",
+      "rarity": "Common",
       "artist": "SuL",
       "influence": 1,
       "rulesText": "Swift (You can play this as a counter.)\n\nOn Enter: Deal 1 damage to target enemy unit in a combat zone.",
       "description": "",
       "imageSrc": "/images/cards/imperion-extras/IMP163_ShadowveilHunter.png",
-      "searchContent": "shadowveil hunter unit sylvan terra promo sul swift (you can play this as a counter.)\n\non enter: deal 1 damage to target enemy unit in a combat zone.  163 1 2 1 3",
-      "detailLabel": "Shadowveil Hunter Unit (Sylvan) Cost 2 Affinity Terra Rarity Promo"
+      "searchContent": "shadowveil hunter unit sylvan terra common sul swift (you can play this as a counter.)\n\non enter: deal 1 damage to target enemy unit in a combat zone.  163 1 2 1 3",
+      "detailLabel": "Shadowveil Hunter Unit (Sylvan) Cost 2 Affinity Terra Rarity Common"
     },
     {
       "id": "IMP075",
@@ -3032,14 +3032,14 @@
       "attack": 1,
       "health": 1,
       "subtype": "Equipment",
-      "rarity": "Promo",
+      "rarity": "Uncommon",
       "artist": "EliasArt",
       "influence": 1,
       "rulesText": "When equipped unit scores, you may reveal the top card of your deck. If that card is a unit, you may draw it.",
       "description": "",
       "imageSrc": "/images/cards/imperion-extras/IMP164_WarBanner.png",
-      "searchContent": "war banner item equipment neutral promo eliasart when equipped unit scores, you may reveal the top card of your deck. if that card is a unit, you may draw it.  164 1 4 1 1",
-      "detailLabel": "War Banner Item (Equipment) Cost 4 Affinity Neutral Rarity Promo"
+      "searchContent": "war banner item equipment neutral uncommon eliasart when equipped unit scores, you may reveal the top card of your deck. if that card is a unit, you may draw it.  164 1 4 1 1",
+      "detailLabel": "War Banner Item (Equipment) Cost 4 Affinity Neutral Rarity Uncommon"
     },
     {
       "id": "IMP142",
