@@ -3271,7 +3271,7 @@ export function resolveBattlefieldAttack(
         targetZone
       ),
         ready: defender ? false : true,
-        retreatLockedUntilNextTurn: true,
+        retreatLockedUntilNextTurn: false,
       }
     : null;
   const capturedAttachments = capturedAttacker
