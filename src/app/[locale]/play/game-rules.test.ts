@@ -669,10 +669,26 @@ describe('game rules', () => {
 
     const afterAttack = applyBotTurnStep(botTurn, 'attackBattlefield');
 
-    expect(afterAttack.opponentZones.staging).toEqual([]);
-    expect(afterAttack.zones.battlefieldCenter[0]?.instanceId).toBe(botUnit.instanceId);
-    expect(afterAttack.pendingCombat).toBeNull();
-    expect(afterAttack.log[0]).toMatchObject({
+    expect(afterAttack.pendingCombat).toMatchObject({
+      attackerOwner: 'opponent',
+      attackerInstanceId: botUnit.instanceId,
+      targetZone: 'battlefieldCenter',
+      defenderInstanceId: null,
+      priorityOwner: 'player',
+    });
+    expect(afterAttack.opponentZones.staging[0]?.instanceId).toBe(botUnit.instanceId);
+    expect(afterAttack.zones.battlefieldCenter).toEqual([]);
+
+    const playerPassed = passCounterPriority(afterAttack, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) {
+      return;
+    }
+
+    expect(playerPassed.state.opponentZones.staging).toEqual([]);
+    expect(playerPassed.state.zones.battlefieldCenter[0]?.instanceId).toBe(botUnit.instanceId);
+    expect(playerPassed.state.pendingCombat).toBeNull();
+    expect(playerPassed.state.log[0]).toMatchObject({
       prefix: 'Captured ',
       cardName: 'Bot Ready Unit',
       suffix: ' took Battlefield 2.',
@@ -1240,7 +1256,7 @@ describe('game rules', () => {
     expect(opponentPassed.state.opponentVictoryPoints).toBe(2);
   });
 
-  it('captures an empty battlefield without opening counter priority', () => {
+  it('opens counter priority before capturing an empty battlefield', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
@@ -1285,21 +1301,34 @@ describe('game rules', () => {
       return;
     }
 
-    expect(declared.pendingCombat).toBeNull();
-    expect(declared.resolvedCombat?.captured).toBe(true);
-    expect(declared.state.pendingCombat).toBeNull();
-    expect(declared.state.zones.staging).toEqual([]);
-    expect(declared.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
-    expect(declared.state.log[0]).toMatchObject({
+    expect(declared.pendingCombat).toMatchObject({
+      attackerOwner: 'player',
+      attackerInstanceId: attacker.instanceId,
+      targetZone: 'battlefieldLeft',
+      defenderInstanceId: null,
+      priorityOwner: 'opponent',
+    });
+    expect(declared.resolvedCombat).toBeUndefined();
+    expect(declared.state.zones.staging[0]?.instanceId).toBe(attacker.instanceId);
+    expect(declared.state.zones.battlefieldLeft).toEqual([]);
+    expect(playCounterCard(declared.state, 'player', attackerCounter.instanceId)).toEqual({
+      error: 'Waiting for the bot to pass counter priority.',
+    });
+
+    const opponentPassed = passCounterPriority(declared.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed || !opponentPassed.resolvedCombat) {
+      return;
+    }
+
+    expect(opponentPassed.resolvedCombat.captured).toBe(true);
+    expect(opponentPassed.state.pendingCombat).toBeNull();
+    expect(opponentPassed.state.zones.staging).toEqual([]);
+    expect(opponentPassed.state.zones.battlefieldLeft[0]?.instanceId).toBe(attacker.instanceId);
+    expect(opponentPassed.state.log[0]).toMatchObject({
       prefix: 'Captured ',
       cardName: 'Attacker',
       suffix: ' took Battlefield 1.',
-    });
-    expect(playCounterCard(declared.state, 'opponent', shadowveilHunter.instanceId)).toEqual({
-      error: 'Counter cards can only be played during a counter window.',
-    });
-    expect(playCounterCard(declared.state, 'player', attackerCounter.instanceId)).toEqual({
-      error: 'Counter cards can only be played during a counter window.',
     });
   });
 
