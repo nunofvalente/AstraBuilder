@@ -192,6 +192,63 @@ describe('Caelum card abilities', () => {
     }
   });
 
+  it('stacks Genesis III during a counter step after paying its exhaust cost', () => {
+    const genesis = makeUnit('IMP066', 'player', {
+      card: createTestCard({ id: 'IMP066', name: 'Genesis III', type: 'Renowned Unit', affinity: 'Caelum' }),
+    });
+    const defender = makeUnit('genesis-counter-target', 'player', {
+      card: createTestCard({ id: 'genesis-counter-target', name: 'Defender', type: 'Unit', attack: 0, health: 5, influence: 1 }),
+    });
+    const dreadnought = makeUnit('IMP079', 'player', {
+      card: createTestCard({ id: 'IMP079', name: 'Valrathian Dreadnought', type: 'Renowned Unit', affinity: 'Caelum' }),
+    });
+    const attacker = makeUnit('counter-attacker', 'opponent', {
+      card: createTestCard({ id: 'counter-attacker', name: 'Attacker', type: 'Unit', attack: 0, health: 5 }),
+    });
+    const base = makeState();
+    const state: GameState = {
+      ...base,
+      activePlayer: 'opponent',
+      zones: {
+        ...base.zones,
+        staging: [genesis],
+        battlefieldLeft: [defender],
+        battlefieldCenter: [dreadnought],
+      },
+      opponentZones: { ...base.opponentZones, staging: [attacker] },
+    };
+
+    const declared = declareBattlefieldAttack(state, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect(declared).not.toHaveProperty('error');
+    if ('error' in declared) return;
+    expect(activateCardAbility(declared.state, 'player', dreadnought.instanceId, attacker.instanceId)).toEqual({
+      error: 'Valrathian Dreadnought can only activate its ability outside combat.',
+    });
+
+    const activated = activateCardAbility(declared.state, 'player', genesis.instanceId, defender.instanceId);
+    expect(activated).not.toHaveProperty('error');
+    if ('error' in activated) return;
+    expect(activated.state.zones.staging.find((card) => card.instanceId === genesis.instanceId)?.ready).toBe(false);
+    expect(activated.state.zones.battlefieldLeft[0]?.temporaryInfluenceBonus).toBeUndefined();
+    expect(activated.state.pendingCombat?.priorityOwner).toBe('opponent');
+    expect(activated.state.pendingCombat?.counterStack).toEqual([
+      expect.objectContaining({
+        instanceId: genesis.instanceId,
+        counterStackEntryKind: 'activatedAbility',
+        selectedAbilityTargetInstanceIds: [defender.instanceId],
+      }),
+    ]);
+
+    expect(activateCardAbility(activated.state, 'player', genesis.instanceId, defender.instanceId)).toEqual({
+      error: 'Waiting for the bot to pass counter priority.',
+    });
+    const resolved = passCounterPriority(activated.state, 'opponent');
+    expect(resolved).not.toHaveProperty('error');
+    if ('error' in resolved) return;
+    expect(resolved.state.pendingCombat).toBeNull();
+    expect(resolved.state.zones.battlefieldLeft[0]?.temporaryInfluenceBonus).toBe(1);
+  });
+
   it('handles Caelum target choices for bounce, lockdown, and tactic damage', () => {
     const leviathan = makeCard('IMP064', 'Cloudbreach Leviathan', 'Unit', "On Enter: Return target unit to owner's hand.");
     const enforcer = makeCard('IMP071', 'Lockdown Enforcer', 'Unit', 'On Enter: exhaust target enemy unit.');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getLocalizedCardDisplay, getPlayBoardCopy, getPlayControlsCopy, getPlayLobbyCopy, translateCardTypeLabel, translateGameLogText } from './play-localization';
+import { getActivatedAbilityModalCopy, getLocalizedCardDisplay, getPlayBoardCopy, getPlayControlsCopy, getPlayLobbyCopy, translateCardTypeLabel, translateGameLogText } from './play-localization';
 
 describe('play localization', () => {
   it('provides localized board labels for every supported locale', () => {
@@ -40,6 +40,26 @@ describe('play localization', () => {
       backToLobby: '返回大厅',
       passTurn: '结束回合',
       rematch: '再来一局',
+    });
+  });
+
+  it('uses each card\'s actual rules text in the activated ability modal', () => {
+    const dreadnought = {
+      id: 'IMP079',
+      name: 'Valrathian Dreadnought',
+      type: 'Unit',
+      subtype: 'Vehicle',
+      rulesText: '{Exhaust},{3}: Destroy target unit. Use this ability only if this is in a combat zone, and only outside of combat.',
+      description: '',
+    } as Parameters<typeof getActivatedAbilityModalCopy>[1];
+
+    expect(getActivatedAbilityModalCopy('en', dreadnought)).toEqual({
+      title: 'Activate ability: Valrathian Dreadnought',
+      description: '{Exhaust},{3}: Destroy target unit. Use this ability only if this is in a combat zone, and only outside of combat.',
+    });
+    expect(getActivatedAbilityModalCopy('fr', dreadnought)).toMatchObject({
+      title: 'Activer la capacité: Valrathian Dreadnought',
+      description: expect.stringContaining('Détruisez'),
     });
   });
 

@@ -6,6 +6,7 @@ import {
   getDefaultPendingChoiceSelectionIds,
   getHandActions,
   getPendingChoiceTargetCards,
+  getCardLocationLabel,
   isPrivateOpponentSupplyChoiceTarget,
   shouldContinueBotTurnAfterResolvedAttack,
 } from './game-client-support';
@@ -35,6 +36,24 @@ function makeInstance(id: string): GameCardInstance {
 }
 
 describe('game client support', () => {
+  it('distinguishes duplicate activation sources by location', () => {
+    const stagingRallier = makeInstance('sylvan-rallier-a1b2');
+    const battlefieldRallier = makeInstance('sylvan-rallier-c3d4');
+    const base = buildInitialGameState(makeDeck(), makeDeck());
+    const gameState: GameState = {
+      ...base,
+      zones: {
+        ...base.zones,
+        staging: [stagingRallier],
+        battlefieldCenter: [battlefieldRallier],
+      },
+    };
+
+    expect(getCardLocationLabel(gameState, stagingRallier, 'en')).toBe('Staging');
+    expect(getCardLocationLabel(gameState, battlefieldRallier, 'en')).toBe('Battlefield 2');
+    expect(getCardLocationLabel(gameState, battlefieldRallier, 'fr')).toBe('Champ de bataille 2');
+  });
+
   function makeBotMainState(overrides: Partial<GameState> = {}): GameState {
     return {
       ...buildInitialGameState(makeDeck(), makeDeck()),
@@ -123,6 +142,54 @@ describe('game client support', () => {
     };
 
     expect(getDefaultPendingChoiceSelectionIds(pendingChoice)).toEqual(['fortuna']);
+  });
+
+  it('preselects Biscuit for its optional end-turn return', () => {
+    const pendingChoice: PendingChoice = {
+      kind: 'luxTarget',
+      owner: 'player',
+      sourceInstanceId: 'biscuit',
+      sourceName: 'Biscuit, Ever Vigilant',
+      prompt: 'Put Biscuit on the bottom of your deck and draw a card?',
+      effect: 'biscuitReturn',
+      availableInstanceIds: ['biscuit'],
+      optional: true,
+      resumeTurnAdvance: true,
+    };
+
+    expect(getDefaultPendingChoiceSelectionIds(pendingChoice)).toEqual(['biscuit']);
+  });
+
+  it('preselects Escape Route for its end-turn supply payment', () => {
+    const pendingChoice: PendingChoice = {
+      kind: 'terraTarget',
+      owner: 'player',
+      sourceInstanceId: 'escape-route',
+      sourceName: 'Escape Route',
+      prompt: 'Pay 2 supply to keep Escape Route? Decline to sacrifice it.',
+      effect: 'escapeRoutePay',
+      availableInstanceIds: ['escape-route'],
+      optional: true,
+      resumeTurnAdvance: true,
+    };
+
+    expect(getDefaultPendingChoiceSelectionIds(pendingChoice)).toEqual(['escape-route']);
+  });
+
+  it('preselects Unyielding Storm for its optional end-turn sweep', () => {
+    const pendingChoice: PendingChoice = {
+      kind: 'caelumTarget',
+      owner: 'player',
+      sourceInstanceId: 'unyielding-storm',
+      sourceName: 'Unyielding Storm',
+      prompt: "Return units and enemy territories in Unyielding Storm's zone to their owners' hands, then sacrifice it?",
+      effect: 'unyieldingStormSweep',
+      availableInstanceIds: ['unyielding-storm'],
+      optional: true,
+      resumeTurnAdvance: true,
+    };
+
+    expect(getDefaultPendingChoiceSelectionIds(pendingChoice)).toEqual(['unyielding-storm']);
   });
 
   it('includes supply cards for Wingshield Transport target choices', () => {

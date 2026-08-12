@@ -37,6 +37,7 @@ export type GameCardInstance = {
   retreatLockedUntilNextTurn: boolean;
   banishOnDeath?: boolean;
   selectedAbilityTargetInstanceIds?: string[];
+  counterStackEntryKind?: 'activatedAbility';
   loseVictoryPointOnDeathThisTurnCount?: number;
   discardCardOnDeathThisTurnCount?: number;
   temporaryInfluenceBonus?: number;
@@ -359,6 +360,7 @@ export type TriggerAbilitiesInput = {
   controller?: Owner;
   zone?: ZoneId | null;
   targets?: AbilityTarget[];
+  costsPaid?: boolean;
 };
 
 export type ActivateCardAbilityResult =
