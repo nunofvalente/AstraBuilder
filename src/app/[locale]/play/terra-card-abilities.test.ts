@@ -109,7 +109,7 @@ describe('Terra card abilities', () => {
     expect('error' in resolved ? null : resolved.zones.battlefieldLeft[0]?.damage).toBe(1);
   });
 
-  it('does not let Shadowveil Hunter counter an attacker entering an empty battlefield', () => {
+  it('lets Shadowveil Hunter counter an attacker during empty-zone combat', () => {
     const attacker = card('attacker', 'opponent', {
       ready: true,
       card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 2, health: 3 }),
@@ -138,16 +138,25 @@ describe('Terra card abilities', () => {
     expect('error' in declared ? declared.error : null).toBeNull();
     if ('error' in declared) return;
 
-    expect(declared.pendingCombat).toBeNull();
-    expect(declared.resolvedCombat?.captured).toBe(true);
+    expect(declared.pendingCombat).toMatchObject({
+      attackerInstanceId: attacker.instanceId,
+      defenderInstanceId: null,
+      priorityOwner: 'player',
+    });
     const played = playCounterCard(declared.state, 'player', hunter.instanceId, {
       targetInstanceId: attacker.instanceId,
     });
-    expect(played).toEqual({
-      error: 'Counter cards can only be played during a counter window.',
-    });
-    expect(declared.state.zones.battlefieldLeft.find((unit) => unit.instanceId === attacker.instanceId)?.damage).toBe(0);
-    expect(declared.state.zones.hand.find((unit) => unit.instanceId === hunter.instanceId)).toBeTruthy();
+    expect('error' in played ? played.error : null).toBeNull();
+    if ('error' in played) return;
+    expect(played.state.pendingCombat?.counterStack[0]?.instanceId).toBe(hunter.instanceId);
+
+    const opponentPassed = passCounterPriority(played.state, 'opponent');
+    expect('error' in opponentPassed ? opponentPassed.error : null).toBeNull();
+    if ('error' in opponentPassed) return;
+
+    expect(opponentPassed.resolvedCombat?.captured).toBe(true);
+    expect(opponentPassed.state.zones.battlefieldLeft.find((unit) => unit.instanceId === attacker.instanceId)?.damage).toBe(1);
+    expect(opponentPassed.state.zones.staging.find((unit) => unit.instanceId === hunter.instanceId)).toBeTruthy();
   });
 
   it('applies Impede from units, Caltrops, and Escape Route and heals surviving Akeno', () => {

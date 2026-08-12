@@ -434,14 +434,23 @@ describe('bot policy', () => {
     };
 
     const firstAttack = applyBotTurnStep(state, 'attackBattlefield');
-    expect(firstAttack.pendingCombat).toBeNull();
-    expect(getBotBattlefieldAttackChoice(firstAttack)).toEqual({
+    expect(firstAttack.pendingCombat).toMatchObject({
+      attackerInstanceId: firstAttacker.instanceId,
+      defenderInstanceId: null,
+      priorityOwner: 'player',
+    });
+
+    const playerPassed = passCounterPriority(firstAttack, 'player');
+    expect('error' in playerPassed ? playerPassed.error : null).toBeNull();
+    if ('error' in playerPassed) return;
+
+    expect(getBotBattlefieldAttackChoice(playerPassed.state)).toEqual({
       attackerInstanceId: secondAttacker.instanceId,
       targetZone: 'battlefieldLeft',
     });
   });
 
-  it('runs every immediate bot attack while profitable attacks remain', () => {
+  it('pauses the bot turn when an empty-zone attack opens counter priority', () => {
     const firstAttacker = makeInstance({
       instanceId: 'first-attacker',
       ready: true,
@@ -471,17 +480,18 @@ describe('bot policy', () => {
     };
 
     const executedState = runBotTurn(state);
-    const botBattlefieldUnits = [
-      ...executedState.zones.battlefieldLeft,
-      ...executedState.zones.battlefieldCenter,
-      ...executedState.zones.battlefieldRight,
-    ].filter((instance) => instance.owner === 'opponent');
-
-    expect(botBattlefieldUnits.map((instance) => instance.instanceId).sort()).toEqual([
+    expect(executedState.pendingCombat).toMatchObject({
+      attackerInstanceId: firstAttacker.instanceId,
+      defenderInstanceId: null,
+      priorityOwner: 'player',
+    });
+    expect(executedState.opponentZones.staging.map((instance) => instance.instanceId)).toEqual([
       firstAttacker.instanceId,
       secondAttacker.instanceId,
-    ].sort());
-    expect(executedState.opponentZones.staging).toEqual([]);
+    ]);
+    expect(executedState.zones.battlefieldLeft).toEqual([]);
+    expect(executedState.zones.battlefieldCenter).toEqual([]);
+    expect(executedState.zones.battlefieldRight).toEqual([]);
   });
 
   it('uses a setup attack to exhaust and soften a defender for a follow-up attacker', () => {
