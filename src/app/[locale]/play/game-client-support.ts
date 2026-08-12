@@ -1,6 +1,7 @@
 import type { Locale } from '@/i18n/config';
 import type { Card, DeckEntry } from '../create/deck-builder/types';
 import type { MoveCardOptions } from './game-actions';
+import { getPlayBoardCopy } from './play-localization';
 import {
   getCardController,
   getModifiedManualPlayCost,
@@ -47,6 +48,18 @@ export type BattlefieldAction = {
   options?: MoveCardOptions;
   disabled?: boolean;
 };
+
+export function getCardLocationLabel(
+  gameState: GameState,
+  instance: GameCardInstance,
+  locale: Locale
+): string {
+  const copy = getPlayBoardCopy(locale);
+  const battlefieldIndex = (['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] as const)
+    .findIndex((zone) => gameState.zones[zone].some((card) => card.instanceId === instance.instanceId));
+  const location = battlefieldIndex >= 0 ? copy.battlefield[battlefieldIndex]! : copy.staging;
+  return location;
+}
 
 export function getPendingChoiceTargetCards(gameState: GameState, pendingChoice: PendingChoice | null): GameCardInstance[] {
   if (!pendingChoice) {
@@ -96,11 +109,22 @@ export function getPendingChoiceTargetCards(gameState: GameState, pendingChoice:
 }
 
 export function getDefaultPendingChoiceSelectionIds(pendingChoice: PendingChoice | null): string[] {
-  if (pendingChoice?.kind === 'luxTarget' && pendingChoice.effect === 'fortunaSacrifice') {
+  if (
+    pendingChoice?.kind === 'luxTarget' &&
+    (pendingChoice.effect === 'biscuitReturn' || pendingChoice.effect === 'fortunaSacrifice')
+  ) {
     return pendingChoice.availableInstanceIds.slice(0, 1);
   }
 
   if (pendingChoice?.kind === 'terraTarget' && pendingChoice.effect === 'ravenRetreat') {
+    return pendingChoice.availableInstanceIds.slice(0, 1);
+  }
+
+  if (pendingChoice?.kind === 'terraTarget' && pendingChoice.effect === 'escapeRoutePay') {
+    return pendingChoice.availableInstanceIds.slice(0, 1);
+  }
+
+  if (pendingChoice?.kind === 'caelumTarget' && pendingChoice.effect === 'unyieldingStormSweep') {
     return pendingChoice.availableInstanceIds.slice(0, 1);
   }
 

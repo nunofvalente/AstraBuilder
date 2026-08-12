@@ -183,6 +183,17 @@ function createReanimateNonRenownedUnitAbility(): AbilityHandler {
 }
 
 function resolveAssimilatingAbominationAbility({ state, event }: AbilityContext): AbilityResolution {
+  if (event.costsPaid) {
+    const source = getUnitsInPlay(state).find((unit) => unit.instanceId === event.source.instanceId);
+    return source
+      ? {
+          state: updateUnitInPlay(state, source.instanceId, (instance) => ({ ...instance, ready: true })),
+          resolved: true,
+          message: `${event.source.card.name} readied.`,
+        }
+      : { state, resolved: false };
+  }
+
   const sacrificeTarget = event.targets?.find((target) => target.type === 'card');
 
   if (!sacrificeTarget || sacrificeTarget.instanceId === event.source.instanceId) {
@@ -554,6 +565,15 @@ function resolveTenebrosaOnDefend({ state, event }: AbilityContext): AbilityReso
 }
 
 function resolveCommissarAbility({ state, event }: AbilityContext): AbilityResolution {
+  if (event.costsPaid) {
+    const opponent: Owner = event.controller === 'player' ? 'opponent' : 'player';
+    return {
+      state: adjustVictoryPoints(state, opponent, -1),
+      resolved: true,
+      message: `${event.source.card.name} made ${opponent === 'player' ? 'you lose' : 'Bot lose'} 1 victory point.`,
+    };
+  }
+
   const target = event.targets?.find((entry) => entry.type === 'card');
   if (!target) {
     return { state, resolved: false };

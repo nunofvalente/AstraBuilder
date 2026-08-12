@@ -184,6 +184,15 @@ const excavator: AbilityHandler = ({ state, event }) => {
 
 const supplyCarrier: AbilityHandler = ({ state, event }) => {
   const owner: Owner = event.controller;
+  if (event.costsPaid) {
+    return {
+      state: owner === 'player'
+        ? { ...state, playerTemporarySupply: state.playerTemporarySupply + 1 }
+        : { ...state, opponentTemporarySupply: state.opponentTemporarySupply + 1 },
+      resolved: true,
+      message: `${event.source.card.name} added 1 temporary supply until end of turn.`,
+    };
+  }
   const nextState: GameState = owner === 'player'
     ? {
         ...state,

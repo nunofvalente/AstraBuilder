@@ -219,9 +219,11 @@ const sunderingWyrm: AbilityHandler = ({ state, event }) =>
 const sylvanRallier: AbilityHandler = ({ state, event }) => {
   const targets = getFriendlyUnitsInPlay(state, event.controller);
   const target = selected(event, targets);
-  if (!target || !event.source.ready || getReadySupplyCount(state, event.controller) < 1) return { state, resolved: false };
-  let next = exhaustSupplyForCost(state, event.controller, 1);
-  next = updateInPlay(next, event.source.instanceId, (card) => ({ ...card, ready: false }));
+  if (!target || (!event.costsPaid && (!event.source.ready || getReadySupplyCount(state, event.controller) < 1))) return { state, resolved: false };
+  let next = event.costsPaid ? state : exhaustSupplyForCost(state, event.controller, 1);
+  if (!event.costsPaid) {
+    next = updateInPlay(next, event.source.instanceId, (card) => ({ ...card, ready: false }));
+  }
   next = updateInPlay(next, target.instanceId, (card) => ({ ...card, temporaryAttackBonus: (card.temporaryAttackBonus ?? 0) + 1, temporaryStatsExpireAfterTurn: state.turn }));
   return { state: next, resolved: true };
 };

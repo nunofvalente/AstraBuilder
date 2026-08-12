@@ -506,7 +506,9 @@ function resolveGenesisActivated({ state, event }: AbilityContext): AbilityResol
   const targetId = event.targets?.find((target) => target.type === 'card')?.instanceId;
   const target = targetId ? friendlyUnits(state, event.controller).find((unit) => unit.instanceId === targetId) : null;
   if (!target) return { state, resolved: false };
-  const exhausted = updateCardInPlay(state, event.source.instanceId, (unit) => ({ ...unit, ready: false }));
+  const exhausted = event.costsPaid
+    ? state
+    : updateCardInPlay(state, event.source.instanceId, (unit) => ({ ...unit, ready: false }));
   return {
     state: updateCardInPlay(exhausted, target.instanceId, (unit) => ({
       ...unit,
@@ -554,9 +556,11 @@ function resolveRepulsiveExperiment({ state, event }: AbilityContext): AbilityRe
 function resolveRenataActivated({ state, event }: AbilityContext): AbilityResolution {
   const targetId = event.targets?.find((target) => target.type === 'card')?.instanceId;
   const target = targetId ? friendlyUnits(state, event.controller).find((unit) => unit.instanceId === targetId && isDroneOrVehicle(unit)) : null;
-  if (!target || getReadySupplyCount(state, event.controller) < 2) return { state, resolved: false };
-  let nextState = exhaustSupplyForCost(state, event.controller, 2);
-  nextState = updateCardInPlay(nextState, event.source.instanceId, (unit) => ({ ...unit, ready: false }));
+  if (!target || (!event.costsPaid && getReadySupplyCount(state, event.controller) < 2)) return { state, resolved: false };
+  let nextState = event.costsPaid ? state : exhaustSupplyForCost(state, event.controller, 2);
+  if (!event.costsPaid) {
+    nextState = updateCardInPlay(nextState, event.source.instanceId, (unit) => ({ ...unit, ready: false }));
+  }
   nextState = readyUnitInPlay(nextState, target.instanceId);
   return {
     state: updateCardInPlay(nextState, target.instanceId, (unit) => ({
