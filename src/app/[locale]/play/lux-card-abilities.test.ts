@@ -424,6 +424,41 @@ describe('Lux card abilities', () => {
     expect(advanceToNextTurn(paid).playerTemporarySupply).toBe(0);
   });
 
+  it('sacrifices Fortuna Bank and draws a card when its end-turn choice is confirmed', () => {
+    const fortuna = makeCard('IMP061', 'Fortuna Bank', 'Territory', 'At the end of your turn, you may sacrifice this to draw a card.');
+    const occupyingUnit = makeUnit('occupying-unit');
+    const drawnCard = makeUnit('drawn-card');
+    const base = makeState();
+    const state = {
+      ...base,
+      zones: {
+        ...base.zones,
+        deck: [drawnCard],
+        battlefieldLeft: [occupyingUnit, fortuna],
+      },
+    };
+
+    const pending = advanceToNextTurn(state);
+
+    expect(pending.pendingChoice).toMatchObject({
+      kind: 'luxTarget',
+      effect: 'fortunaSacrifice',
+      availableInstanceIds: [fortuna.instanceId],
+      resumeTurnAdvance: true,
+    });
+
+    const resolved = resolvePendingChoice(pending, [fortuna.instanceId]);
+
+    expect('error' in resolved ? resolved.error : null).toBeNull();
+    if ('error' in resolved) {
+      return;
+    }
+    expect(resolved.zones.battlefieldLeft.some((card) => card.instanceId === fortuna.instanceId)).toBe(false);
+    expect(resolved.zones.graveyard.some((card) => card.instanceId === fortuna.instanceId)).toBe(true);
+    expect(resolved.zones.hand.some((card) => card.instanceId === drawnCard.instanceId)).toBe(true);
+    expect(resolved.activePlayer).toBe('opponent');
+  });
+
   it('suppresses scoring and retreat in Quarantine Zone and sacrifices it after two starts', () => {
     const unit = makeUnit('quarantined');
     const quarantine = makeCard('IMP063', 'Quarantine Zone', 'Territory', 'Quarantine');

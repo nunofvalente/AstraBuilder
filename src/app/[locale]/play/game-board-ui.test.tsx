@@ -629,6 +629,55 @@ describe('CombinedStagingSupplyPanel', () => {
 });
 
 describe('BattlefieldPanel', () => {
+  it('positions the flip action menu above the clicked territory', () => {
+    const territory: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'positioned-territory',
+      card: createTestCard({ id: 'positioned-territory', name: 'Positioned Territory', type: 'Territory', cost: 1 }),
+      faceDown: true,
+    };
+    const { container } = render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[territory]}
+        onMove={() => undefined}
+        canFlipFaceUp
+        readySupplyCount={1}
+      />,
+    );
+    const panel = container.querySelector('section')!;
+    const trigger = screen.getByRole('button', { name: /open positioned territory actions/i });
+    vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      top: 40,
+      width: 600,
+      height: 300,
+      right: 700,
+      bottom: 340,
+      x: 100,
+      y: 40,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+      left: 130,
+      top: 110,
+      width: 80,
+      height: 112,
+      right: 210,
+      bottom: 222,
+      x: 130,
+      y: 110,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(trigger);
+
+    const menu = container.querySelector('[data-action-menu-for="positioned-territory"]');
+    expect(menu).toHaveStyle({ left: '70px', top: '66px' });
+    expect(menu).toHaveClass('-translate-y-full');
+    expect(screen.getByRole('menuitem', { name: /flip face up/i })).toBeInTheDocument();
+  });
+
   it('offers Flanking attacks from a combat zone', () => {
     const onAttack = vi.fn();
     const flanker = {
@@ -941,12 +990,12 @@ describe('BattlefieldPanel', () => {
     expect(screen.getByLabelText('Vermillion, Ghastly Researcher has 3 influence')).toHaveTextContent('3');
   });
 
-  it('offers retreat for exhausted battlefield units', () => {
+  it('offers retreat for ready battlefield units', () => {
     const unit: GameCardInstance = {
       ...makeInstance(),
-      instanceId: 'exhausted-battlefield-unit',
-      card: createTestCard({ id: 'exhausted-battlefield-unit', name: 'Exhausted Battlefield Unit', type: 'Unit' }),
-      ready: false,
+      instanceId: 'ready-battlefield-unit',
+      card: createTestCard({ id: 'ready-battlefield-unit', name: 'Ready Battlefield Unit', type: 'Unit' }),
+      ready: true,
     };
     const onMove = vi.fn();
     const { container } = render(
@@ -957,10 +1006,33 @@ describe('BattlefieldPanel', () => {
       />,
     );
 
-    fireEvent.click(container.querySelector('[data-card-instance-id="exhausted-battlefield-unit"]')!);
+    fireEvent.click(container.querySelector('[data-card-instance-id="ready-battlefield-unit"]')!);
     fireEvent.click(screen.getByRole('menuitem', { name: /retreat to staging/i }));
 
     expect(onMove).toHaveBeenCalledWith(unit.instanceId, 'battlefieldLeft', 'staging', { enterExhausted: true });
+  });
+
+  it('does not offer retreat for enemy battlefield units', () => {
+    const unit: GameCardInstance = {
+      ...makeInstance(),
+      instanceId: 'enemy-battlefield-unit',
+      owner: 'opponent',
+      card: createTestCard({ id: 'enemy-battlefield-unit', name: 'Enemy Battlefield Unit', type: 'Unit' }),
+      ready: true,
+    };
+    const onMove = vi.fn();
+    const { container } = render(
+      <BattlefieldPanel
+        zone="battlefieldLeft"
+        cards={[unit]}
+        onMove={onMove}
+      />,
+    );
+
+    fireEvent.click(container.querySelector('[data-card-instance-id="enemy-battlefield-unit"]')!);
+
+    expect(screen.queryByRole('menuitem', { name: /retreat to staging/i })).not.toBeInTheDocument();
+    expect(onMove).not.toHaveBeenCalled();
   });
 
   it('shows implemented item ability badges on equipped battlefield units', () => {
@@ -987,13 +1059,13 @@ describe('BattlefieldPanel', () => {
     expect(screen.getByLabelText('Caltrops: equipped unit gains Impede 1')).toHaveTextContent('Impede 1');
   });
 
-  it('disables manual retreat for units that captured this turn', () => {
+  it('disables manual retreat for exhausted units', () => {
     const unit: GameCardInstance = {
       ...makeInstance(),
       instanceId: 'locked-battlefield-unit',
       card: createTestCard({ id: 'IMP107', name: 'Reckless Warrior', type: 'Unit' }),
       ready: false,
-      retreatLockedUntilNextTurn: true,
+      retreatLockedUntilNextTurn: false,
     };
     const onMove = vi.fn();
     const { container } = render(

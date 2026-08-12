@@ -974,8 +974,8 @@ describe('deterministic player card actions', () => {
     expect(equipmentPlay.state.opponentZones.supply.every((instance) => !instance.ready)).toBe(true);
   });
 
-  it('retreats a battlefield unit exhausted with its attached equipment', () => {
-    const unit = makeInstance({ instanceId: 'retreating-unit', ready: false, damage: 1 });
+  it('retreats a ready battlefield unit with its attached equipment', () => {
+    const unit = makeInstance({ instanceId: 'retreating-unit', ready: true, damage: 1 });
     const equipment = makeInstance({
       instanceId: 'attached-equipment',
       ready: true,
@@ -1008,7 +1008,7 @@ describe('deterministic player card actions', () => {
     );
   });
 
-  it('blocks a unit from manually retreating on the same turn it captured through combat', () => {
+  it('blocks an exhausted unit from manually retreating after combat', () => {
     const attacker = makeInstance({
       instanceId: 'attacker',
       ready: true,
@@ -1045,10 +1045,83 @@ describe('deterministic player card actions', () => {
     });
 
     expect(retreatResult.applied).toBe(false);
-    expect(retreatResult.error).toBe('Reckless Warrior cannot retreat on the same turn it captured a battlefield.');
+    expect(retreatResult.error).toBe('Reckless Warrior must be ready to retreat.');
     expect(retreatResult.state.zones.battlefieldLeft).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ instanceId: attacker.instanceId, retreatLockedUntilNextTurn: true }),
+        expect.objectContaining({ instanceId: attacker.instanceId, ready: false, retreatLockedUntilNextTurn: false }),
+      ])
+    );
+  });
+
+  it('lets a re-readied unit repeatedly capture an empty battlefield and retreat in the same turn', () => {
+    const attacker = makeInstance({
+      instanceId: 'attacker',
+      ready: true,
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 3, health: 3 }),
+    });
+    const baseState = makePlayerTurn();
+    const attackState = {
+      ...baseState,
+      zones: {
+        ...baseState.zones,
+        staging: [attacker],
+        battlefieldLeft: [],
+      },
+    };
+
+    const attackResult = resolveBattlefieldAttack(attackState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in attackResult ? attackResult.error : null).toBeNull();
+    if ('error' in attackResult) {
+      return;
+    }
+    expect(attackResult.state.zones.battlefieldLeft[0]).toMatchObject({
+      instanceId: attacker.instanceId,
+      ready: true,
+      retreatLockedUntilNextTurn: false,
+    });
+
+    const retreatResult = applyPlayerCardAction(attackResult.state, {
+      instanceId: attacker.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'staging',
+    });
+
+    expect(retreatResult.applied).toBe(true);
+    expect(retreatResult.state.zones.battlefieldLeft).toEqual([]);
+    expect(retreatResult.state.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instanceId: attacker.instanceId, ready: false }),
+      ])
+    );
+
+    const readiedState = {
+      ...retreatResult.state,
+      zones: {
+        ...retreatResult.state.zones,
+        staging: retreatResult.state.zones.staging.map((instance) =>
+          instance.instanceId === attacker.instanceId ? { ...instance, ready: true } : instance
+        ),
+      },
+    };
+    const secondAttack = resolveBattlefieldAttack(readiedState, 'player', attacker.instanceId, 'battlefieldLeft');
+
+    expect('error' in secondAttack ? secondAttack.error : null).toBeNull();
+    if ('error' in secondAttack) {
+      return;
+    }
+
+    const secondRetreat = applyPlayerCardAction(secondAttack.state, {
+      instanceId: attacker.instanceId,
+      fromZone: 'battlefieldLeft',
+      toZone: 'staging',
+    });
+
+    expect(secondRetreat.applied).toBe(true);
+    expect(secondRetreat.state.zones.battlefieldLeft).toEqual([]);
+    expect(secondRetreat.state.zones.staging).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instanceId: attacker.instanceId, ready: false }),
       ])
     );
   });

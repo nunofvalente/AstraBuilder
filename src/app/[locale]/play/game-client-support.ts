@@ -2,6 +2,7 @@ import type { Locale } from '@/i18n/config';
 import type { Card, DeckEntry } from '../create/deck-builder/types';
 import type { MoveCardOptions } from './game-actions';
 import {
+  getCardController,
   getModifiedManualPlayCost,
   isItemCard,
   isTerritoryCard,
@@ -95,6 +96,10 @@ export function getPendingChoiceTargetCards(gameState: GameState, pendingChoice:
 }
 
 export function getDefaultPendingChoiceSelectionIds(pendingChoice: PendingChoice | null): string[] {
+  if (pendingChoice?.kind === 'luxTarget' && pendingChoice.effect === 'fortunaSacrifice') {
+    return pendingChoice.availableInstanceIds.slice(0, 1);
+  }
+
   if (pendingChoice?.kind === 'terraTarget' && pendingChoice.effect === 'ravenRetreat') {
     return pendingChoice.availableInstanceIds.slice(0, 1);
   }
@@ -339,7 +344,7 @@ export function getBattlefieldActions(
     ];
   }
 
-  if (!isUnitCard(instance.card)) {
+  if (!isUnitCard(instance.card) || getCardController(instance) !== 'player') {
     return [];
   }
 
@@ -349,7 +354,7 @@ export function getBattlefieldActions(
       label: copy.retreatToStaging,
       target: 'staging',
       options: { enterExhausted: true },
-      disabled: instance.retreatLockedUntilNextTurn,
+      disabled: !instance.ready,
     },
   ];
 }

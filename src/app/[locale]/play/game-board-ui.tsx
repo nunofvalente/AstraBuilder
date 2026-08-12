@@ -498,7 +498,9 @@ export function BattlefieldPanel({
   const activeInstance = cards.find((instance) => instance.instanceId === activeInstanceId) ?? null;
   const [previewCards, setPreviewCards] = useState<GameCardInstance[] | null>(null);
   const [isTouchPreviewActive, setIsTouchPreviewActive] = useState(false);
+  const [actionMenuPosition, setActionMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const previewClearTimeoutRef = useRef<number | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const isFourKViewport = useIsFourKViewport();
@@ -592,6 +594,22 @@ export function BattlefieldPanel({
     setPreviewCards(null);
   }
 
+  function toggleActionMenu(instanceId: string, trigger: HTMLButtonElement) {
+    if (activeInstanceId === instanceId) {
+      setActiveInstanceId(null);
+      setActionMenuPosition(null);
+      return;
+    }
+
+    const panelRect = panelRef.current?.getBoundingClientRect();
+    const triggerRect = trigger.getBoundingClientRect();
+    setActionMenuPosition({
+      left: triggerRect.left - (panelRect?.left ?? 0) + triggerRect.width / 2,
+      top: triggerRect.top - (panelRect?.top ?? 0) - 4,
+    });
+    setActiveInstanceId(instanceId);
+  }
+
   function renderSlot(instance: GameCardInstance | null, label: string | null, size: 'unit' | 'territory') {
     const isActive = activeInstanceId === instance?.instanceId;
     const sizeClassName = size === 'unit' ? 'h-[7.1rem] min-[2560px]:h-[min(11rem,100%)]' : 'h-[6.35rem] min-[2560px]:h-[min(10.25rem,100%)]';
@@ -616,7 +634,7 @@ export function BattlefieldPanel({
         data-card-zone={zone}
         data-card-owner={getCardController(instance)}
         data-battlefield-slot-size={size}
-        onClick={() => !disabled && setActiveInstanceId((current) => (current === instance.instanceId ? null : instance.instanceId))}
+        onClick={(event) => !disabled && toggleActionMenu(instance.instanceId, event.currentTarget)}
         onMouseEnter={() => openPreview(instance)}
         onFocus={() => openPreview(instance)}
         onMouseLeave={() => schedulePreviewClear(instance.instanceId)}
@@ -661,7 +679,7 @@ export function BattlefieldPanel({
   }
 
   return (
-    <section className="play-battlefield-panel relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]" data-battlefield-zone={zone}>
+    <section ref={panelRef} className="play-battlefield-panel relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-visible rounded-lg border border-[color:var(--accent)]/35 bg-[radial-gradient(circle_at_50%_0%,rgba(241,143,59,0.14),transparent_48%),linear-gradient(180deg,rgba(55,42,32,0.92),rgba(30,27,25,0.86))] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.08),0_0.75rem_1.35rem_rgba(0,0,0,0.18)]" data-battlefield-zone={zone}>
       <CardZoomPreview
         cards={previewCards}
         interactive
@@ -719,7 +737,12 @@ export function BattlefieldPanel({
         {renderTerritoryColumn(copy.enemyTerritory, opponentTerritory)}
       </div>
       {activeInstance && !disabled && (actions.length > 0 || canActivate || flankingTargets.length > 0) ? (
-        <div ref={menuRef} className="absolute left-1/2 top-2 z-40 w-36 -translate-x-1/2 overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl">
+        <div
+          ref={menuRef}
+          data-action-menu-for={activeInstance.instanceId}
+          className="absolute z-40 w-36 -translate-x-1/2 -translate-y-full overflow-hidden rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-2xl"
+          style={actionMenuPosition ?? undefined}
+        >
           {actions.map((action) => (
             <button
               key={action.key}
