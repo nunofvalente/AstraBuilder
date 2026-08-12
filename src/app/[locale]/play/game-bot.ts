@@ -5,8 +5,12 @@ import {
   type BotTurnStep,
 } from './bot-policy';
 import {
+  activateCardAbility,
   advanceToNextTurn,
   declareBattlefieldAttack,
+  getCardAbilityActivationError,
+  getCardAbilityTargetOptions,
+  getFriendlyUnitsInPlay,
   playCounterCard,
   resolveBattlefieldAttack,
   type GameState,
@@ -89,17 +93,25 @@ export function resolveAutomaticBotTurn(state: GameState): GameState {
 export function playFirstBotCounter(state: GameState): GameState | null {
   const counterChoice = chooseBotCounter(state);
 
-  if (!counterChoice) {
-    return null;
+  if (counterChoice) {
+    const result = playCounterCard(
+      state,
+      'opponent',
+      counterChoice.counterInstanceId,
+      counterChoice.targetInstanceId ? { targetInstanceId: counterChoice.targetInstanceId } : undefined
+    );
+    return 'error' in result ? null : result.state;
   }
 
-  const result = playCounterCard(
-    state,
-    'opponent',
-    counterChoice.counterInstanceId,
-    counterChoice.targetInstanceId ? { targetInstanceId: counterChoice.targetInstanceId } : undefined
-  );
-  return 'error' in result ? null : result.state;
+  for (const source of getFriendlyUnitsInPlay(state, 'opponent')) {
+    if (getCardAbilityActivationError(state, 'opponent', source.instanceId)) continue;
+    const target = getCardAbilityTargetOptions(state, 'opponent', source.instanceId)[0];
+    if (!target) continue;
+    const result = activateCardAbility(state, 'opponent', source.instanceId, target.instanceId);
+    if (!('error' in result)) return result.state;
+  }
+
+  return null;
 }
 
 export type { BotTurnStep } from './bot-policy';

@@ -64,7 +64,7 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Attachment state is stabilized after board moves; equipment without a legal same-zone unit host is sent to graveyard automatically.
 - Territories can be played face down to a battlefield at 0 cost.
 - Face-down territories can be flipped face up on a later turn during your main phase by paying their printed supply cost.
-- During a counter window, flipping a face-down territory or playing a counter passes priority once; if the opponent declines to counter, the window closes without returning priority for another consecutive counter.
+- During a counter window, flipping a face-down territory, playing a counter card, or activating an eligible unit ability passes priority once; if the opponent declines to counter, the window closes without returning priority for another consecutive counter. Activated ability costs, including Assimilating Abomination's sacrifice cost, are paid when the ability is added to the stack, and their effects resolve in normal last-in-first-out order. Abilities restricted to outside combat, such as Valrathian Dreadnought, remain unavailable.
 - Manual moves to deck, hand, graveyard, and banish are blocked unless a future card ability implements them.
 - Multiplayer projections redact opponent deck, hand, face-down supply, face-down territory, and unrevealed Airdrop identities from both board payloads and action-log metadata.
 - Combat, death, scoring, counter windows, targeted choices, token creation, and turn-duration effects are active.

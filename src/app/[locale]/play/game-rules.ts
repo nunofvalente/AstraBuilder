@@ -86,6 +86,7 @@ export type {
 export const BATTLEFIELD_ZONE_IDS = ['battlefieldLeft', 'battlefieldCenter', 'battlefieldRight'] as const satisfies ZoneId[];
 export const BATTLEFIELD_ZONES = new Set<ZoneId>(BATTLEFIELD_ZONE_IDS);
 export const VICTORY_POINT_TARGET = 20;
+const COUNTER_ACTIVATABLE_CARD_IDS = new Set(['IMP001', 'IMP016', 'IMP066', 'IMP073', 'IMP139', 'IMP160']);
 const ZONE_LOG_LABELS: Record<ZoneId, string> = {
   deck: 'Deck',
   hand: 'Hand',
@@ -477,6 +478,7 @@ export function triggerCardAbilities(state: GameState, trigger: AbilityTrigger, 
         controller,
         zone: input.zone ?? null,
         targets: input.targets,
+        costsPaid: input.costsPaid,
       },
     });
 
@@ -920,75 +922,14 @@ export function activateCardAbility(
   sourceInstanceId: string,
   targetInstanceId: string
 ): ActivateCardAbilityResult {
-  if (state.winner) {
-    return { error: 'The game is over.' };
+  const activationError = getCardAbilityActivationError(state, owner, sourceInstanceId);
+  if (activationError) {
+    return { error: activationError };
   }
 
-  if (state.pendingCombat) {
-    return { error: 'Resolve the pending combat before activating an ability.' };
-  }
-
-  if (state.pendingChoice) {
-    return { error: 'Resolve the pending ability choice before activating an ability.' };
-  }
-
-  if (state.phase !== 'main' || state.activePlayer !== owner) {
-    return {
-      error: `${owner === 'player' ? 'You can' : 'Bot can'} only activate abilities during ${owner === 'player' ? 'your' : 'its'} main turn.`,
-    };
-  }
-
-  const friendlyUnits = getFriendlyUnitsInPlay(state, owner);
-  const source = friendlyUnits.find((instance) => instance.instanceId === sourceInstanceId) ?? null;
-
-  if (!source || getImplementedAbilitiesForTrigger(source.card.id, 'activated').length === 0) {
-    return { error: 'That card has no implemented activated ability.' };
-  }
-
-  if (source.card.id === 'IMP001' && source.ready) {
-    return { error: `${source.card.name} is already ready.` };
-  }
-
-  if (source.card.id === 'IMP016' && !source.ready) {
-    return { error: `${source.card.name} must be ready to activate its ability.` };
-  }
-
-  if (['IMP066', 'IMP073', 'IMP079', 'IMP139', 'IMP160'].includes(source.card.id) && !source.ready) {
-    return { error: `${source.card.name} must be ready to activate its ability.` };
-  }
-
-  if (source.card.id === 'IMP073' && getReadySupplyCount(state, owner) < 2) {
-    return { error: `Not enough ready supply. ${source.card.name} costs 2 to activate, but you have ${getReadySupplyCount(state, owner)}.` };
-  }
-
-  if (source.card.id === 'IMP139' && getReadySupplyCount(state, owner) < 1) {
-    return { error: `Not enough ready supply. ${source.card.name} costs 1 to activate, but you have ${getReadySupplyCount(state, owner)}.` };
-  }
-
-  if (source.card.id === 'IMP079') {
-    if (getUnitZone(state, source.instanceId) === 'staging') {
-      return { error: `${source.card.name} must be in a combat zone to activate its ability.` };
-    }
-    if (getReadySupplyCount(state, owner) < 3) {
-      return { error: `Not enough ready supply. ${source.card.name} costs 3 to activate, but you have ${getReadySupplyCount(state, owner)}.` };
-    }
-  }
-
-  const target = source.card.id === 'IMP160'
-    ? source
-    : source.card.id === 'IMP066' || source.card.id === 'IMP139'
-    ? friendlyUnits.find((instance) => instance.instanceId === targetInstanceId) ?? null
-    : source.card.id === 'IMP073'
-      ? friendlyUnits.find(
-          (instance) =>
-            instance.instanceId === targetInstanceId &&
-            ['drone', 'vehicle'].includes(instance.card.subtype.trim().toLowerCase())
-        ) ?? null
-      : source.card.id === 'IMP079'
-        ? getUnitsInPlay(state).find((instance) => instance.instanceId === targetInstanceId) ?? null
-        : friendlyUnits.find(
-            (instance) => instance.instanceId === targetInstanceId && instance.instanceId !== source.instanceId
-          ) ?? null;
+  const source = getFriendlyUnitsInPlay(state, owner).find((instance) => instance.instanceId === sourceInstanceId)!;
+  const target = getCardAbilityTargetOptions(state, owner, sourceInstanceId)
+    .find((instance) => instance.instanceId === targetInstanceId) ?? null;
 
   if (!target) {
     if (source.card.id === 'IMP160') return { error: 'Choose Supply Carrier.' };
@@ -998,15 +939,182 @@ export function activateCardAbility(
     return { error: 'Choose another friendly unit to sacrifice.' };
   }
 
-  return {
-    state: triggerCardAbilities(state, 'activated', {
-      source,
-      controller: owner,
-      targets: [{ type: 'card', instanceId: target.instanceId }],
-    }),
+  if (state.pendingCombat) {
+    const paidState = payActivatedAbilityCosts(state, owner, source, target);
+    if ('error' in paidState) return paidState;
+    const pendingCombat = paidState.state.pendingCombat!;
+    const stackedAbility: GameCardInstance = {
+      ...source,
+      counterStackEntryKind: 'activatedAbility',
+      selectedAbilityTargetInstanceIds: [target.instanceId],
+    };
+    const nextState: GameState = {
+      ...paidState.state,
+      pendingCombat: {
+        ...pendingCombat,
+        priorityOwner: owner === 'player' ? 'opponent' : 'player',
+        lastPassedOwner: null,
+        lastCounterActionOwner: owner,
+        counterStack: [...pendingCombat.counterStack, stackedAbility],
+      },
+      log: addLogEntry(paidState.state, {
+        prefix: `${owner === 'player' ? 'You activated ' : 'Bot activated '}`,
+        cardName: source.card.name,
+        suffix: ` as a counter, targeting ${target.card.name}.`,
+      }),
+    };
+    return { state: nextState, source, target };
+  }
+
+  const nextState = triggerCardAbilities(state, 'activated', {
     source,
-    target,
+    controller: owner,
+    targets: [{ type: 'card', instanceId: target.instanceId }],
+  });
+
+  return { state: nextState, source, target };
+}
+
+function exhaustUnitInPlay(state: GameState, instanceId: string): GameState {
+  const exhaustCards = (cards: GameCardInstance[]) =>
+    cards.map((card) => card.instanceId === instanceId ? { ...card, ready: false } : card);
+  return {
+    ...state,
+    zones: {
+      ...state.zones,
+      staging: exhaustCards(state.zones.staging),
+      battlefieldLeft: exhaustCards(state.zones.battlefieldLeft),
+      battlefieldCenter: exhaustCards(state.zones.battlefieldCenter),
+      battlefieldRight: exhaustCards(state.zones.battlefieldRight),
+    },
+    opponentZones: {
+      ...state.opponentZones,
+      staging: exhaustCards(state.opponentZones.staging),
+    },
   };
+}
+
+function payActivatedAbilityCosts(
+  state: GameState,
+  owner: Owner,
+  source: GameCardInstance,
+  target: GameCardInstance
+): { state: GameState } | { error: string } {
+  let nextState = state;
+
+  if (source.card.id === 'IMP001' || source.card.id === 'IMP016') {
+    const removed = removeUnitFromPlay(nextState, target.instanceId);
+    if ('error' in removed) return removed;
+    nextState = removed.state;
+  }
+
+  const supplyCost = source.card.id === 'IMP073' ? 2 : source.card.id === 'IMP139' ? 1 : 0;
+  if (supplyCost > 0) {
+    nextState = exhaustSupplyForCost(nextState, owner, supplyCost);
+  }
+
+  if (source.card.id !== 'IMP001') {
+    nextState = exhaustUnitInPlay(nextState, source.instanceId);
+  }
+
+  return { state: nextState };
+}
+
+export function getCardAbilityActivationError(
+  state: GameState,
+  owner: Owner,
+  sourceInstanceId: string
+): string | null {
+  if (state.winner) {
+    return 'The game is over.';
+  }
+
+  if (state.pendingChoice) {
+    return 'Resolve the pending ability choice before activating an ability.';
+  }
+
+  if (state.pendingCombat) {
+    if (state.pendingCombat.priorityOwner !== owner) {
+      return owner === 'player' ? 'Waiting for the bot to pass counter priority.' : 'Waiting for you to pass counter priority.';
+    }
+  } else if (state.phase !== 'main' || state.activePlayer !== owner) {
+    return `${owner === 'player' ? 'You can' : 'Bot can'} only activate abilities during ${owner === 'player' ? 'your' : 'its'} main turn.`;
+  }
+
+  const friendlyUnits = getFriendlyUnitsInPlay(state, owner);
+  const source = friendlyUnits.find((instance) => instance.instanceId === sourceInstanceId) ?? null;
+
+  if (!source || getImplementedAbilitiesForTrigger(source.card.id, 'activated').length === 0) {
+    return 'That card has no implemented activated ability.';
+  }
+
+  if (state.pendingCombat && source.card.id === 'IMP079') {
+    return `${source.card.name} can only activate its ability outside combat.`;
+  }
+
+  if (state.pendingCombat && !COUNTER_ACTIVATABLE_CARD_IDS.has(source.card.id)) {
+    return `${source.card.name} cannot use its ability during a counter step.`;
+  }
+
+  if (source.card.id === 'IMP001' && source.ready) {
+    return `${source.card.name} is already ready.`;
+  }
+
+  if (source.card.id === 'IMP016' && !source.ready) {
+    return `${source.card.name} must be ready to activate its ability.`;
+  }
+
+  if (['IMP066', 'IMP073', 'IMP079', 'IMP139', 'IMP160'].includes(source.card.id) && !source.ready) {
+    return `${source.card.name} must be ready to activate its ability.`;
+  }
+
+  if (source.card.id === 'IMP073' && getReadySupplyCount(state, owner) < 2) {
+    return `Not enough ready supply. ${source.card.name} costs 2 to activate, but you have ${getReadySupplyCount(state, owner)}.`;
+  }
+
+  if (source.card.id === 'IMP139' && getReadySupplyCount(state, owner) < 1) {
+    return `Not enough ready supply. ${source.card.name} costs 1 to activate, but you have ${getReadySupplyCount(state, owner)}.`;
+  }
+
+  if (source.card.id === 'IMP079') {
+    if (getUnitZone(state, source.instanceId) === 'staging') {
+      return `${source.card.name} must be in a combat zone to activate its ability.`;
+    }
+    if (getReadySupplyCount(state, owner) < 3) {
+      return `Not enough ready supply. ${source.card.name} costs 3 to activate, but you have ${getReadySupplyCount(state, owner)}.`;
+    }
+  }
+
+  return null;
+}
+
+export function getCardAbilityTargetOptions(
+  state: GameState,
+  owner: Owner,
+  sourceInstanceId: string
+): GameCardInstance[] {
+  const friendlyUnits = getFriendlyUnitsInPlay(state, owner);
+  const source = friendlyUnits.find((instance) => instance.instanceId === sourceInstanceId) ?? null;
+  if (!source) return [];
+
+  return source.card.id === 'IMP160'
+    ? [source]
+    : source.card.id === 'IMP066' || source.card.id === 'IMP139'
+    ? friendlyUnits
+    : source.card.id === 'IMP073'
+      ? friendlyUnits.filter((instance) => ['drone', 'vehicle'].includes(instance.card.subtype.trim().toLowerCase()))
+      : source.card.id === 'IMP079'
+        ? getUnitsInPlay(state)
+        : friendlyUnits.filter((instance) => instance.instanceId !== source.instanceId);
+}
+
+export function getCounterActivatableUnits(state: GameState, owner: Owner): GameCardInstance[] {
+  if (state.pendingCombat?.priorityOwner !== owner) return [];
+  return getFriendlyUnitsInPlay(state, owner).filter(
+    (instance) =>
+      !getCardAbilityActivationError(state, owner, instance.instanceId) &&
+      getCardAbilityTargetOptions(state, owner, instance.instanceId).length > 0
+  );
 }
 
 export function getBattlefieldPlacementError(card: GameCardInstance, destinationCards: GameCardInstance[]): string | null {
@@ -2948,6 +3056,23 @@ export function playCounterCard(
 
 function resolveCounterCard(state: GameState, counter: GameCardInstance): GameState {
   const owner = counter.owner;
+  if (counter.counterStackEntryKind === 'activatedAbility') {
+    const nextState = triggerCardAbilities(state, 'activated', {
+      source: counter,
+      controller: getCardController(counter),
+      targets: counter.selectedAbilityTargetInstanceIds?.map((instanceId) => ({ type: 'card' as const, instanceId })),
+      costsPaid: true,
+    });
+    return {
+      ...nextState,
+      log: addLogEntry(nextState, {
+        prefix: 'Resolved activated ability of ',
+        cardName: counter.card.name,
+        suffix: '.',
+      }),
+    };
+  }
+
   const hasImplementedEffect = getImplementedAbilitiesForTrigger(counter.card.id, 'onPlay').length > 0;
   let nextState = triggerCardAbilities(state, 'onPlay', {
     source: counter,

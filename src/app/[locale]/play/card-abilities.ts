@@ -60,6 +60,7 @@ export type AbilityEvent = {
   controller: Owner;
   zone: ZoneId | null;
   targets?: AbilityTarget[];
+  costsPaid?: boolean;
 };
 
 export type AbilityTarget =

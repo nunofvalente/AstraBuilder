@@ -36,7 +36,9 @@ import {
   createLogEntry,
   declareBattlefieldAttack,
   getCardController,
+  getCardAbilityTargetOptions,
   getCounterPlayError,
+  getCounterActivatableUnits,
   getCounterTargetOptions,
   getCurrentUnitAttack,
   getCurrentUnitHealth,
@@ -71,6 +73,7 @@ import {
   getCardActionCopy,
   getDefaultPendingChoiceSelectionIds,
   getPendingChoiceTargetCards,
+  getCardLocationLabel,
   isPrivateOpponentSupplyChoiceTarget,
   mapDeckRows,
   shouldContinueBotTurnAfterResolvedAttack,
@@ -84,7 +87,7 @@ import {
   OpponentHandStrip,
   RequiredActionToast,
 } from './game-client-ui';
-import { getPlayBoardCopy, getPlayControlsCopy, getPlayLobbyCopy } from './play-localization';
+import { getActivatedAbilityModalCopy, getPlayBoardCopy, getPlayControlsCopy, getPlayLobbyCopy } from './play-localization';
 import { startCardMoveViewTransition } from './card-move-animation';
 import { useCardExitAnimations } from './card-exit-animation';
 
@@ -1623,6 +1626,8 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       pendingCombat?.priorityOwner === 'player'
         ? gameState.zones.hand.filter((instance) => !getCounterPlayError(gameState, 'player', instance.instanceId))
         : [];
+    const playablePlayerActivatedAbilities =
+      getCounterActivatableUnits(gameState, 'player');
     const canTakePlayerActions = !gameState.winner && (gameState.phase === 'setup' || gameState.activePlayer === 'player');
     const canUseBoardActions = canTakePlayerActions && !pendingCombat && !pendingChoice;
     const canPlayFromHand = gameState.phase === 'main' && gameState.activePlayer === 'player' && !pendingCombat && !pendingChoice;
@@ -1662,16 +1667,11 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
     };
     const pendingAbilitySource =
       friendlyUnitsInPlay.find((instance) => instance.instanceId === pendingAbilitySourceId) ?? null;
+    const pendingAbilityCopy = pendingAbilitySource
+      ? getActivatedAbilityModalCopy(locale, pendingAbilitySource.card)
+      : null;
     const pendingAbilityTargets = pendingAbilitySource
-      ? pendingAbilitySource.card.id === 'IMP066' || pendingAbilitySource.card.id === 'IMP139'
-        ? friendlyUnitsInPlay
-        : pendingAbilitySource.card.id === 'IMP073'
-          ? friendlyUnitsInPlay.filter((instance) =>
-              ['drone', 'vehicle'].includes(instance.card.subtype.trim().toLowerCase())
-            )
-          : pendingAbilitySource.card.id === 'IMP079'
-            ? getUnitsInPlay(gameState)
-            : friendlyUnitsInPlay.filter((instance) => instance.instanceId !== pendingAbilitySource.instanceId)
+      ? getCardAbilityTargetOptions(gameState, 'player', pendingAbilitySource.instanceId)
       : [];
     const canFlipFaceUp = canPlayFromHand;
     const canSupplyFromHand =
@@ -1784,7 +1784,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
             </div>
           </div>
           <div className="play-game-board relative grid min-h-[42rem] grid-rows-[minmax(11.75rem,0.84fr)_minmax(8.75rem,0.66fr)_minmax(11.75rem,0.84fr)] gap-2 rounded-xl border border-[color:var(--accent)]/30 bg-[radial-gradient(circle_at_50%_43%,rgba(241,143,59,0.15),transparent_34%),radial-gradient(circle_at_50%_50%,rgba(235,184,113,0.06),transparent_58%),linear-gradient(180deg,rgba(54,52,50,0.88),rgba(31,28,26,0.86))] p-2 shadow-[inset_0_1px_0_rgba(255,226,183,0.10),inset_0_0_0_1px_rgba(255,255,255,0.025),0_1rem_2rem_rgba(0,0,0,0.22)] xl:min-h-0 min-[2560px]:grid-rows-[minmax(12.5rem,0.84fr)_minmax(11rem,0.74fr)_minmax(12rem,1fr)]">
-            {pendingCombat && !pendingCounterTargetSource ? (
+            {pendingCombat && !pendingCounterTargetSource && !pendingAbilitySource ? (
               <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/45 px-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="counter-window-title" className="w-full max-w-md rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-4 shadow-2xl shadow-black/45">
                   <p id="counter-window-title" className="text-[0.65rem] font-bold uppercase tracking-wide text-[color:var(--text-secondary)]">{controlsCopy.counterWindow}</p>
@@ -1827,9 +1827,41 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                       <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{controlsCopy.noCounters}</p>
                     )}
                   </div>
-                  {pendingCombat.priorityOwner === 'player' && (playablePlayerCounters.length > 0 || playableCounterTerritories.length > 0) ? (
+                  {pendingCombat.priorityOwner === 'player' && (playablePlayerCounters.length > 0 || playableCounterTerritories.length > 0 || playablePlayerActivatedAbilities.length > 0) ? (
                     <div className="mt-4 border-t border-[color:var(--border)] pt-3">
                       <p className="text-xs font-semibold text-[color:var(--text-secondary)]">{controlsCopy.availableCounters}</p>
+                      {playablePlayerActivatedAbilities.length > 0 ? (
+                        <div className="mt-2 grid gap-2">
+                          {playablePlayerActivatedAbilities.map((source) => (
+                            <button
+                              key={`ability-${source.instanceId}`}
+                              type="button"
+                              onClick={() => requestAbilityActivation(source)}
+                              onMouseEnter={() => setHoveredCounterPreviewCards([source])}
+                              onFocus={() => setHoveredCounterPreviewCards([source])}
+                              onMouseLeave={() => {
+                                setHoveredCounterPreviewCards((current) =>
+                                  current?.[0]?.instanceId === source.instanceId ? null : current
+                                );
+                              }}
+                              onBlur={() => {
+                                setHoveredCounterPreviewCards((current) =>
+                                  current?.[0]?.instanceId === source.instanceId ? null : current
+                                );
+                              }}
+                              className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-[color:var(--accent)]/55 bg-[color:var(--surface-muted)] px-3 py-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold">{source.card.name}</span>
+                                <span className="block text-[0.65rem] text-[color:var(--text-secondary)]">
+                                  {getCardLocationLabel(gameState, source, locale)}
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-xs font-semibold text-[color:var(--accent)]">{playCopy.activateAbility}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                       <div className="mt-2 grid max-h-36 gap-2 overflow-y-auto">
                         {playablePlayerCounters.map((counter) => (
                           <button
@@ -2181,10 +2213,10 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
               className="w-full max-w-lg rounded-lg border border-[color:var(--accent)]/55 bg-[color:var(--surface)] p-5 shadow-2xl"
             >
               <h2 id="ability-target-title" className="text-lg font-bold text-[color:var(--text-primary)]">
-                Sacrifice another unit
+                {pendingAbilityCopy?.title}
               </h2>
-              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                Choose a friendly unit to sacrifice. {pendingAbilitySource.card.name} will ready.
+              <p className="mt-1 whitespace-pre-line text-sm text-[color:var(--text-secondary)]">
+                {pendingAbilityCopy?.description}
               </p>
               {pendingAbilityTargets.length > 0 ? (
                 <div className="mt-4 grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
@@ -2193,6 +2225,18 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                       key={target.instanceId}
                       type="button"
                       onClick={() => activateAbilityWithTarget(target.instanceId)}
+                      onMouseEnter={() => setHoveredCounterPreviewCards([target])}
+                      onFocus={() => setHoveredCounterPreviewCards([target])}
+                      onMouseLeave={() => {
+                        setHoveredCounterPreviewCards((current) =>
+                          current?.[0]?.instanceId === target.instanceId ? null : current
+                        );
+                      }}
+                      onBlur={() => {
+                        setHoveredCounterPreviewCards((current) =>
+                          current?.[0]?.instanceId === target.instanceId ? null : current
+                        );
+                      }}
                       className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2 text-left transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
                     >
                       <span className="relative block aspect-[5/7] overflow-hidden rounded border border-black/30 bg-black/15">
@@ -2206,6 +2250,9 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                         />
                       </span>
                       <span className="mt-1 block truncate text-xs font-semibold">{target.card.name}</span>
+                      <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
+                        {getCardLocationLabel(gameState, target, locale)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -2219,7 +2266,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
                 onClick={() => setPendingAbilitySourceId(null)}
                 className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-semibold transition hover:border-[color:var(--accent)] focus:outline-none focus-visible:ring focus-visible:ring-[color:var(--accent)]"
               >
-                Cancel
+                {controlsCopy.cancel}
               </button>
             </div>
           </div>

@@ -47,6 +47,14 @@ export function getPlayBoardCopy(locale: Locale): PlayBoardCopy {
   return BOARD_COPY[locale];
 }
 
+export function getActivatedAbilityModalCopy(locale: Locale, card: Card): { title: string; description: string } {
+  const localizedCard = getLocalizedCardDisplay(locale, card);
+  return {
+    title: `${getPlayBoardCopy(locale).activateAbility}: ${localizedCard.name}`,
+    description: localizedCard.rulesText,
+  };
+}
+
 const BANISH_ON_DEATH_COPY: Record<Locale, string> = {
   en: 'Banish on death',
   fr: 'Bannir à la mort',
