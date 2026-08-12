@@ -2791,27 +2791,12 @@ export function declareBattlefieldAttack(
   }
 
   const defender = state.zones[targetZone].find((instance) => isUnitCard(instance.card) && getCardController(instance) !== owner) ?? null;
-  if (!defender) {
-    const resolved = resolveBattlefieldAttack(state, owner, attackerInstanceId, targetZone);
-    if ('error' in resolved) {
-      return resolved;
-    }
-
-    return {
-      state: resolved.state,
-      pendingCombat: null,
-      attacker: resolved.attacker,
-      defender: null,
-      resolvedCombat: resolved,
-    };
-  }
-
   const defendingOwner: Owner = owner === 'player' ? 'opponent' : 'player';
   const pendingCombat: PendingCombat = {
     attackerOwner: owner,
     attackerInstanceId,
     targetZone,
-    defenderInstanceId: defender.instanceId,
+    defenderInstanceId: defender?.instanceId ?? null,
     ...(flankingOriginZone ? { flankingOriginZone } : {}),
     priorityOwner: defendingOwner,
     lastPassedOwner: null,
@@ -2839,86 +2824,88 @@ export function declareBattlefieldAttack(
     source: attacker,
     controller: owner,
     zone: targetZone,
-    targets: [{ type: 'card', instanceId: defender.instanceId }],
+    targets: defender ? [{ type: 'card', instanceId: defender.instanceId }] : undefined,
   });
 
-  nextState = triggerCardAbilities(nextState, 'onDefend', {
-    source: defender,
-    controller: getCardController(defender),
-    zone: targetZone,
-    targets: [{ type: 'card', instanceId: attacker.instanceId }],
-  });
-  const ancestralCrown = state.zones[targetZone].find(
-    (card) =>
-      card.card.id === 'IMP155' &&
-      !card.faceDown &&
-      getCardController(card) === getCardController(defender)
-  );
-  const defenderSubtype = defender.card.subtype.toLowerCase();
-  if (
-    ancestralCrown &&
-    ['sylvan', 'kitsune', 'beast'].some((subtype) => defenderSubtype.includes(subtype))
-  ) {
-    nextState = readyUnitInPlay(nextState, defender.instanceId);
-    nextState = {
-      ...nextState,
-      zones: {
-        ...nextState.zones,
-        [targetZone]: nextState.zones[targetZone].map((card) =>
-          card.instanceId === defender.instanceId
-            ? { ...card, combatAttackBonus: (card.combatAttackBonus ?? 0) + 2 }
-            : card
-        ),
-      },
-    };
-  }
-  if (
-    state.zones[targetZone].some(
-      (instance) =>
-        instance.card.id === 'IMP094' &&
-        !instance.faceDown &&
-        getCardController(instance) === getCardController(defender)
-    )
-  ) {
-    nextState = readyUnitInPlay(nextState, defender.instanceId);
-  }
+  if (defender) {
+    nextState = triggerCardAbilities(nextState, 'onDefend', {
+      source: defender,
+      controller: getCardController(defender),
+      zone: targetZone,
+      targets: [{ type: 'card', instanceId: attacker.instanceId }],
+    });
+    const ancestralCrown = state.zones[targetZone].find(
+      (card) =>
+        card.card.id === 'IMP155' &&
+        !card.faceDown &&
+        getCardController(card) === getCardController(defender)
+    );
+    const defenderSubtype = defender.card.subtype.toLowerCase();
+    if (
+      ancestralCrown &&
+      ['sylvan', 'kitsune', 'beast'].some((subtype) => defenderSubtype.includes(subtype))
+    ) {
+      nextState = readyUnitInPlay(nextState, defender.instanceId);
+      nextState = {
+        ...nextState,
+        zones: {
+          ...nextState.zones,
+          [targetZone]: nextState.zones[targetZone].map((card) =>
+            card.instanceId === defender.instanceId
+              ? { ...card, combatAttackBonus: (card.combatAttackBonus ?? 0) + 2 }
+              : card
+          ),
+        },
+      };
+    }
+    if (
+      state.zones[targetZone].some(
+        (instance) =>
+          instance.card.id === 'IMP094' &&
+          !instance.faceDown &&
+          getCardController(instance) === getCardController(defender)
+      )
+    ) {
+      nextState = readyUnitInPlay(nextState, defender.instanceId);
+    }
 
-  const currentDefender = getCardInstanceById(nextState, defender.instanceId);
-  if (
-    currentDefender &&
-    isUnitCard(currentDefender.card) &&
-    ['IMP067', 'IMP079', 'IMP111', 'IMP127', 'IMP130'].includes(currentDefender.card.id) &&
-    !currentDefender.ready
-  ) {
-    const fortifyOptions = getFortifyDiscardOptions(nextState, currentDefender);
-    if (fortifyOptions.length > 0) {
-      if (getCardController(currentDefender) === 'player') {
-        nextState = {
-          ...nextState,
-          pendingChoice: {
-            kind: 'caelumTarget',
-            owner: 'player',
-            sourceInstanceId: currentDefender.instanceId,
-            sourceName: currentDefender.card.name,
-            prompt: `Discard a ${currentDefender.card.affinity} card to ready ${currentDefender.card.name}?`,
-            effect: 'fortifyDiscard',
-            availableInstanceIds: fortifyOptions.map((card) => card.instanceId),
-            optional: true,
-          },
-        };
-      } else {
-        nextState = applyFortifyDiscard(nextState, currentDefender.instanceId, fortifyOptions[0]!);
+    const currentDefender = getCardInstanceById(nextState, defender.instanceId);
+    if (
+      currentDefender &&
+      isUnitCard(currentDefender.card) &&
+      ['IMP067', 'IMP079', 'IMP111', 'IMP127', 'IMP130'].includes(currentDefender.card.id) &&
+      !currentDefender.ready
+    ) {
+      const fortifyOptions = getFortifyDiscardOptions(nextState, currentDefender);
+      if (fortifyOptions.length > 0) {
+        if (getCardController(currentDefender) === 'player') {
+          nextState = {
+            ...nextState,
+            pendingChoice: {
+              kind: 'caelumTarget',
+              owner: 'player',
+              sourceInstanceId: currentDefender.instanceId,
+              sourceName: currentDefender.card.name,
+              prompt: `Discard a ${currentDefender.card.affinity} card to ready ${currentDefender.card.name}?`,
+              effect: 'fortifyDiscard',
+              availableInstanceIds: fortifyOptions.map((card) => card.instanceId),
+              optional: true,
+            },
+          };
+        } else {
+          nextState = applyFortifyDiscard(nextState, currentDefender.instanceId, fortifyOptions[0]!);
+        }
       }
     }
-  }
 
-  if (attacker.card.id === 'IMP008') {
-    nextState = {
-      ...markUnitToLoseVictoryPointOnDeathThisTurn(nextState, defender.instanceId),
-      log: addLogEntry(nextState, {
-        suffix: `${attacker.card.name} marked ${defender.card.name}; if it dies this turn, its controller loses 1 victory point.`,
-      }),
-    };
+    if (attacker.card.id === 'IMP008') {
+      nextState = {
+        ...markUnitToLoseVictoryPointOnDeathThisTurn(nextState, defender.instanceId),
+        log: addLogEntry(nextState, {
+          suffix: `${attacker.card.name} marked ${defender.card.name}; if it dies this turn, its controller loses 1 victory point.`,
+        }),
+      };
+    }
   }
 
   if (flankingOriginZone) {

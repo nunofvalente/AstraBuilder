@@ -382,7 +382,7 @@ export type DeclareBattlefieldAttackResult =
       state: GameState;
       pendingCombat: PendingCombat;
       attacker: GameCardInstance;
-      defender: GameCardInstance;
+      defender: GameCardInstance | null;
       resolvedCombat?: null;
     }
   | {
