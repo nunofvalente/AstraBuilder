@@ -529,9 +529,9 @@ function moveCard(
     BATTLEFIELD_ZONES.has(fromZone) &&
     toZone === 'staging' &&
     isUnitCard(card.card) &&
-    card.retreatLockedUntilNextTurn
+    !card.ready
   ) {
-    return rejected(state, `${card.card.name} cannot retreat on the same turn it captured a battlefield.`);
+    return rejected(state, `${card.card.name} must be ready to retreat.`);
   }
 
   if (isUnitCard(card.card) && (toZone === 'staging' || BATTLEFIELD_ZONES.has(toZone))) {

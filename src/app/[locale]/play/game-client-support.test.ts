@@ -109,6 +109,22 @@ describe('game client support', () => {
     expect(getDefaultPendingChoiceSelectionIds(pendingChoice)).toEqual(['raven']);
   });
 
+  it('preselects Fortuna Bank for its optional end-turn sacrifice', () => {
+    const pendingChoice: PendingChoice = {
+      kind: 'luxTarget',
+      owner: 'player',
+      sourceInstanceId: 'fortuna',
+      sourceName: 'Fortuna Bank',
+      prompt: 'Sacrifice Fortuna Bank to draw a card?',
+      effect: 'fortunaSacrifice',
+      availableInstanceIds: ['fortuna'],
+      optional: true,
+      resumeTurnAdvance: true,
+    };
+
+    expect(getDefaultPendingChoiceSelectionIds(pendingChoice)).toEqual(['fortuna']);
+  });
+
   it('includes supply cards for Wingshield Transport target choices', () => {
     const supplyCard = makeInstance('supply-choice');
     const state = {

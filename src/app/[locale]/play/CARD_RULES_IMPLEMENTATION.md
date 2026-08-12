@@ -54,6 +54,7 @@ Card rules are implemented from canonical card text, not stored as executable da
 - Manual supply is limited to 1 card from hand during your own main turn.
 - Staging accepts units only.
 - Battlefield zones accept territories from hand and ready units from staging.
+- Ready units can retreat from a battlefield during their controller's main phase, including immediately after taking control of an empty battlefield. Units exhausted by combat cannot retreat as a manual unit action.
 - Units enter staging exhausted unless they have `Blitz`.
 - Renowned units are limited to one in play per card name for each controller.
 - Equipment must be attached to one of your units in staging when played.
