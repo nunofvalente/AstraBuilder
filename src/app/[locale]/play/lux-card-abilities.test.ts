@@ -13,6 +13,8 @@ import {
   getCurrentUnitAttack,
   getCurrentUnitHealth,
   getReadySupplyCount,
+  passCounterPriority,
+  playCounterCard,
   resolveBattlefieldAttack,
   resolvePendingChoice,
   runTurnStart,
@@ -409,6 +411,189 @@ describe('Lux card abilities', () => {
     expect(getCounterTargetOptions(state, extraction).map((card) => card.instanceId)).toContain(attacker.instanceId);
     expect(getCounterTargetOptions(state, muster).map((card) => card.instanceId)).not.toContain(attacker.instanceId);
     expect(getCounterTargetOptions(state, medic).map((card) => card.instanceId)).toEqual([defender.instanceId]);
+  });
+
+  it('resolves responses above Muster before pausing for Celeste to exhaust the attacker', () => {
+    const attacker = makeUnit('attacker', 'opponent', {
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 4, health: 5 }),
+    });
+    const celeste = makeUnit('IMP041', 'player', {
+      ready: false,
+      card: createTestCard({ id: 'IMP041', name: 'Celeste, Concord Paladin', type: 'Unit', attack: 2, health: 5 }),
+    });
+    const muster = makeUnit('IMP058', 'player', {
+      card: createTestCard({
+        id: 'IMP058',
+        name: 'Muster for Battle',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 2,
+        rulesText: 'Ready target friendly unit. Draw a card.',
+      }),
+    });
+    const opponentResponse = makeUnit('opponent-response', 'opponent', {
+      card: createTestCard({
+        id: 'opponent-response',
+        name: 'Opponent Response',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'You can play this as a counter.',
+      }),
+    });
+    const playerResponse = makeUnit('player-response', 'player', {
+      card: createTestCard({
+        id: 'player-response',
+        name: 'Player Response',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'You can play this as a counter.',
+      }),
+    });
+    const opponentFinalResponse = makeUnit('opponent-final-response', 'opponent', {
+      card: createTestCard({
+        id: 'opponent-final-response',
+        name: 'Opponent Final Response',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'You can play this as a counter.',
+      }),
+    });
+    const supply = [makeCard('supply-1', 'Supply 1', 'Territory', ''), makeCard('supply-2', 'Supply 2', 'Territory', '')];
+    const drawn = makeCard('drawn', 'Drawn Card', 'Tactic', '');
+    const state: GameState = {
+      ...makeState(),
+      activePlayer: 'opponent',
+      zones: {
+        ...makeState().zones,
+        hand: [muster, playerResponse],
+        deck: [drawn],
+        supply,
+        battlefieldLeft: [celeste],
+      },
+      opponentZones: {
+        ...makeState().opponentZones,
+        hand: [opponentResponse, opponentFinalResponse],
+        staging: [attacker],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(state, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect(declared).not.toHaveProperty('error');
+    if (!('state' in declared)) return;
+    const played = playCounterCard(declared.state, 'player', muster.instanceId, {
+      targetInstanceId: celeste.instanceId,
+    });
+    expect(played).not.toHaveProperty('error');
+    if (!('state' in played)) return;
+    const opponentResponded = playCounterCard(played.state, 'opponent', opponentResponse.instanceId);
+    expect(opponentResponded).not.toHaveProperty('error');
+    if (!('state' in opponentResponded)) return;
+    const playerResponded = playCounterCard(opponentResponded.state, 'player', playerResponse.instanceId);
+    expect(playerResponded).not.toHaveProperty('error');
+    if (!('state' in playerResponded)) return;
+    const opponentRespondedAgain = playCounterCard(
+      playerResponded.state,
+      'opponent',
+      opponentFinalResponse.instanceId
+    );
+    expect(opponentRespondedAgain).not.toHaveProperty('error');
+    if (!('state' in opponentRespondedAgain)) return;
+    const paused = passCounterPriority(opponentRespondedAgain.state, 'player');
+    expect(paused).not.toHaveProperty('error');
+    if (!('state' in paused)) return;
+
+    expect(paused.resolvedCombat).toBeNull();
+    expect(paused.resolvedCounters.map((counter) => counter.instanceId)).toEqual([
+      opponentFinalResponse.instanceId,
+      playerResponse.instanceId,
+      opponentResponse.instanceId,
+      muster.instanceId,
+    ]);
+    expect(paused.state.pendingChoice).toMatchObject({
+      kind: 'luxTarget',
+      effect: 'celesteExhaust',
+      resumeCombat: true,
+      availableInstanceIds: [attacker.instanceId],
+    });
+    expect(paused.state.zones.hand.some((card) => card.instanceId === drawn.instanceId)).toBe(true);
+
+    const resolved = resolvePendingChoice(paused.state, [attacker.instanceId]);
+    expect(resolved).not.toHaveProperty('error');
+    if ('error' in resolved) return;
+    expect(resolved.pendingCombat).toBeNull();
+    expect(resolved.zones.battlefieldLeft.find((card) => card.instanceId === celeste.instanceId)?.damage).toBe(0);
+  });
+
+  it('does not trigger Celeste when a counter above Muster destroys her first', () => {
+    const attacker = makeUnit('attacker', 'opponent', {
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 4, health: 5 }),
+    });
+    const celeste = makeUnit('IMP041', 'player', {
+      ready: false,
+      card: createTestCard({ id: 'IMP041', name: 'Celeste, Concord Paladin', type: 'Unit', attack: 2, health: 5 }),
+    });
+    const muster = makeUnit('IMP058', 'player', {
+      card: createTestCard({
+        id: 'IMP058',
+        name: 'Muster for Battle',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'Ready target friendly unit. Draw a card.',
+      }),
+    });
+    const killingBlow = makeUnit('IMP026', 'opponent', {
+      card: createTestCard({
+        id: 'IMP026',
+        name: 'Killing Blow',
+        type: 'Tactic',
+        subtype: 'Counter',
+        cost: 0,
+        rulesText: 'Destroy target unit in a combat zone.',
+      }),
+    });
+    const state: GameState = {
+      ...makeState(),
+      activePlayer: 'opponent',
+      zones: {
+        ...makeState().zones,
+        hand: [muster],
+        battlefieldLeft: [celeste],
+      },
+      opponentZones: {
+        ...makeState().opponentZones,
+        hand: [killingBlow],
+        staging: [attacker],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(state, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect(declared).not.toHaveProperty('error');
+    if (!('state' in declared)) return;
+    const playedMuster = playCounterCard(declared.state, 'player', muster.instanceId, {
+      targetInstanceId: celeste.instanceId,
+    });
+    expect(playedMuster).not.toHaveProperty('error');
+    if (!('state' in playedMuster)) return;
+    const playedKillingBlow = playCounterCard(playedMuster.state, 'opponent', killingBlow.instanceId, {
+      targetInstanceId: celeste.instanceId,
+    });
+    expect(playedKillingBlow).not.toHaveProperty('error');
+    if (!('state' in playedKillingBlow)) return;
+
+    const resolved = passCounterPriority(playedKillingBlow.state, 'player');
+    expect(resolved).not.toHaveProperty('error');
+    if (!('state' in resolved)) return;
+    expect(resolved.resolvedCounters.map((counter) => counter.instanceId)).toEqual([
+      killingBlow.instanceId,
+      muster.instanceId,
+    ]);
+    expect(resolved.resolvedCombat).not.toBeNull();
+    expect(resolved.state.pendingChoice).toBeNull();
+    expect(resolved.state.zones.graveyard.some((card) => card.instanceId === celeste.instanceId)).toBe(true);
   });
 
   it('adds and spends Fortuna temporary supply', () => {

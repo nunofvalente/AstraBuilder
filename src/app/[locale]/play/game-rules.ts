@@ -1784,6 +1784,20 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   const selectedIdSet = new Set(selectedInstanceIds);
   const ownerZones = getOwnerZoneMap(state, pendingChoice.owner);
+  const continueCombatIfNeeded = (resolved: GameState | { error: string }): GameState | { error: string } => {
+    if (!pendingChoice.resumeCombat || 'error' in resolved) return resolved;
+    if (resolved.pendingChoice) {
+      return {
+        ...resolved,
+        pendingChoice: {
+          ...resolved.pendingChoice,
+          resumeCombat: true,
+        },
+      };
+    }
+    const continued = resolveCounterStackAndCombat(resolved);
+    return 'error' in continued ? continued : continued.state;
+  };
   const continueQueuedScoreItems = (resolved: GameState): GameState => {
     const remainingIds = pendingChoice.remainingScoreItemTriggerIds;
     const owner = pendingChoice.scoreTriggerOwner;
@@ -1806,6 +1820,7 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'luxTarget') {
     const resolved = resolveLuxTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(resolved);
     if (!('error' in resolved) && pendingChoice.resumeTurnStart && !resolved.pendingChoice) {
       return runTurnStart(resolved);
     }
@@ -1823,6 +1838,7 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'solaraTarget') {
     const resolved = resolveSolaraTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(resolved);
     if (!('error' in resolved) && pendingChoice.resumeTurnStart && !resolved.pendingChoice) {
       return runTurnStart(resolved);
     }
@@ -1834,6 +1850,7 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'terraTarget') {
     const resolved = resolveTerraTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(resolved);
     if (!('error' in resolved) && pendingChoice.resumeTurnAdvance && !resolved.pendingChoice) {
       return pendingChoice.effect === 'ravenRetreat'
         ? finishAdvanceToNextTurnAfterScoring(resolved)
@@ -1843,13 +1860,14 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
   }
 
   if (pendingChoice.kind === 'terraZone') {
-    return resolveTerraZoneChoice(state, pendingChoice, selectedInstanceIds);
+    return continueCombatIfNeeded(resolveTerraZoneChoice(state, pendingChoice, selectedInstanceIds));
   }
 
   if (pendingChoice.kind === 'neutralTarget') {
     const resolved = resolveNeutralTargetChoice(state, pendingChoice, selectedInstanceIds);
     if ('error' in resolved) return resolved;
     const continued = continueQueuedScoreItems(resolved);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(continued);
     if (pendingChoice.resumeTurnAdvance && !continued.pendingChoice) {
       return finishAdvanceToNextTurnAfterScoring(continued);
     }
@@ -1860,6 +1878,7 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
     const resolved = resolveCaelumTargetChoice(state, pendingChoice, selectedInstanceIds);
     if ('error' in resolved) return resolved;
     const continued = continueQueuedScoreItems(resolved);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(continued);
     if (pendingChoice.resumeTurnAdvance && !continued.pendingChoice) {
       return pendingChoice.effect === 'unyieldingStormSweep'
         ? advanceToNextTurn(continued)
@@ -1870,6 +1889,7 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'caelumZone') {
     const resolved = resolveCaelumZoneChoice(state, pendingChoice, selectedInstanceIds);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(resolved);
     if (
       !('error' in resolved) &&
       pendingChoice.resumeTurnStart &&
@@ -1882,6 +1902,7 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
 
   if (pendingChoice.kind === 'noxTarget') {
     const resolved = resolveNoxTargetChoice(state, pendingChoice, selectedInstanceIds);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(resolved);
     if (
       !('error' in resolved) &&
       pendingChoice.resumeTurnAdvance &&
@@ -2230,6 +2251,7 @@ export function resolvePendingChoice(state: GameState, selectedInstanceIds: stri
       }),
     };
     const continued = continueQueuedScoreItems(resolvedState);
+    if (pendingChoice.resumeCombat) return continueCombatIfNeeded(continued);
     return pendingChoice.resumeTurnAdvance && !continued.pendingChoice ? finishAdvanceToNextTurnAfterScoring(continued) : continued;
   }
 
@@ -3122,6 +3144,64 @@ function resolveCounterCard(state: GameState, counter: GameCardInstance): GameSt
   };
 }
 
+function resolveCounterStackAndCombat(
+  state: GameState,
+  resolvedCounters: GameCardInstance[] = []
+): CounterPriorityPassResult | { error: string } {
+  let resolvingState = state;
+  const counters = [...resolvedCounters];
+
+  while (resolvingState.pendingCombat?.counterStack.length) {
+    const pendingCombat = resolvingState.pendingCombat;
+    const counter = pendingCombat.counterStack[pendingCombat.counterStack.length - 1]!;
+    resolvingState = {
+      ...resolvingState,
+      pendingCombat: {
+        ...pendingCombat,
+        counterStack: pendingCombat.counterStack.slice(0, -1),
+      },
+    };
+    resolvingState = resolveCounterCard(resolvingState, counter);
+    counters.push(counter);
+
+    if (resolvingState.pendingChoice) {
+      return {
+        state: {
+          ...resolvingState,
+          pendingChoice: {
+            ...resolvingState.pendingChoice,
+            resumeCombat: true,
+          },
+        },
+        resolvedCombat: null,
+        resolvedCounters: counters,
+      };
+    }
+  }
+
+  const pendingCombat = resolvingState.pendingCombat;
+  if (!pendingCombat) {
+    return { error: 'No counter window is open.' };
+  }
+
+  const result = resolveBattlefieldAttack(
+    resolvingState,
+    pendingCombat.attackerOwner,
+    pendingCombat.attackerInstanceId,
+    pendingCombat.targetZone
+  );
+
+  if ('error' in result) {
+    return { error: result.error };
+  }
+
+  return {
+    state: result.state,
+    resolvedCombat: result,
+    resolvedCounters: counters,
+  };
+}
+
 export function passCounterPriority(state: GameState, owner: Owner): CounterPriorityPassResult | { error: string } {
   const pendingCombat = state.pendingCombat;
 
@@ -3138,36 +3218,13 @@ export function passCounterPriority(state: GameState, owner: Owner): CounterPrio
     (pendingCombat.lastCounterActionOwner && pendingCombat.lastCounterActionOwner !== owner) ||
     (pendingCombat.lastPassedOwner && pendingCombat.lastPassedOwner !== owner)
   ) {
-    const resolvedCounters = [...pendingCombat.counterStack].reverse();
-    let resolvingState: GameState = {
+    const resolvingState: GameState = {
       ...state,
       log: addLogEntry(state, {
         suffix: `${owner === 'player' ? 'You pass' : 'Bot passes'} counter priority. Counter window closes.`,
       }),
     };
-
-    for (const counter of resolvedCounters) {
-      resolvingState = resolveCounterCard(resolvingState, counter);
-    }
-
-    const result = resolveBattlefieldAttack(
-      resolvingState,
-      pendingCombat.attackerOwner,
-      pendingCombat.attackerInstanceId,
-      pendingCombat.targetZone
-    );
-
-    if ('error' in result) {
-      return {
-        error: result.error,
-      };
-    }
-
-    return {
-      state: result.state,
-      resolvedCombat: result,
-      resolvedCounters,
-    };
+    return resolveCounterStackAndCombat(resolvingState);
   }
 
   const nextPriorityOwner: Owner = owner === 'player' ? 'opponent' : 'player';

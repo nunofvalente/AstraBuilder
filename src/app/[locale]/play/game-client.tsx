@@ -911,6 +911,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
   function confirmPendingLucilleChoice(selectNone = false) {
     let nextResolvedState: GameState | null = null;
+    let resolvedCombatFromChoice = false;
 
     setGameState((previous) => {
       if (!previous) {
@@ -933,6 +934,13 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
       }
 
       nextResolvedState = result;
+      if (previous.pendingChoice?.resumeCombat && !result.pendingCombat) {
+        resolvedCombatFromChoice = true;
+        setAttackArrow(null);
+        if (result.activePlayer === 'opponent') {
+          scheduleBotAttackOrAdvance(BOT_POST_COMBAT_REVIEW_DELAY_MS);
+        }
+      }
       return result;
     });
 
@@ -940,7 +948,7 @@ export function GameClient({ locale, initialCards, initialError, initialMode = '
 
     const resolvedState = nextResolvedState as GameState | null;
 
-    if (resolvedState?.activePlayer === 'opponent' && !resolvedState.pendingChoice) {
+    if (!resolvedCombatFromChoice && resolvedState?.activePlayer === 'opponent' && !resolvedState.pendingChoice) {
       playAutomaticBotTurn(resolvedState);
     }
   }

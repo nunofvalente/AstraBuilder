@@ -318,6 +318,7 @@ export type PendingChoice = (
   remainingScoreItemTriggerIds?: string[];
   scoreTriggerOwner?: Owner;
   scoreTriggerZone?: ZoneId;
+  resumeCombat?: boolean;
   resumeTurnAdvance?: boolean;
   resumeTurnStart?: boolean;
 };
