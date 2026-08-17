@@ -287,9 +287,19 @@ function friendlyCombatUnits(state: GameState, owner: Owner): GameCardInstance[]
 }
 
 function enemyCombatUnits(state: GameState, owner: Owner): GameCardInstance[] {
-  return BATTLEFIELD_ZONE_IDS.flatMap((zone) =>
+  const battlefieldUnits = BATTLEFIELD_ZONE_IDS.flatMap((zone) =>
     state.zones[zone].filter((card) => isUnitCard(card.card) && getCardController(card) !== owner)
   );
+  const pendingAttacker = state.pendingCombat
+    ? findCardInstance(state, state.pendingCombat.attackerInstanceId)
+    : null;
+
+  return pendingAttacker &&
+    isUnitCard(pendingAttacker.card) &&
+    getCardController(pendingAttacker) !== owner &&
+    !battlefieldUnits.some((unit) => unit.instanceId === pendingAttacker.instanceId)
+    ? [...battlefieldUnits, pendingAttacker]
+    : battlefieldUnits;
 }
 
 function isProtectedFromEnemyTactic(state: GameState, unit: GameCardInstance, controller: Owner): boolean {

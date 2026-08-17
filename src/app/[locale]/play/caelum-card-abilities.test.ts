@@ -1017,6 +1017,48 @@ describe('Caelum card abilities', () => {
     }
   });
 
+  it('lets Radar Beacon ready Celeste to exhaust the declared attacker before combat damage', () => {
+    const attacker = makeUnit('attacker', 'opponent', {
+      card: createTestCard({ id: 'attacker', name: 'Attacker', type: 'Unit', attack: 4, health: 5 }),
+    });
+    const celeste = makeUnit('IMP041', 'player', {
+      ready: false,
+      card: createTestCard({ id: 'IMP041', name: 'Celeste, Concord Paladin', type: 'Unit', attack: 2, health: 5, affinity: 'Lux' }),
+    });
+    const beacon = makeUnit('IMP094', 'player', {
+      card: createTestCard({ id: 'IMP094', name: 'Radar Beacon', type: 'Territory', affinity: 'Caelum' }),
+    });
+    const state: GameState = {
+      ...makeState(),
+      activePlayer: 'opponent',
+      zones: {
+        ...makeState().zones,
+        battlefieldLeft: [celeste, beacon],
+      },
+      opponentZones: {
+        ...makeState().opponentZones,
+        staging: [attacker],
+      },
+    };
+
+    const declared = declareBattlefieldAttack(state, 'opponent', attacker.instanceId, 'battlefieldLeft');
+    expect(declared).not.toHaveProperty('error');
+    if (!('state' in declared)) return;
+    expect(declared.state.pendingChoice).toMatchObject({
+      kind: 'luxTarget',
+      effect: 'celesteExhaust',
+      availableInstanceIds: [attacker.instanceId],
+    });
+
+    const exhausted = resolvePendingChoice(declared.state, [attacker.instanceId]);
+    expect(exhausted).not.toHaveProperty('error');
+    if ('error' in exhausted) return;
+    const resolved = passCounterPriority(exhausted, 'player');
+    expect(resolved).not.toHaveProperty('error');
+    if (!('state' in resolved)) return;
+    expect(resolved.state.zones.battlefieldLeft.find((card) => card.instanceId === celeste.instanceId)?.damage).toBe(0);
+  });
+
   it("returns Drifter's Necklace and gains a victory point after taking an unoccupied zone", () => {
     const strategist = makeUnit('IMP072', 'player', {
       card: createTestCard({ id: 'IMP072', name: 'Master Strategist', type: 'Unit', attack: 2, health: 2, affinity: 'Caelum' }),
